@@ -1,0 +1,82 @@
+# Credentials and machine-local configuration
+.env
+.env.*
+!.env.example
+*key.txt
+*Key.txt
+*_key.txt
+*_Key.txt
+credentials*.json
+config.local.*
+secrets.*
+*.pem
+*.p12
+*.pfx
+
+# Known local configs containing credentials
+/trading_bot/config.json
+/my-trading-gui/config.json
+
+# Python and JavaScript environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*venv*/
+env/
+site-packages/
+node_modules/
+
+# Model, dataset, and experiment artifacts
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.model
+*.h5
+*.onnx
+*.exe
+*.pkl
+*.pickle
+*.joblib
+*.parquet
+*.jsonl
+*.csv
+*.tsv
+*.db
+*.sqlite
+*.sqlite3
+*.npy
+*.npz
+[Cc]heckpoints/
+[Dd]atasets/
+[Dd]ataset/
+data/
+model_artifacts/
+runs/
+outputs/
+
+# Sanitized result tables may be published deliberately here
+!evidence/**/*.csv
+!evidence/**/*.tsv
+
+# Generated operational output
+*.log
+logs/
+charts/
+coverage/
+dist/
+build/
+
+# Large archives and local OS files
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.xz
+*.gz
+*.bz2
+*.7z
+desktop.ini
+.DS_Store
