@@ -24,7 +24,7 @@ class PoolStats:
 
 
 class SharedExpandableCellPool(nn.Module):
-    """One shared population with threshold routing and growable internal micro-neurons."""
+    """One shared population with threshold routing and growable micro-neurons."""
 
     def __init__(self, config: ModelConfig) -> None:
         super().__init__()
@@ -58,6 +58,10 @@ class SharedExpandableCellPool(nn.Module):
         self.register_buffer("consolidated_mask", torch.zeros(c, dtype=torch.bool))
         self.register_buffer("maturity", torch.zeros(c))
         self.register_buffer("usage_ema", torch.zeros(c))
+        self.register_buffer("relevance_ema", torch.zeros(c))
+        self.register_buffer("contribution_ema", torch.zeros(c))
+        self.register_buffer("gradient_pressure_ema", torch.zeros(c))
+        self.register_buffer("growth_score_ema", torch.zeros(c))
         self.register_buffer("edge_mask", torch.zeros(c, c, dtype=torch.bool))
 
         with torch.no_grad():
@@ -104,16 +108,20 @@ class SharedExpandableCellPool(nn.Module):
             activity = F.silu(drive + torch.einsum("btc,cd->btd", activity, rec))
 
         micro_mask = self.micro_active_mask[idx].to(x.dtype)
-        micro_hidden = F.silu(activity.unsqueeze(-1) * self.micro_in[idx][None, None, :, :])
+        micro_hidden = F.silu(
+            activity.unsqueeze(-1) * self.micro_in[idx][None, None, :, :]
+        )
         micro_hidden = micro_hidden * micro_mask[None, None, :, :]
-        output = torch.einsum("btcm,cmd->btd", micro_hidden, self.micro_out[idx])
-        denom = micro_mask.sum(dim=-1).clamp_min(1).float().sqrt().mean()
-        output = output / denom
+
+        # Per-cell outputs are retained long enough to estimate usefulness.
+        cell_outputs = torch.einsum("btcm,cmd->btcd", micro_hidden, self.micro_out[idx])
+        per_cell_denom = micro_mask.sum(dim=-1).clamp_min(1).float().sqrt()
+        cell_outputs = cell_outputs / per_cell_denom[None, None, :, None]
+        output = cell_outputs.sum(dim=2)
 
         plastic = ~self.consolidated_mask[idx]
         if plastic.any():
-            p_hidden = micro_hidden * plastic.to(x.dtype)[None, None, :, None]
-            p_out = torch.einsum("btcm,cmd->btd", p_hidden, self.micro_out[idx]) / denom
+            p_out = cell_outputs[..., plastic, :].sum(dim=2)
             plastic_activity = hard[..., plastic].mean()
             plastic_output_rms = (p_out.square().mean() + 1e-12).sqrt()
         else:
@@ -122,9 +130,20 @@ class SharedExpandableCellPool(nn.Module):
 
         with torch.no_grad():
             usage = hard.mean((0, 1))
+            relevance = (hard * soft).mean((0, 1))
+            contribution = cell_outputs.square().mean((0, 1, 3)).sqrt()
+
             global_usage = torch.zeros_like(self.usage_ema)
+            global_relevance = torch.zeros_like(self.relevance_ema)
+            global_contribution = torch.zeros_like(self.contribution_ema)
             global_usage[idx] = usage
+            global_relevance[idx] = relevance
+            global_contribution[idx] = contribution
+
             self.usage_ema.mul_(0.99).add_(global_usage, alpha=0.01)
+            self.relevance_ema.mul_(0.99).add_(global_relevance, alpha=0.01)
+            self.contribution_ema.mul_(0.99).add_(global_contribution, alpha=0.01)
+
             aggregate = hard.sum((0, 1))
             top = idx[aggregate.topk(min(16, aggregate.numel())).indices].tolist()
 
@@ -144,6 +163,86 @@ class SharedExpandableCellPool(nn.Module):
         )
 
     @torch.no_grad()
+    def update_growth_signals(self) -> None:
+        """Update unresolved gradient pressure and the combined growth score."""
+        pressure = torch.zeros_like(self.gradient_pressure_ema)
+
+        if self.micro_out.grad is not None:
+            pressure.add_(self.micro_out.grad.square().mean(dim=(1, 2)).sqrt())
+        if self.micro_in.grad is not None:
+            pressure.add_(self.micro_in.grad.square().mean(dim=1).sqrt())
+        if self.keys.grad is not None:
+            pressure.add_(self.keys.grad.square().mean(dim=1).sqrt())
+        if self.read_vectors.grad is not None:
+            pressure.add_(self.read_vectors.grad.square().mean(dim=1).sqrt())
+
+        pressure.mul_(self.active_mask.to(pressure.dtype))
+        self.gradient_pressure_ema.mul_(0.95).add_(pressure, alpha=0.05)
+
+        saturation = self.micro_active_mask.float().mean(dim=1)
+        relevance = self._normalize_active(self.relevance_ema)
+        contribution = self._normalize_active(self.contribution_ema)
+        gradient = self._normalize_active(self.gradient_pressure_ema)
+
+        # Geometric-like product: all three signals must be present.
+        raw_score = relevance * saturation * gradient * (0.5 + 0.5 * contribution)
+        raw_score.mul_(self.active_mask.to(raw_score.dtype))
+        raw_score.masked_fill_(self.consolidated_mask, 0.0)
+        self.growth_score_ema.mul_(0.9).add_(raw_score, alpha=0.1)
+
+    @torch.no_grad()
+    def _normalize_active(self, values: torch.Tensor) -> torch.Tensor:
+        active_values = values[self.active_mask]
+        result = torch.zeros_like(values)
+        if active_values.numel() == 0:
+            return result
+        scale = active_values.max().clamp_min(1e-8)
+        result[self.active_mask] = active_values / scale
+        return result
+
+    @torch.no_grad()
+    def micro_growth_candidates(
+        self,
+        max_cells: int = 4,
+        minimum_score: float = 0.05,
+        minimum_saturation: float = 0.75,
+    ) -> list[int]:
+        saturation = self.micro_active_mask.float().mean(dim=1)
+        has_capacity = self.micro_active_mask.sum(dim=1) < self.max_micro
+        eligible = (
+            self.active_mask
+            & ~self.consolidated_mask
+            & has_capacity
+            & (saturation >= minimum_saturation)
+            & (self.growth_score_ema >= minimum_score)
+        )
+        ids = torch.nonzero(eligible, as_tuple=False).flatten()
+        if ids.numel() == 0:
+            return []
+        ranked = ids[self.growth_score_ema[ids].argsort(descending=True)]
+        return ranked[: min(max_cells, ranked.numel())].tolist()
+
+    @torch.no_grad()
+    def growth_diagnostics(self, limit: int = 8) -> list[dict[str, float | int]]:
+        ids = torch.nonzero(self.active_mask, as_tuple=False).flatten()
+        if ids.numel() == 0:
+            return []
+        ranked = ids[self.growth_score_ema[ids].argsort(descending=True)]
+        rows = []
+        for cell_id in ranked[: min(limit, ranked.numel())].tolist():
+            rows.append(
+                {
+                    "cell": int(cell_id),
+                    "score": float(self.growth_score_ema[cell_id]),
+                    "relevance": float(self.relevance_ema[cell_id]),
+                    "saturation": float(self.micro_active_mask[cell_id].float().mean()),
+                    "gradient": float(self.gradient_pressure_ema[cell_id]),
+                    "contribution": float(self.contribution_ema[cell_id]),
+                }
+            )
+        return rows
+
+    @torch.no_grad()
     def allocate_cells(self, count: int, seed: torch.Tensor | None = None) -> list[int]:
         dormant = torch.nonzero(~self.active_mask, as_tuple=False).flatten()
         chosen = dormant[: min(count, dormant.numel())]
@@ -153,7 +252,9 @@ class SharedExpandableCellPool(nn.Module):
             seed = torch.randn(self.d_model, device=self.keys.device)
         seed = F.normalize(seed.to(self.keys), dim=-1)
         established = torch.nonzero(self.active_mask, as_tuple=False).flatten()
-        parents = established[self.usage_ema[established].topk(min(self.fan_in, established.numel())).indices]
+        parents = established[
+            self.usage_ema[established].topk(min(self.fan_in, established.numel())).indices
+        ]
         for row in chosen.tolist():
             init = F.normalize(seed + 0.05 * torch.randn_like(seed), dim=-1)
             self.keys[row].copy_(init)
@@ -168,6 +269,10 @@ class SharedExpandableCellPool(nn.Module):
             self.consolidated_mask[row] = False
             self.maturity[row] = 0.0
             self.usage_ema[row] = 0.0
+            self.relevance_ema[row] = 0.0
+            self.contribution_ema[row] = 0.0
+            self.gradient_pressure_ema[row] = 0.0
+            self.growth_score_ema[row] = 0.0
             self.edge_mask[parents, row] = True
             self.recurrent[parents, row].normal_(0.0, 0.02)
             self.edge_mask[row, row] = True
@@ -175,11 +280,13 @@ class SharedExpandableCellPool(nn.Module):
         return chosen.tolist()
 
     @torch.no_grad()
-    def grow_micro_neurons(self, count: int, cell_ids: list[int] | None = None) -> dict[int, list[int]]:
+    def grow_micro_neurons(
+        self,
+        count: int,
+        cell_ids: list[int] | None = None,
+    ) -> dict[int, list[int]]:
         if cell_ids is None:
-            active = torch.nonzero(self.active_mask, as_tuple=False).flatten()
-            ranked = active[self.usage_ema[active].argsort(descending=True)]
-            cell_ids = ranked[: min(8, ranked.numel())].tolist()
+            cell_ids = self.micro_growth_candidates()
         grown: dict[int, list[int]] = {}
         for cell_id in cell_ids:
             free = torch.nonzero(~self.micro_active_mask[cell_id], as_tuple=False).flatten()
@@ -205,11 +312,18 @@ class SharedExpandableCellPool(nn.Module):
             if p.grad is not None:
                 p.grad.mul_(row_scale)
         if self.micro_in.grad is not None:
-            self.micro_in.grad.mul_(row_scale[:, None] * self.micro_active_mask.to(row_scale.dtype))
+            self.micro_in.grad.mul_(
+                row_scale[:, None] * self.micro_active_mask.to(row_scale.dtype)
+            )
         if self.micro_out.grad is not None:
-            self.micro_out.grad.mul_(row_scale[:, None, None] * self.micro_active_mask[:, :, None].to(row_scale.dtype))
+            self.micro_out.grad.mul_(
+                row_scale[:, None, None]
+                * self.micro_active_mask[:, :, None].to(row_scale.dtype)
+            )
         if self.recurrent.grad is not None:
-            self.recurrent.grad.mul_(row_scale[None, :] * self.edge_mask.to(row_scale.dtype))
+            self.recurrent.grad.mul_(
+                row_scale[None, :] * self.edge_mask.to(row_scale.dtype)
+            )
 
     @torch.no_grad()
     def advance_maturity(self) -> None:
