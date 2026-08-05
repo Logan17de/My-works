@@ -116,7 +116,7 @@ def main() -> None:
     parser.add_argument(
         "--show-routing",
         action="store_true",
-        help="Print the selected cell IDs in each routing bank.",
+        help="Print selected cells and bank gate strengths for each prompt.",
     )
     args = parser.parse_args()
 
@@ -139,7 +139,7 @@ def main() -> None:
         checkpoint["model_state"]
     )
     if missing:
-        print("Initialized missing V2 fields:", missing)
+        print("Initialized missing architecture fields:", missing)
     if unexpected:
         print("Ignored unexpected fields:", unexpected)
     model.to(device).eval()
@@ -175,7 +175,9 @@ def main() -> None:
 
         if args.show_routing:
             routing = model(input_ids)
-            print("Routing:", routing["bank_top_ids"])
+            print("Selected cells:", routing["bank_top_ids"])
+            print("Gate means:", routing["bank_gate_means"])
+            print("Gate maxes:", routing["bank_gate_maxes"])
 
         answer = generate_until_stop(
             model=model,
