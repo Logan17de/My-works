@@ -19,14 +19,11 @@ def load_checkpoint(path: str | Path) -> dict:
 
 
 def prepare_prompt(prompt: str, raw_prompt: bool) -> str:
-    """Match the training format unless the caller explicitly requests raw text."""
     prompt = prompt.strip()
     if raw_prompt:
         return prompt
-
     if prompt.startswith("<Q>"):
         return prompt if "<A>" in prompt else f"{prompt}\n<A>"
-
     return f"<Q> {prompt}\n<A>"
 
 
@@ -40,12 +37,6 @@ def generate_until_stop(
     top_k: int,
     stop_texts: tuple[str, ...],
 ) -> str:
-    """
-    Generate one token at a time and stop as soon as an end marker appears.
-
-    The previous chat implementation generated a fixed 120-token continuation,
-    so after a correct answer it continued into the next memorized <Q> example.
-    """
     generated = input_ids
     answer_ids: list[int] = []
 
@@ -54,18 +45,35 @@ def generate_until_stop(
         logits = model(context)["logits"][:, -1, :]
 
         if temperature <= 0.0 or top_k == 1:
-            next_token = torch.argmax(logits, dim=-1, keepdim=True)
+            next_token = torch.argmax(
+                logits,
+                dim=-1,
+                keepdim=True,
+            )
         else:
             logits = logits / max(temperature, 1e-5)
             if top_k > 0:
-                k = min(top_k, logits.size(-1))
-                threshold = torch.topk(logits, k=k, dim=-1).values[:, -1:]
-                logits = logits.masked_fill(logits < threshold, float("-inf"))
+                selected = min(top_k, logits.size(-1))
+                threshold = torch.topk(
+                    logits,
+                    k=selected,
+                    dim=-1,
+                ).values[:, -1:]
+                logits = logits.masked_fill(
+                    logits < threshold,
+                    float("-inf"),
+                )
             probabilities = F.softmax(logits, dim=-1)
-            next_token = torch.multinomial(probabilities, num_samples=1)
+            next_token = torch.multinomial(
+                probabilities,
+                num_samples=1,
+            )
 
         token_id = int(next_token.item())
-        generated = torch.cat((generated, next_token), dim=1)
+        generated = torch.cat(
+            (generated, next_token),
+            dim=1,
+        )
         answer_ids.append(token_id)
 
         if token_id == tokenizer.eos_token_id:
@@ -76,8 +84,6 @@ def generate_until_stop(
             break
 
     decoded = tokenizer.decode(answer_ids)
-
-    # Keep only the answer, even when the model skipped <END> and started a new Q.
     earliest_stop = len(decoded)
     for marker in stop_texts:
         position = decoded.find(marker)
@@ -98,31 +104,49 @@ def main() -> None:
         "--temperature",
         type=float,
         default=0.0,
-        help="0 uses deterministic greedy decoding, recommended for arithmetic.",
+        help="0 uses deterministic greedy decoding.",
     )
     parser.add_argument("--top-k", type=int, default=1)
     parser.add_argument(
         "--stop-text",
         action="append",
         default=None,
-        help="Text marker that ends generation. May be supplied repeatedly.",
     )
+    parser.add_argument("--raw-prompt", action="store_true")
     parser.add_argument(
-        "--raw-prompt",
+        "--show-routing",
         action="store_true",
-        help="Do not wrap input as '<Q> ...\\n<A>'.",
+        help="Print the selected cell IDs in each routing bank.",
     )
     args = parser.parse_args()
 
-    stop_texts = tuple(args.stop_text or ("<END>", "<Q>"))
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    stop_texts = tuple(
+        args.stop_text or ("<END>", "<Q>")
+    )
+    device = torch.device(
+        "cuda" if torch.cuda.is_available() else "cpu"
+    )
     checkpoint = load_checkpoint(args.checkpoint)
-    tokenizer = DynamicByteTokenizer.from_dict(checkpoint["tokenizer"])
-    model = ContinualCellTransformer(ModelConfig.from_dict(checkpoint["model_config"]))
-    model.load_state_dict(checkpoint["model_state"])
+    tokenizer = DynamicByteTokenizer.from_dict(
+        checkpoint["tokenizer"]
+    )
+    model = ContinualCellTransformer(
+        ModelConfig.from_dict(
+            checkpoint["model_config"]
+        )
+    )
+    missing, unexpected = model.load_compatible_state_dict(
+        checkpoint["model_state"]
+    )
+    if missing:
+        print("Initialized missing V2 fields:", missing)
+    if unexpected:
+        print("Ignored unexpected fields:", unexpected)
     model.to(device).eval()
 
     print("Continual Cell Transformer. Type /quit to exit.")
+    print("Routing banks:", model.bank_summaries())
+
     while True:
         try:
             user_prompt = input("\nYou: ")
@@ -135,9 +159,23 @@ def main() -> None:
         if not user_prompt.strip():
             continue
 
-        model_prompt = prepare_prompt(user_prompt, args.raw_prompt)
-        prompt_ids = tokenizer.encode(model_prompt, add_bos=True)
-        input_ids = torch.tensor([prompt_ids], dtype=torch.long, device=device)
+        model_prompt = prepare_prompt(
+            user_prompt,
+            args.raw_prompt,
+        )
+        prompt_ids = tokenizer.encode(
+            model_prompt,
+            add_bos=True,
+        )
+        input_ids = torch.tensor(
+            [prompt_ids],
+            dtype=torch.long,
+            device=device,
+        )
+
+        if args.show_routing:
+            routing = model(input_ids)
+            print("Routing:", routing["bank_top_ids"])
 
         answer = generate_until_stop(
             model=model,
