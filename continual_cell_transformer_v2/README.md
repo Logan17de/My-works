@@ -24,7 +24,18 @@ a plastic residual is favored only when the new bank matches the state better.
 Only the plastic bank, its adapter and gate are trainable during continual
 learning.
 
+## Colab setup
+
+```bash
+!git pull origin agent/continual-cell-transformer
+%cd /content/My-works/continual_cell_transformer_v2
+!pip install -r requirements.txt
+!python -m py_compile config.py tokenizer.py model.py train.py chat.py inspect_routes.py
+```
+
 ## Import the trained V1 addition checkpoint and learn multiplication
+
+Run this from `continual_cell_transformer_v2/`:
 
 ```bash
 python train.py \
