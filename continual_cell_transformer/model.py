@@ -105,7 +105,7 @@ class RecurrentTransformerBlock(nn.Module):
 
 
 class ContinualCellTransformer(nn.Module):
-    ARCHITECTURE_VERSION = 5
+    ARCHITECTURE_VERSION = 6
 
     def __init__(self, config: ModelConfig) -> None:
         super().__init__()
@@ -227,8 +227,47 @@ class ContinualCellTransformer(nn.Module):
         return self.block.cells.allocate_cells(count, seed)
 
     @torch.no_grad()
-    def grow_micro_neurons(self, count: int) -> dict[int, list[int]]:
-        return self.block.cells.grow_micro_neurons(count)
+    def grow_micro_neurons(
+        self,
+        count: int,
+        cell_ids: list[int] | None = None,
+    ) -> dict[int, list[int]]:
+        return self.block.cells.grow_micro_neurons(count, cell_ids)
+
+    @torch.no_grad()
+    def intelligent_capacity_growth(
+        self,
+        micro_count: int,
+        outer_cell_count: int,
+        seed: torch.Tensor | None,
+        max_candidate_cells: int = 4,
+        minimum_score: float = 0.05,
+        minimum_saturation: float = 0.75,
+    ) -> dict[str, object]:
+        candidates = self.block.cells.micro_growth_candidates(
+            max_cells=max_candidate_cells,
+            minimum_score=minimum_score,
+            minimum_saturation=minimum_saturation,
+        )
+        if candidates:
+            return {
+                "mode": "micro",
+                "candidates": candidates,
+                "grown": self.grow_micro_neurons(micro_count, candidates),
+            }
+        return {
+            "mode": "outer_cell",
+            "candidates": [],
+            "grown": self.allocate_cells(outer_cell_count, seed),
+        }
+
+    @torch.no_grad()
+    def update_growth_signals(self) -> None:
+        self.block.cells.update_growth_signals()
+
+    @torch.no_grad()
+    def growth_diagnostics(self, limit: int = 8) -> list[dict[str, float | int]]:
+        return self.block.cells.growth_diagnostics(limit)
 
     def mask_cell_gradients(self, consolidated_scale: float) -> None:
         self.block.cells.mask_gradients(consolidated_scale)
