@@ -1,42 +1,33 @@
 # Continual Cell Transformer V4
 
-A research prototype for continual learning with one shared recurrent cell
-population inside a causal Transformer.
+A research prototype for continual learning with **one shared recurrent cell population** inside a causal RoPE Transformer.
 
-V4 removes named routing banks. Addition, multiplication, chemistry and other
-concepts are not assigned separate blocks. They must emerge as overlapping
-activation patterns inside the same population.
+The banked architecture has been removed. There are no addition, multiplication, chemistry, or other manually named task blocks. Concepts must emerge as overlapping activation patterns in the same population.
 
-## Core mechanism
+## Architecture
 
-After attention:
+```text
+Embedding
+  ↓
+Causal attention with RoPE
+  ↓
+Shared threshold-routed recurrent cells
+  ↓
+Main FFN
+```
 
-1. Every active cell compares its key with the contextual token state.
-2. A cell activates only when its own learned threshold is exceeded.
-3. Active cells communicate through sparse recurrent links.
-4. Their latent outputs are added back to the Transformer state.
-5. New concepts may recruit dormant cells.
+Each cell owns a key, activation threshold, read vector, write vector, bias, and sparse recurrent incoming links.
 
-There is no global top-k competition. Adding a cell cannot push an old cell out
-of the route.
+- Cells activate independently; there is no global top-k competition.
+- Adding a cell cannot push an old cell out of the route.
+- New cells receive old-to-new links, but allocation creates no new-to-old links.
+- New cells start with exactly zero write vectors, so allocation has zero immediate effect on existing outputs.
+- Consolidated cells can be frozen while recruited cells remain plastic.
+- Retention replay and an old-task output penalty discourage new cells from interfering with earlier concepts.
 
-New cells start with zero write vectors, so allocation has no immediate effect
-on the model output. They receive inbound links from established cells but no
-new-to-old links.
+## Checkpoint boundary
 
-## Files
-
-- `config.py` — Transformer and shared-population settings
-- `model.py` — RoPE Transformer and threshold-routed recurrent cells
-- `tokenizer.py` — UTF-8 fallback plus append-only token insertion
-- `train.py` — base and continual training, replay and retention metrics
-- `chat.py` — deterministic chat with shared-population telemetry
-
-## Important checkpoint boundary
-
-V4 changes routing from top-k/banks to independent thresholds. Old V1–V3
-checkpoints can be loaded for inspection, but their exact old routing is not
-preserved. Controlled experiments should retrain the base task with V4.
+V1-V3 banked checkpoints are intentionally unsupported. Retrain the base task once using V4.
 
 ## Base addition training
 
@@ -58,16 +49,13 @@ python train.py \
   --d-ff 512 \
   --max-cells 256 \
   --initial-cells 64 \
-  --recurrent-fan-in 8 \
-  --cell-maturity-steps 2000 \
   --embedding-lr 2e-4 \
   --attention-lr 2e-4 \
   --ffn-lr 2e-4 \
   --cell-lr 5e-4 \
   --other-lr 2e-4 \
-  --mature-cell-scale 1.0 \
   --weight-decay 0 \
-  --seal-active-cells
+  --consolidate-active-cells
 ```
 
 ## Continual multiplication update
@@ -81,7 +69,7 @@ python train.py \
   --out-dir runs/multiplication_v4 \
   --allocate-cells 16 \
   --allocation-seed-batches 8 \
-  --steps 1000 \
+  --steps 1200 \
   --batch-size 32 \
   --seq-len 16 \
   --eval-interval 50 \
@@ -92,14 +80,16 @@ python train.py \
   --attention-lr 0 \
   --ffn-lr 0 \
   --other-lr 0 \
-  --cell-lr 1e-3 \
-  --mature-cell-scale 0 \
+  --cell-lr 5e-4 \
+  --consolidated-cell-scale 0 \
   --retention-replay-weight 1.0 \
+  --plastic-sparsity-weight 0.02 \
   --retention-output-penalty 10.0 \
-  --activity-sparsity-weight 0.01 \
   --weight-decay 0 \
-  --seal-active-cells
+  --consolidate-active-cells
 ```
+
+The trainer verifies the zero-impact allocation invariant before training and aborts if new cells alter the old logits by more than `1e-5`.
 
 ## Chat and inspect activity
 
@@ -109,15 +99,14 @@ python chat.py \
   --show-routing
 ```
 
-The routing output now reports active shared-population cell IDs, activity
-fraction, mean gate strength and the contribution from newly recruited cells.
+Telemetry includes population coverage, plastic-cell activity, plastic output RMS, active/consolidated/plastic counts, and the most active cell IDs.
 
 ## What counts as success
 
 - multiplication held-out loss falls;
-- addition retention loss stays near its pre-update value;
-- recruited cells contribute strongly on multiplication;
+- addition retention loss stays close to its pre-update value;
+- newly recruited cells contribute on multiplication;
 - their output remains near zero on addition;
-- addition and multiplication exact-answer accuracy both remain high.
+- exact-answer accuracy remains high on both tasks.
 
 This remains an experimental architecture, not evidence of human-like learning.
