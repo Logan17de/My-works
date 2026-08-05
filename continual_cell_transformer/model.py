@@ -246,8 +246,6 @@ class SharedThresholdCellPool(nn.Module):
                 drive + torch.einsum("btc,cd->btd", activity, recurrent)
             )
 
-        # A fixed normalizer is essential: an active-count normalizer would let
-        # zero-output cell insertion change old outputs indirectly.
         output = (
             torch.einsum("btc,cd->btd", activity, writes)
             / math.sqrt(max(1, self.recurrent_fan_in))
@@ -305,11 +303,9 @@ class SharedThresholdCellPool(nn.Module):
     ) -> list[int]:
         if count <= 0:
             return []
-
         dormant = torch.nonzero(~self.active_mask, as_tuple=False).flatten()
         if dormant.numel() == 0:
             return []
-
         chosen = dormant[: min(count, dormant.numel())]
         existing = torch.nonzero(self.active_mask, as_tuple=False).flatten()
 
@@ -332,8 +328,6 @@ class SharedThresholdCellPool(nn.Module):
             initialized = F.normalize(seed + noise, dim=-1)
             self.keys[row].copy_(initialized)
             self.read_vectors[row].copy_(initialized)
-
-            # Zero-impact insertion: no output change at allocation time.
             self.write_vectors[row].zero_()
             self.bias[row] = 0.0
             self.thresholds[row] = self.new_cell_threshold
@@ -342,8 +336,6 @@ class SharedThresholdCellPool(nn.Module):
             self.consolidated_mask[row] = False
             self.active_mask[row] = True
 
-            # Existing cells may drive the new cell, but new cells do not alter
-            # existing old targets. Allocation therefore preserves old dynamics.
             if parents.numel() > 0:
                 self.edge_mask[parents, row] = True
                 self.recurrent[parents, row].normal_(0.0, 0.02)
@@ -393,8 +385,6 @@ class SharedThresholdCellPool(nn.Module):
                 parameter.grad.mul_(row_scale)
 
         if self.recurrent.grad is not None:
-            # An edge changes the target cell's dynamics, so plasticity follows
-            # the target row. Old consolidated targets remain stable.
             edge_scale = row_scale[None, :] * self.edge_mask.to(row_scale.dtype)
             self.recurrent.grad.mul_(edge_scale)
 
@@ -464,11 +454,7 @@ class ContinualCellTransformer(nn.Module):
                     module.weight[module.padding_idx].zero_()
 
     def pools(self) -> list[SharedThresholdCellPool]:
-        return [
-            block.pool
-            for block in self.blocks
-            if block.pool is not None
-        ]
+        return [block.pool for block in self.blocks if block.pool is not None]
 
     def forward(
         self,
