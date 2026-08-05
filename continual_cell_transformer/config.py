@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass
 from typing import Any
 
 
@@ -15,18 +15,19 @@ class ModelConfig:
     dropout: float = 0.1
     rope_base: float = 10_000.0
 
-    # Shared threshold-routed recurrent population.
+    # A single shared recurrent population is inserted after attention in these blocks.
     cell_layers: tuple[int, ...] = (1, 3)
     max_cells: int = 256
     initial_active_cells: int = 64
     recurrent_steps: int = 2
     recurrent_fan_in: int = 8
     cell_residual_scale: float = 0.10
-    cell_match_temperature: float = 0.70
-    initial_cell_threshold: float = 0.15
-    new_cell_threshold: float = 0.05
-    cell_output_normalizer: float = 8.0
-    cell_maturity_steps: int = 2_000
+
+    # Threshold routing: cells activate independently; there is no global top-k.
+    threshold_temperature: float = 0.08
+    initial_threshold: float = 0.10
+    new_cell_threshold: float = 0.00
+    cell_maturity_steps: int = 500
 
     pad_token_id: int = 0
     bos_token_id: int = 1
@@ -39,12 +40,8 @@ class ModelConfig:
             raise ValueError("initial_active_cells must be in [1, max_cells].")
         if self.recurrent_fan_in <= 0:
             raise ValueError("recurrent_fan_in must be positive.")
-        if self.cell_match_temperature <= 0:
-            raise ValueError("cell_match_temperature must be positive.")
-        if self.cell_output_normalizer <= 0:
-            raise ValueError("cell_output_normalizer must be positive.")
-        if self.cell_maturity_steps <= 0:
-            raise ValueError("cell_maturity_steps must be positive.")
+        if self.threshold_temperature <= 0:
+            raise ValueError("threshold_temperature must be positive.")
         if any(layer < 0 or layer >= self.n_layers for layer in self.cell_layers):
             raise ValueError("Every cell_layers index must refer to an existing block.")
 
@@ -55,9 +52,7 @@ class ModelConfig:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ModelConfig":
-        # Ignore fields from older bank-based checkpoints.
-        valid = {item.name for item in fields(cls)}
-        clean = {key: value for key, value in dict(data).items() if key in valid}
+        clean = dict(data)
         clean["cell_layers"] = tuple(clean.get("cell_layers", (1, 3)))
         return cls(**clean)
 
@@ -77,18 +72,18 @@ class TrainConfig:
     ffn_lr: float = 5e-5
     cell_lr: float = 2e-4
     other_lr: float = 5e-5
-    mature_cell_scale: float = 0.02
+    consolidated_cell_scale: float = 0.02
 
     retention_replay_weight: float = 0.0
+    plastic_sparsity_weight: float = 0.0
     retention_output_penalty: float = 0.0
-    activity_sparsity_weight: float = 0.0
 
     enable_growth: bool = False
     growth_warmup_steps: int = 100
     growth_patience: int = 40
     growth_cells: int = 8
-    growth_loss_floor: float = 1.5
-    growth_active_fraction: float = 0.20
+    growth_loss_floor: float = 1.0
+    growth_coverage_ceiling: float = 1.0
     max_growth_events: int = 1
     growth_cooldown_steps: int = 100
 
