@@ -1,102 +1,123 @@
-# Continual Cell Transformer
+# Continual Cell Transformer V4
 
-Research prototype combining a causal Transformer with sparse recurrent concept-cell pools, append-only token insertion, local plasticity and expandable routing banks.
+A research prototype for continual learning with one shared recurrent cell
+population inside a causal Transformer.
 
-This does **not** prove human-like learning. The testable claim is narrower: a new task should learn through a newly allocated routing bank without displacing the routes used by older tasks.
+V4 removes named routing banks. Addition, multiplication, chemistry and other
+concepts are not assigned separate blocks. They must emerge as overlapping
+activation patterns inside the same population.
 
-## V2: stable routing banks
+## Core mechanism
 
-The first version placed every active cell in one global top-k competition. New cells could therefore displace old cells even when every old weight was frozen.
+After attention:
 
-V2 changes that design:
+1. Every active cell compares its key with the contextual token state.
+2. A cell activates only when its own learned threshold is exceeded.
+3. Active cells communicate through sparse recurrent links.
+4. Their latent outputs are added back to the Transformer state.
+5. New concepts may recruit dormant cells.
 
-- the original cells remain in bank `0`;
-- each allocation event creates a separate bank;
-- top-k routing happens independently inside each bank;
-- new banks may read the detached output of older banks;
-- every new bank owns a trainable output adapter;
-- sealed banks can be completely frozen with `--mature-cell-scale 0`;
-- automatic growth is capped by `--max-growth-events`;
-- `--allocate-cells` is the preferred controlled experiment.
+There is no global top-k competition. Adding a cell cannot push an old cell out
+of the route.
+
+New cells start with zero write vectors, so allocation has no immediate effect
+on the model output. They receive inbound links from established cells but no
+new-to-old links.
 
 ## Files
 
-- `config.py` — architecture, routing-bank and plasticity settings
-- `model.py` — RoPE Transformer, stable multi-bank routing and vocabulary resizing
-- `tokenizer.py` — UTF-8 byte fallback plus append-only concept tokens
-- `train.py` — initial/continual training, held-out evaluation and retention checks
-- `chat.py` — deterministic interactive generation with optional routing telemetry
+- `config.py` — Transformer and shared-population settings
+- `model.py` — RoPE Transformer and threshold-routed recurrent cells
+- `tokenizer.py` — UTF-8 fallback plus append-only token insertion
+- `train.py` — base and continual training, replay and retention metrics
+- `chat.py` — deterministic chat with shared-population telemetry
 
-## Initial addition training
+## Important checkpoint boundary
+
+V4 changes routing from top-k/banks to independent thresholds. Old V1–V3
+checkpoints can be loaded for inspection, but their exact old routing is not
+preserved. Controlled experiments should retrain the base task with V4.
+
+## Base addition training
 
 ```bash
 python train.py \
   --train-file data/addition_train.txt \
   --eval-file data/addition_eval.txt \
-  --out-dir runs/addition_v2 \
-  --steps 3000 \
+  --out-dir runs/addition_v4 \
+  --steps 2000 \
   --batch-size 32 \
   --seq-len 16 \
   --eval-interval 50 \
+  --eval-batches 20 \
   --early-stop-patience 8 \
+  --early-stop-min-delta 0.001 \
   --d-model 128 \
   --layers 4 \
   --heads 4 \
   --d-ff 512 \
   --max-cells 256 \
   --initial-cells 64 \
-  --top-k-cells 8 \
+  --recurrent-fan-in 8 \
+  --cell-maturity-steps 2000 \
+  --embedding-lr 2e-4 \
+  --attention-lr 2e-4 \
+  --ffn-lr 2e-4 \
+  --cell-lr 5e-4 \
+  --other-lr 2e-4 \
+  --mature-cell-scale 1.0 \
+  --weight-decay 0 \
   --seal-active-cells
 ```
 
 ## Continual multiplication update
 
-Use the clean addition checkpoint, not the failed single-bank multiplication checkpoint.
-
 ```bash
 python train.py \
-  --resume runs/addition_v2/checkpoint.pt \
+  --resume runs/addition_v4/checkpoint.pt \
   --train-file data/multiplication_train.txt \
   --eval-file data/multiplication_eval.txt \
   --retention-file data/addition_eval.txt \
-  --out-dir runs/multiplication_v2 \
-  --allocate-cells 8 \
-  --freeze-backbone \
-  --mature-cell-scale 0 \
-  --cell-lr 5e-4 \
-  --weight-decay 0 \
-  --steps 1500 \
+  --out-dir runs/multiplication_v4 \
+  --allocate-cells 16 \
+  --allocation-seed-batches 8 \
+  --steps 1000 \
   --batch-size 32 \
   --seq-len 16 \
   --eval-interval 50 \
   --eval-batches 20 \
   --early-stop-patience 8 \
-  --log-cell-routing \
+  --early-stop-min-delta 0.001 \
+  --embedding-lr 0 \
+  --attention-lr 0 \
+  --ffn-lr 0 \
+  --other-lr 0 \
+  --cell-lr 1e-3 \
+  --mature-cell-scale 0 \
+  --retention-replay-weight 1.0 \
+  --retention-output-penalty 10.0 \
+  --activity-sparsity-weight 0.01 \
+  --weight-decay 0 \
   --seal-active-cells
 ```
 
-Expected bank layout:
-
-```text
-routing banks: [{0: 64, 1: 8}, {0: 64, 1: 8}]
-```
-
-The trainer separately reports:
-
-- old-task loss before allocation;
-- old-task loss immediately after allocation;
-- multiplication held-out loss during training;
-- old-task loss after training;
-- selected cell IDs inside each bank.
-
-## Chat and inspect routing
+## Chat and inspect activity
 
 ```bash
 python chat.py \
-  --checkpoint runs/multiplication_v2/checkpoint.pt \
+  --checkpoint runs/multiplication_v4/checkpoint.pt \
   --show-routing
 ```
 
-## Important boundary
+The routing output now reports active shared-population cell IDs, activity
+fraction, mean gate strength and the contribution from newly recruited cells.
 
-Separate banks preserve routing competition, but they do not guarantee that eight new cells have enough capacity to learn multiplication through a frozen backbone. If multiplication fails while addition remains stable, the next question is capacity or interface expressiveness—not catastrophic forgetting.
+## What counts as success
+
+- multiplication held-out loss falls;
+- addition retention loss stays near its pre-update value;
+- recruited cells contribute strongly on multiplication;
+- their output remains near zero on addition;
+- addition and multiplication exact-answer accuracy both remain high.
+
+This remains an experimental architecture, not evidence of human-like learning.
