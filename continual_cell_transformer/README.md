@@ -6,8 +6,6 @@ V5 combines three adaptive mechanisms in one model:
 2. **Shared expandable cell population** — cells activate independently through learned thresholds. There are no named task banks and no global top-k competition.
 3. **Expandable cell interiors** — each cell starts with a small number of active micro-neurons and can activate more internal capacity later.
 
-## Learning policy
-
 Prediction loss trains the model. A depth penalty rewards the cheapest sufficient computation. Loss plateaus plus high population coverage can recruit new cells. Loss plateaus plus saturated internal capacity can activate new micro-neurons. Both forms of growth start with zero output vectors, so allocation is checked to have no immediate effect on existing logits.
 
 The Transformer backbone remains slightly plastic through separate low learning rates, while new cells and micro-neurons learn much faster. Consolidated cell rows receive a configurable gradient scale.
