@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -43,7 +44,9 @@ class RotaryEmbedding(nn.Module):
         self.register_buffer("sin", angles.sin(), persistent=False)
 
     def forward(
-        self, q: torch.Tensor, k: torch.Tensor
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         length = q.size(-2)
         cos = self.cos[:length].to(q)[None, None]
@@ -74,7 +77,10 @@ class CausalSelfAttention(nn.Module):
 
         def split_heads(tensor: torch.Tensor) -> torch.Tensor:
             return tensor.view(
-                batch, length, self.heads, self.head_dim
+                batch,
+                length,
+                self.heads,
+                self.head_dim,
             ).transpose(1, 2)
 
         q, k, v = map(split_heads, (q, k, v))
@@ -104,69 +110,55 @@ class SwiGLU(nn.Module):
 
 @dataclass
 class PoolStats:
-    confidence: torch.Tensor
     seed: torch.Tensor
+    parent_ids: list[int]
     active_count: int
-    bank_counts: dict[int, int]
-    bank_top_ids: dict[int, list[int]]
-    bank_gate_means: dict[int, torch.Tensor]
-    bank_gate_maxes: dict[int, torch.Tensor]
+    active_fraction: torch.Tensor
+    active_ids: list[int]
+    mean_gate: torch.Tensor
+    plastic_gate_mean: torch.Tensor
+    plastic_output_rms: torch.Tensor
 
 
-class RecurrentConceptPool(nn.Module):
+class ThresholdRecurrentCellPool(nn.Module):
     """
-    Stable append-only routing banks with local token-wise gates.
+    One shared recurrent population.
 
-    Bank 0 is the original route and is always on. Every later bank:
-      * competes only inside itself for top-k cells;
-      * owns a separate output adapter;
-      * owns a separate gate key and bias;
-      * adds a gated residual rather than replacing the old route.
+    Cells activate independently when their contextual match exceeds their own
+    threshold. There is no global top-k competition and no named domain bank.
 
-    This lets several banks cooperate while preventing a new bank from
-    displacing an old bank's selected cells.
+    New cells:
+      * are appended from a dormant reserve;
+      * receive keys/read vectors seeded from the new context;
+      * start with exactly zero write vectors, so insertion has zero immediate
+        effect on old outputs;
+      * receive inbound edges from established cells, but no new -> old edges.
     """
 
     def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         cells, dim = config.max_cells, config.d_model
-        self.top_k = config.top_k_cells
+        self.max_cells = cells
+        self.dim = dim
         self.steps = config.recurrent_steps
         self.fan_in = config.recurrent_fan_in
-        self.temperature = config.cell_temperature
-        self.maturity_steps = max(1, config.cell_maturity_steps)
-        self.max_banks = config.max_cell_banks
-        self.new_bank_adapter_scale = config.new_bank_adapter_scale
-        self.bank_context_scale = config.bank_context_scale
-        self.bank_gate_temperature = config.bank_gate_temperature
-        self.new_bank_gate_bias = config.new_bank_gate_bias
+        self.match_temperature = config.cell_match_temperature
+        self.new_cell_threshold = config.new_cell_threshold
+        self.output_normalizer = config.cell_output_normalizer
+        self.maturity_steps = config.cell_maturity_steps
 
         self.keys = nn.Parameter(torch.randn(cells, dim) * 0.02)
         self.read_vectors = nn.Parameter(torch.randn(cells, dim) * 0.02)
         self.write_vectors = nn.Parameter(torch.randn(cells, dim) * 0.01)
         self.bias = nn.Parameter(torch.zeros(cells))
-        self.recurrent = nn.Parameter(torch.zeros(cells, cells))
-
-        self.bank_adapters = nn.Parameter(torch.zeros(self.max_banks, dim, dim))
-        self.bank_gate_keys = nn.Parameter(torch.randn(self.max_banks, dim) * 0.02)
-        self.bank_gate_bias = nn.Parameter(
-            torch.full((self.max_banks,), self.new_bank_gate_bias)
+        self.thresholds = nn.Parameter(
+            torch.full((cells,), config.initial_cell_threshold)
         )
+        self.recurrent = nn.Parameter(torch.zeros(cells, cells))
 
         active = torch.zeros(cells, dtype=torch.bool)
         active[: config.initial_active_cells] = True
-        bank_ids = torch.full((cells,), -1, dtype=torch.long)
-        bank_ids[: config.initial_active_cells] = 0
-        bank_active = torch.zeros(self.max_banks, dtype=torch.bool)
-        bank_active[0] = True
-
         self.register_buffer("active_mask", active)
-        self.register_buffer("bank_ids", bank_ids)
-        self.register_buffer("bank_active", bank_active)
-        self.register_buffer(
-            "bank_sealed",
-            torch.zeros(self.max_banks, dtype=torch.bool),
-        )
         self.register_buffer("maturity", torch.zeros(cells))
         self.register_buffer("usage_ema", torch.zeros(cells))
         self.register_buffer(
@@ -177,261 +169,199 @@ class RecurrentConceptPool(nn.Module):
         with torch.no_grad():
             self.keys.copy_(F.normalize(self.keys, dim=-1))
             self.read_vectors.copy_(F.normalize(self.read_vectors, dim=-1))
-            self.bank_gate_keys.copy_(F.normalize(self.bank_gate_keys, dim=-1))
-
-            identity = torch.eye(dim)
-            self.bank_adapters[0].copy_(identity)
-            self.bank_gate_bias[0] = 20.0
-            for bank_id in range(1, self.max_banks):
-                self.bank_adapters[bank_id].copy_(
-                    identity * self.new_bank_adapter_scale
-                )
-
-            self._initialize_bank_edges(
-                torch.arange(config.initial_active_cells),
+            self._initialize_base_edges(
+                torch.arange(config.initial_active_cells)
             )
 
     @property
     def active_count(self) -> int:
         return int(self.active_mask.sum().item())
 
-    @property
-    def active_bank_count(self) -> int:
-        return int(self.bank_active.sum().item())
-
-    def _initialize_bank_edges(self, indices: torch.Tensor) -> None:
+    def _initialize_base_edges(self, indices: torch.Tensor) -> None:
         if indices.numel() == 0:
             return
         for target in indices.tolist():
-            source_count = min(self.fan_in, indices.numel())
-            sources = indices[
-                torch.randperm(indices.numel(), device=indices.device)[
-                    :source_count
-                ]
-            ]
+            count = min(self.fan_in, indices.numel())
+            order = torch.randperm(indices.numel(), device=indices.device)[:count]
+            sources = indices[order]
             self.edge_mask[sources, target] = True
             self.recurrent[sources, target].normal_(0.0, 0.02)
             self.edge_mask[target, target] = True
             self.recurrent[target, target] = 0.01
 
-    def _run_bank(
-        self,
-        x: torch.Tensor,
-        indices: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, list[int]]:
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, PoolStats]:
+        indices = torch.nonzero(
+            self.active_mask,
+            as_tuple=False,
+        ).flatten()
+
+        if indices.numel() == 0:
+            zero = torch.zeros_like(x)
+            scalar = x.new_tensor(0.0)
+            return zero, PoolStats(
+                seed=x.detach().mean(dim=(0, 1)),
+                parent_ids=[],
+                active_count=0,
+                active_fraction=scalar,
+                active_ids=[],
+                mean_gate=scalar,
+                plastic_gate_mean=scalar,
+                plastic_output_rms=scalar,
+            )
+
+        normalized_x = F.normalize(x, dim=-1)
         keys = F.normalize(self.keys[indices], dim=-1)
         reads = F.normalize(self.read_vectors[indices], dim=-1)
         writes = self.write_vectors[indices]
 
-        scores = (
-            torch.einsum(
-                "btd,cd->btc",
-                F.normalize(x, dim=-1),
-                keys,
-            )
-            / self.temperature
+        matches = (
+            torch.einsum("btd,cd->btc", normalized_x, keys)
+            / self.match_temperature
+            + self.bias[indices]
         )
-        selected_count = min(self.top_k, indices.numel())
-        values, local_indices = scores.topk(selected_count, dim=-1)
-        weights = values.softmax(dim=-1)
-        gates = torch.zeros_like(scores).scatter(
-            dim=-1,
-            index=local_indices,
-            src=weights,
-        )
+        margins = matches - self.thresholds[indices]
+        gates = torch.tanh(F.relu(margins))
 
-        drive = gates * F.silu(
-            torch.einsum("btd,cd->btc", x, reads) + self.bias[indices]
+        read_signal = F.silu(
+            torch.einsum("btd,cd->btc", normalized_x, reads)
         )
+        drive = gates * read_signal
+
         recurrent = (
             self.recurrent[indices][:, indices]
             * self.edge_mask[indices][:, indices].to(x.dtype)
         )
         activity = drive
         for _ in range(self.steps):
-            activity = F.silu(
-                drive + torch.einsum("btc,cd->btd", activity, recurrent)
-            )
+            spread = torch.einsum("btc,cd->btd", activity, recurrent)
+            activity = F.silu(drive + spread)
 
         output = (
             torch.einsum("btc,cd->btd", activity, writes)
-            / math.sqrt(max(1, selected_count))
+            / math.sqrt(self.output_normalizer)
         )
 
+        plastic_local = self.maturity[indices] < 1.0
+        if plastic_local.any():
+            plastic_activity = activity * plastic_local.to(activity.dtype)[None, None, :]
+            plastic_output = (
+                torch.einsum("btc,cd->btd", plastic_activity, writes)
+                / math.sqrt(self.output_normalizer)
+            )
+            plastic_gate_mean = gates[..., plastic_local].mean()
+            plastic_output_rms = (
+                plastic_output.square().mean() + 1e-12
+            ).sqrt()
+        else:
+            plastic_gate_mean = x.new_tensor(0.0)
+            plastic_output_rms = x.new_tensor(0.0)
+
         with torch.no_grad():
-            usage = (gates > 0).float().mean(dim=(0, 1))
+            selected = (gates > 0).float().mean(dim=(0, 1))
             global_usage = torch.zeros_like(self.usage_ema)
-            global_usage[indices] = usage
+            global_usage[indices] = selected
             self.usage_ema.mul_(0.99).add_(global_usage, alpha=0.01)
 
             aggregate = gates.sum(dim=(0, 1))
-            top_n = min(self.top_k, aggregate.numel())
-            top_local = aggregate.topk(top_n).indices
-            top_global = indices[top_local].tolist()
-
-        confidence = torch.sigmoid(values[..., 0]).mean()
-        return output, confidence, top_global
-
-    def _bank_gate(self, x: torch.Tensor, bank_id: int) -> torch.Tensor:
-        if bank_id == 0:
-            return torch.ones(
-                (*x.shape[:2], 1),
-                device=x.device,
-                dtype=x.dtype,
-            )
-
-        key = F.normalize(self.bank_gate_keys[bank_id], dim=-1)
-        score = (
-            torch.einsum("btd,d->bt", F.normalize(x, dim=-1), key)
-            / self.bank_gate_temperature
-            + self.bank_gate_bias[bank_id]
-        )
-        return torch.sigmoid(score).unsqueeze(-1)
-
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, PoolStats]:
-        accumulated = torch.zeros_like(x)
-        confidences: list[torch.Tensor] = []
-        bank_counts: dict[int, int] = {}
-        bank_top_ids: dict[int, list[int]] = {}
-        bank_gate_means: dict[int, torch.Tensor] = {}
-        bank_gate_maxes: dict[int, torch.Tensor] = {}
-
-        active_banks = torch.nonzero(
-            self.bank_active,
-            as_tuple=False,
-        ).flatten()
-
-        for bank_tensor in active_banks:
-            bank_id = int(bank_tensor.item())
-            indices = torch.nonzero(
-                self.active_mask & (self.bank_ids == bank_id),
-                as_tuple=False,
-            ).flatten()
-            if indices.numel() == 0:
-                continue
-
-            bank_input = x
-            if bank_id > 0:
-                bank_input = x + self.bank_context_scale * accumulated.detach()
-
-            raw_output, confidence, top_ids = self._run_bank(
-                bank_input,
-                indices,
-            )
-
-            if bank_id == 0:
-                adapted_output = raw_output
+            nonzero = torch.nonzero(aggregate > 0, as_tuple=False).flatten()
+            if nonzero.numel() > 0:
+                count = min(16, nonzero.numel())
+                local_top = aggregate.topk(count).indices
+                active_ids = indices[local_top].tolist()
             else:
-                adapted_output = torch.einsum(
-                    "btd,de->bte",
-                    raw_output,
-                    self.bank_adapters[bank_id],
-                )
+                active_ids = []
 
-            route_gate = self._bank_gate(x, bank_id)
-            accumulated = accumulated + route_gate * adapted_output
+            parent_count = min(self.fan_in, indices.numel())
+            parent_local = self.usage_ema[indices].topk(parent_count).indices
+            parent_ids = indices[parent_local].tolist()
 
-            confidences.append(confidence)
-            bank_counts[bank_id] = int(indices.numel())
-            bank_top_ids[bank_id] = top_ids
-            bank_gate_means[bank_id] = route_gate.mean()
-            bank_gate_maxes[bank_id] = route_gate.max()
-
-        confidence = (
-            torch.stack(confidences).mean()
-            if confidences
-            else x.new_tensor(0.0)
-        )
-        return accumulated, PoolStats(
-            confidence=confidence,
+        active_fraction = (gates > 0).float().mean()
+        mean_gate = gates.mean()
+        return output, PoolStats(
             seed=x.detach().mean(dim=(0, 1)),
-            active_count=self.active_count,
-            bank_counts=bank_counts,
-            bank_top_ids=bank_top_ids,
-            bank_gate_means=bank_gate_means,
-            bank_gate_maxes=bank_gate_maxes,
+            parent_ids=parent_ids,
+            active_count=int(indices.numel()),
+            active_fraction=active_fraction,
+            active_ids=active_ids,
+            mean_gate=mean_gate,
+            plastic_gate_mean=plastic_gate_mean,
+            plastic_output_rms=plastic_output_rms,
         )
 
     @torch.no_grad()
-    def seal_active_banks(self) -> None:
-        active_ids = torch.unique(self.bank_ids[self.active_mask])
-        active_ids = active_ids[active_ids >= 0]
-        if active_ids.numel() > 0:
-            self.bank_sealed[active_ids] = True
-        self.maturity[self.active_mask] = 1.0
-
-    @torch.no_grad()
-    def allocate_new_bank(
+    def allocate(
         self,
         count: int,
         seed: torch.Tensor | None = None,
-        seal_existing: bool = True,
-    ) -> dict[str, object]:
-        if count <= 0:
-            return {"bank_id": None, "cells": []}
-
-        if seal_existing:
-            self.seal_active_banks()
-
-        free_banks = torch.nonzero(
-            ~self.bank_active,
-            as_tuple=False,
-        ).flatten()
+        parent_ids: list[int] | None = None,
+    ) -> list[int]:
         dormant = torch.nonzero(
             ~self.active_mask,
             as_tuple=False,
         ).flatten()
+        if count <= 0 or dormant.numel() == 0:
+            return []
 
-        if free_banks.numel() == 0 or dormant.numel() == 0:
-            return {"bank_id": None, "cells": []}
-
-        bank_id = int(free_banks[0].item())
         chosen = dormant[: min(count, dormant.numel())]
-
         if seed is None:
-            seed = torch.randn_like(self.keys[0])
+            seed = torch.randn(self.dim, device=self.keys.device)
         seed = F.normalize(seed.to(self.keys), dim=-1)
+
+        established = torch.nonzero(
+            self.active_mask,
+            as_tuple=False,
+        ).flatten()
+        valid_parents = [
+            int(value)
+            for value in (parent_ids or [])
+            if 0 <= int(value) < self.max_cells and self.active_mask[int(value)]
+        ]
+        if not valid_parents and established.numel() > 0:
+            count_parents = min(self.fan_in, established.numel())
+            top = self.usage_ema[established].topk(count_parents).indices
+            valid_parents = established[top].tolist()
 
         for row in chosen.tolist():
             noise = 0.05 * torch.randn_like(seed)
-            self.keys[row].copy_(F.normalize(seed + noise, dim=-1))
-            self.read_vectors[row].copy_(F.normalize(seed + noise, dim=-1))
-            self.write_vectors[row].normal_(0.0, 0.01)
+            initial = F.normalize(seed + noise, dim=-1)
+            self.keys[row].copy_(initial)
+            self.read_vectors[row].copy_(initial)
+            self.write_vectors[row].zero_()
             self.bias[row] = 0.0
+            self.thresholds[row] = self.new_cell_threshold
             self.maturity[row] = 0.0
             self.usage_ema[row] = 0.0
             self.active_mask[row] = True
-            self.bank_ids[row] = bank_id
 
-        dim = self.bank_adapters.size(-1)
-        self.bank_adapters[bank_id].copy_(
-            torch.eye(
-                dim,
-                device=self.bank_adapters.device,
-                dtype=self.bank_adapters.dtype,
-            )
-            * self.new_bank_adapter_scale
-        )
-        self.bank_gate_keys[bank_id].copy_(seed)
-        self.bank_gate_bias[bank_id] = self.new_bank_gate_bias
+            if valid_parents:
+                parents = torch.tensor(
+                    valid_parents[: self.fan_in],
+                    device=self.keys.device,
+                    dtype=torch.long,
+                )
+                self.edge_mask[parents, row] = True
+                self.recurrent[parents, row].normal_(0.0, 0.02)
 
-        self.bank_active[bank_id] = True
-        self.bank_sealed[bank_id] = False
-        self._initialize_bank_edges(chosen)
+            self.edge_mask[row, row] = True
+            self.recurrent[row, row] = 0.01
 
-        return {
-            "bank_id": bank_id,
-            "cells": chosen.tolist(),
-            "initial_gate_bias": float(self.bank_gate_bias[bank_id].item()),
-        }
+        for target in chosen.tolist():
+            if chosen.numel() <= 1:
+                continue
+            count_sources = min(self.fan_in, chosen.numel())
+            sources = chosen[
+                torch.randperm(chosen.numel(), device=chosen.device)[:count_sources]
+            ]
+            self.edge_mask[sources, target] = True
+            self.recurrent[sources, target].normal_(0.0, 0.02)
 
-    def mask_gradients(self, sealed_scale: float) -> None:
-        safe_bank_ids = self.bank_ids.clamp_min(0)
-        sealed_rows = self.bank_sealed[safe_bank_ids]
-        row_scale = self.active_mask.to(self.keys) * torch.where(
-            sealed_rows,
-            torch.full_like(self.maturity, sealed_scale),
-            torch.ones_like(self.maturity),
+        return chosen.tolist()
+
+    def mask_gradients(self, mature_scale: float) -> None:
+        active = self.active_mask.to(self.keys.dtype)
+        row_scale = active * (
+            mature_scale
+            + (1.0 - mature_scale) * (1.0 - self.maturity)
         )
 
         for parameter in (
@@ -442,89 +372,26 @@ class RecurrentConceptPool(nn.Module):
             if parameter.grad is not None:
                 parameter.grad.mul_(row_scale[:, None])
 
-        if self.bias.grad is not None:
-            self.bias.grad.mul_(row_scale)
+        for parameter in (self.bias, self.thresholds):
+            if parameter.grad is not None:
+                parameter.grad.mul_(row_scale)
 
         if self.recurrent.grad is not None:
-            same_bank = (
-                self.bank_ids[:, None] == self.bank_ids[None, :]
-            ) & (self.bank_ids[:, None] >= 0)
-            edge_scale = torch.minimum(
-                row_scale[:, None],
-                row_scale[None, :],
-            )
-            edge_scale = (
-                edge_scale
-                * same_bank.to(edge_scale.dtype)
-                * self.edge_mask.to(edge_scale.dtype)
-            )
+            edge_scale = row_scale[None, :] * self.edge_mask.to(row_scale.dtype)
             self.recurrent.grad.mul_(edge_scale)
-
-        bank_scale = torch.zeros(
-            self.max_banks,
-            device=self.keys.device,
-            dtype=self.keys.dtype,
-        )
-        for bank_id in range(1, self.max_banks):
-            if not self.bank_active[bank_id]:
-                continue
-            bank_scale[bank_id] = (
-                sealed_scale if self.bank_sealed[bank_id] else 1.0
-            )
-
-        if self.bank_adapters.grad is not None:
-            self.bank_adapters.grad.mul_(bank_scale[:, None, None])
-        if self.bank_gate_keys.grad is not None:
-            self.bank_gate_keys.grad.mul_(bank_scale[:, None])
-        if self.bank_gate_bias.grad is not None:
-            self.bank_gate_bias.grad.mul_(bank_scale)
 
     @torch.no_grad()
     def advance_maturity(self) -> None:
-        unsealed_rows = self.active_mask & ~self.bank_sealed[
-            self.bank_ids.clamp_min(0)
-        ]
-        self.maturity[unsealed_rows].add_(
-            1.0 / self.maturity_steps
-        ).clamp_(max=1.0)
+        increment = 1.0 / self.maturity_steps
+        self.maturity[self.active_mask].add_(increment).clamp_(max=1.0)
 
     @torch.no_grad()
-    def repair_bank_metadata(self) -> None:
-        """Upgrade pre-bank and pre-gate checkpoints in place."""
-        orphaned = self.active_mask & (self.bank_ids < 0)
-        self.bank_ids[orphaned] = 0
+    def seal(self) -> None:
+        self.maturity[self.active_mask] = 1.0
 
-        self.bank_active.zero_()
-        active_ids = torch.unique(self.bank_ids[self.active_mask])
-        active_ids = active_ids[
-            (active_ids >= 0) & (active_ids < self.max_banks)
-        ]
-        if active_ids.numel() > 0:
-            self.bank_active[active_ids] = True
-        elif self.active_mask.any():
-            self.bank_active[0] = True
-            self.bank_ids[self.active_mask] = 0
-
-        self.bank_gate_bias[0] = 20.0
-        for bank_id in range(1, self.max_banks):
-            if not self.bank_active[bank_id]:
-                self.bank_gate_bias[bank_id] = self.new_bank_gate_bias
-
-    def bank_summary(self) -> dict[int, int]:
-        summary: dict[int, int] = {}
-        for bank_id in torch.nonzero(
-            self.bank_active,
-            as_tuple=False,
-        ).flatten().tolist():
-            count = int(
-                (
-                    self.active_mask
-                    & (self.bank_ids == bank_id)
-                ).sum().item()
-            )
-            if count:
-                summary[int(bank_id)] = count
-        return summary
+    @torch.no_grad()
+    def repair_metadata(self) -> None:
+        self.thresholds.data.clamp_(-1.0, 2.0)
 
 
 class Block(nn.Module):
@@ -533,14 +400,15 @@ class Block(nn.Module):
         self.attn_norm = RMSNorm(config.d_model)
         self.attn = CausalSelfAttention(config)
         self.pool_norm = RMSNorm(config.d_model) if use_pool else None
-        self.pool = RecurrentConceptPool(config) if use_pool else None
+        self.pool = ThresholdRecurrentCellPool(config) if use_pool else None
         self.ffn_norm = RMSNorm(config.d_model)
         self.ffn = SwiGLU(config)
         self.dropout = nn.Dropout(config.dropout)
         self.pool_scale = config.cell_residual_scale
 
     def forward(
-        self, x: torch.Tensor
+        self,
+        x: torch.Tensor,
     ) -> tuple[torch.Tensor, PoolStats | None]:
         x = x + self.dropout(self.attn(self.attn_norm(x)))
         stats = None
@@ -579,7 +447,7 @@ class ContinualCellTransformer(nn.Module):
         if isinstance(module, (nn.Linear, nn.Embedding)):
             nn.init.normal_(module.weight, 0.0, 0.02)
 
-    def pools(self) -> list[RecurrentConceptPool]:
+    def pools(self) -> list[ThresholdRecurrentCellPool]:
         return [
             block.pool
             for block in self.blocks
@@ -590,12 +458,28 @@ class ContinualCellTransformer(nn.Module):
         self,
         state_dict: dict[str, torch.Tensor],
     ) -> tuple[list[str], list[str]]:
-        incompatible = self.load_state_dict(
-            state_dict,
-            strict=False,
-        )
+        migrated: dict[str, torch.Tensor] = {}
+        for name, value in state_dict.items():
+            new_name = name.replace(".input_vectors", ".read_vectors")
+            new_name = new_name.replace(".output_vectors", ".write_vectors")
+            new_name = new_name.replace(".recurrent_mask", ".edge_mask")
+            if any(
+                token in new_name
+                for token in (
+                    "bank_adapters",
+                    "bank_gate_keys",
+                    "bank_gate_bias",
+                    "bank_ids",
+                    "bank_active",
+                    "bank_sealed",
+                )
+            ):
+                continue
+            migrated[new_name] = value
+
+        incompatible = self.load_state_dict(migrated, strict=False)
         for pool in self.pools():
-            pool.repair_bank_metadata()
+            pool.repair_metadata()
         return (
             list(incompatible.missing_keys),
             list(incompatible.unexpected_keys),
@@ -605,7 +489,7 @@ class ContinualCellTransformer(nn.Module):
         self,
         input_ids: torch.Tensor,
         labels: torch.Tensor | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         if input_ids.size(1) > self.config.max_seq_len:
             raise ValueError("Sequence exceeds max_seq_len")
 
@@ -627,45 +511,24 @@ class ContinualCellTransformer(nn.Module):
             )
         )
 
-        gate_tensors = [
-            gate
-            for item in stats
-            for bank_id, gate in item.bank_gate_means.items()
-            if bank_id > 0
-        ]
-        plastic_gate_mean = (
-            torch.stack(gate_tensors).mean()
-            if gate_tensors
-            else logits.new_tensor(0.0)
-        )
+        def mean_metric(name: str) -> torch.Tensor:
+            if not stats:
+                return logits.new_tensor(0.0)
+            return torch.stack(
+                [getattr(item, name) for item in stats]
+            ).mean()
 
         return {
             "logits": logits,
             "loss": loss,
-            "cell_confidence": (
-                torch.stack([item.confidence for item in stats]).mean()
-                if stats
-                else logits.new_tensor(1.0)
-            ),
             "growth_seeds": [item.seed for item in stats],
+            "growth_parent_ids": [item.parent_ids for item in stats],
             "active_cells": [item.active_count for item in stats],
-            "cell_banks": [item.bank_counts for item in stats],
-            "bank_top_ids": [item.bank_top_ids for item in stats],
-            "bank_gate_means": [
-                {
-                    bank_id: float(value.detach().item())
-                    for bank_id, value in item.bank_gate_means.items()
-                }
-                for item in stats
-            ],
-            "bank_gate_maxes": [
-                {
-                    bank_id: float(value.detach().item())
-                    for bank_id, value in item.bank_gate_maxes.items()
-                }
-                for item in stats
-            ],
-            "plastic_gate_mean": plastic_gate_mean,
+            "active_cell_ids": [item.active_ids for item in stats],
+            "active_fraction": mean_metric("active_fraction"),
+            "mean_gate": mean_metric("mean_gate"),
+            "plastic_gate_mean": mean_metric("plastic_gate_mean"),
+            "plastic_output_rms": mean_metric("plastic_output_rms"),
         }
 
     @torch.no_grad()
@@ -694,9 +557,24 @@ class ContinualCellTransformer(nn.Module):
         self.lm_head = head
         self.config.vocab_size = new_size
 
-    def mask_cell_gradients(self, sealed_scale: float) -> None:
+    @torch.no_grad()
+    def allocate_cells(
+        self,
+        count: int,
+        seeds: list[torch.Tensor] | None = None,
+        parent_ids: list[list[int]] | None = None,
+    ) -> list[list[int]]:
+        pools = self.pools()
+        seeds = seeds or [None] * len(pools)
+        parent_ids = parent_ids or [[] for _ in pools]
+        return [
+            pool.allocate(count, seed, parents)
+            for pool, seed, parents in zip(pools, seeds, parent_ids)
+        ]
+
+    def mask_cell_gradients(self, mature_scale: float) -> None:
         for pool in self.pools():
-            pool.mask_gradients(sealed_scale)
+            pool.mask_gradients(mature_scale)
 
     @torch.no_grad()
     def advance_maturity(self) -> None:
@@ -706,28 +584,7 @@ class ContinualCellTransformer(nn.Module):
     @torch.no_grad()
     def seal_active_cells(self) -> None:
         for pool in self.pools():
-            pool.seal_active_banks()
-
-    @torch.no_grad()
-    def allocate_new_bank(
-        self,
-        count: int,
-        seeds: list[torch.Tensor] | None = None,
-        seal_existing: bool = True,
-    ) -> list[dict[str, object]]:
-        pools = self.pools()
-        seeds = seeds or [None] * len(pools)
-        return [
-            pool.allocate_new_bank(
-                count=count,
-                seed=seed,
-                seal_existing=seal_existing,
-            )
-            for pool, seed in zip(pools, seeds)
-        ]
-
-    def bank_summaries(self) -> list[dict[int, int]]:
-        return [pool.bank_summary() for pool in self.pools()]
+            pool.seal()
 
     @torch.no_grad()
     def generate(
@@ -743,19 +600,19 @@ class ContinualCellTransformer(nn.Module):
             logits = self(
                 ids[:, -self.config.max_seq_len :]
             )["logits"][:, -1]
-            logits = logits / max(temperature, 1e-5)
-            if top_k > 0:
-                threshold = logits.topk(
-                    min(top_k, logits.size(-1))
-                ).values[:, -1:]
-                logits = logits.masked_fill(
-                    logits < threshold,
-                    float("-inf"),
-                )
-            token = torch.multinomial(
-                logits.softmax(dim=-1),
-                1,
-            )
+            if temperature <= 0.0 or top_k == 1:
+                token = logits.argmax(dim=-1, keepdim=True)
+            else:
+                logits = logits / max(temperature, 1e-5)
+                if top_k > 0:
+                    threshold = logits.topk(
+                        min(top_k, logits.size(-1))
+                    ).values[:, -1:]
+                    logits = logits.masked_fill(
+                        logits < threshold,
+                        float("-inf"),
+                    )
+                token = torch.multinomial(logits.softmax(dim=-1), 1)
             ids = torch.cat((ids, token), dim=1)
             if (
                 eos_token_id is not None
