@@ -4,7 +4,6 @@ import argparse
 import json
 import math
 import random
-from collections import Counter
 from pathlib import Path
 
 import torch
@@ -14,96 +13,91 @@ from model import ContinualCellTransformer
 from tokenizer import DynamicByteTokenizer
 
 
+ARCHITECTURE_VERSION = ContinualCellTransformer.ARCHITECTURE_VERSION
+
+
 def load_checkpoint(path: str | Path) -> dict:
     try:
-        return torch.load(path, map_location="cpu", weights_only=False)
+        checkpoint = torch.load(path, map_location="cpu", weights_only=False)
     except TypeError:
-        return torch.load(path, map_location="cpu")
+        checkpoint = torch.load(path, map_location="cpu")
+
+    version = int(checkpoint.get("architecture_version", 0))
+    if version != ARCHITECTURE_VERSION:
+        raise ValueError(
+            f"Checkpoint architecture_version={version} is incompatible with "
+            f"shared-population V{ARCHITECTURE_VERSION}. Retrain the base task "
+            "with the current code; banked V2/V3 checkpoints are intentionally unsupported."
+        )
+    return checkpoint
 
 
 def sample_batch(
     ids: list[int],
-    batch: int,
-    length: int,
+    batch_size: int,
+    seq_len: int,
     device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     if not ids:
         raise ValueError("Dataset produced zero tokens.")
-    if len(ids) < length + 2:
-        ids = ids * ((length + 2) // len(ids) + 1)
-    starts = torch.randint(0, len(ids) - length - 1, (batch,))
+    if len(ids) < seq_len + 2:
+        ids = ids * ((seq_len + 2) // len(ids) + 1)
+
+    starts = torch.randint(0, len(ids) - seq_len - 1, (batch_size,))
     x = torch.stack(
-        [torch.tensor(ids[start : start + length]) for start in starts]
-    ).long().to(device)
+        [torch.tensor(ids[start : start + seq_len]) for start in starts]
+    ).long()
     y = torch.stack(
-        [torch.tensor(ids[start + 1 : start + length + 1]) for start in starts]
-    ).long().to(device)
-    return x, y
+        [torch.tensor(ids[start + 1 : start + seq_len + 1]) for start in starts]
+    ).long()
+    return x.to(device), y.to(device)
 
 
 @torch.no_grad()
 def evaluate(
     model: ContinualCellTransformer,
     ids: list[int],
-    batch: int,
-    length: int,
+    batch_size: int,
+    seq_len: int,
     device: torch.device,
-    batches: int = 20,
+    batches: int,
 ) -> float:
     was_training = model.training
     model.eval()
     losses: list[float] = []
     for _ in range(batches):
-        x, y = sample_batch(ids, batch, length, device)
+        x, y = sample_batch(ids, batch_size, seq_len, device)
         losses.append(float(model(x, labels=y)["loss"]))
     model.train(was_training)
     return sum(losses) / len(losses)
 
 
 @torch.no_grad()
-def collect_allocation_context(
+def collect_growth_seeds(
     model: ContinualCellTransformer,
     ids: list[int],
     batch_size: int,
     seq_len: int,
     device: torch.device,
     batches: int,
-) -> tuple[list[torch.Tensor], list[list[int]]]:
+) -> list[torch.Tensor]:
     was_training = model.training
     model.eval()
-    seed_lists: list[list[torch.Tensor]] = [[] for _ in model.pools()]
-    parent_counts: list[Counter[int]] = [Counter() for _ in model.pools()]
-
+    per_pool: list[list[torch.Tensor]] = [[] for _ in model.pools()]
     for _ in range(max(1, batches)):
         x, _ = sample_batch(ids, batch_size, seq_len, device)
         result = model(x)
         for index, seed in enumerate(result["growth_seeds"]):
-            seed_lists[index].append(seed)
-        for index, parent_ids in enumerate(result["growth_parent_ids"]):
-            parent_counts[index].update(parent_ids)
-
+            per_pool[index].append(seed)
     model.train(was_training)
-    seeds = [
-        torch.stack(values).mean(dim=0)
-        for values in seed_lists
-    ]
-    parents = [
-        [
-            cell_id
-            for cell_id, _ in counts.most_common(
-                model.config.recurrent_fan_in
-            )
-        ]
-        for counts in parent_counts
-    ]
-    return seeds, parents
+    return [torch.stack(items).mean(dim=0) for items in per_pool]
 
 
-def optimizer_for(
+def build_optimizer(
     model: ContinualCellTransformer,
     config: TrainConfig,
 ) -> torch.optim.AdamW:
-    groups = {
+    groups: dict[str, list[torch.nn.Parameter]] = {
         "embedding": [],
         "attention": [],
         "ffn": [],
@@ -135,12 +129,13 @@ def optimizer_for(
     for name, parameters in groups.items():
         if not parameters:
             continue
-        weight_decay = 0.0 if name == "cells" else config.weight_decay
         parameter_groups.append(
             {
                 "params": parameters,
                 "lr": learning_rates[name],
-                "weight_decay": weight_decay,
+                # Cell tensors contain dormant and consolidated rows. Decoupled
+                # weight decay would move them even after gradient masking.
+                "weight_decay": 0.0 if name == "cells" else config.weight_decay,
                 "group_name": name,
             }
         )
@@ -150,16 +145,12 @@ def optimizer_for(
 def arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--train-file", required=True)
-    parser.add_argument(
-        "--eval-file",
-        help="Held-out file used for periodic validation. Defaults to training data.",
-    )
+    parser.add_argument("--eval-file")
     parser.add_argument("--retention-file")
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--resume")
-    parser.add_argument("--reset-optimizer", action="store_true")
 
-    parser.add_argument("--steps", type=int, default=2_000)
+    parser.add_argument("--steps", type=int, default=2000)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--seq-len", type=int, default=128)
     parser.add_argument("--eval-interval", type=int, default=100)
@@ -170,31 +161,30 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--auto-add-words", action="store_true")
 
     parser.add_argument("--allocate-cells", type=int, default=0)
-    parser.add_argument("--allocate-new-bank", type=int, default=0, help=argparse.SUPPRESS)
     parser.add_argument("--allocation-seed-batches", type=int, default=8)
-
     parser.add_argument("--enable-growth", action="store_true")
     parser.add_argument("--growth-warmup", type=int, default=100)
     parser.add_argument("--growth-patience", type=int, default=40)
     parser.add_argument("--growth-cells", type=int, default=8)
-    parser.add_argument("--growth-loss-floor", type=float, default=1.5)
-    parser.add_argument("--growth-active-fraction", type=float, default=0.20)
+    parser.add_argument("--growth-loss-floor", type=float, default=1.0)
+    parser.add_argument("--growth-coverage-ceiling", type=float, default=1.0)
     parser.add_argument("--max-growth-events", type=int, default=1)
     parser.add_argument("--growth-cooldown", type=int, default=100)
 
-    parser.add_argument("--seal-active-cells", action="store_true")
+    parser.add_argument("--consolidate-active-cells", action="store_true")
     parser.add_argument("--embedding-lr", type=float, default=1e-5)
     parser.add_argument("--attention-lr", type=float, default=2e-5)
     parser.add_argument("--ffn-lr", type=float, default=5e-5)
     parser.add_argument("--cell-lr", type=float, default=2e-4)
     parser.add_argument("--other-lr", type=float, default=5e-5)
-    parser.add_argument("--mature-cell-scale", type=float, default=0.02)
+    parser.add_argument("--consolidated-cell-scale", type=float, default=0.02)
     parser.add_argument("--weight-decay", type=float, default=0.1)
     parser.add_argument("--grad-clip", type=float, default=1.0)
 
     parser.add_argument("--retention-replay-weight", type=float, default=0.0)
+    parser.add_argument("--plastic-sparsity-weight", type=float, default=0.0)
     parser.add_argument("--retention-output-penalty", type=float, default=0.0)
-    parser.add_argument("--activity-sparsity-weight", type=float, default=0.0)
+    parser.add_argument("--restore-optimizer", action="store_true")
 
     parser.add_argument("--early-stop-patience", type=int, default=0)
     parser.add_argument("--early-stop-min-delta", type=float, default=1e-4)
@@ -205,13 +195,33 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--d-ff", type=int, default=512)
     parser.add_argument("--max-cells", type=int, default=256)
     parser.add_argument("--initial-cells", type=int, default=64)
+    parser.add_argument("--threshold-temperature", type=float, default=0.08)
+    parser.add_argument("--initial-threshold", type=float, default=0.10)
+    parser.add_argument("--new-cell-threshold", type=float, default=0.00)
     parser.add_argument("--recurrent-steps", type=int, default=2)
     parser.add_argument("--recurrent-fan-in", type=int, default=8)
-    parser.add_argument("--initial-cell-threshold", type=float, default=0.15)
-    parser.add_argument("--new-cell-threshold", type=float, default=0.05)
-    parser.add_argument("--cell-maturity-steps", type=int, default=None)
     parser.add_argument("--seed", type=int, default=17)
     return parser.parse_args()
+
+
+def save_checkpoint(
+    path: Path,
+    model: ContinualCellTransformer,
+    optimizer: torch.optim.Optimizer,
+    tokenizer: DynamicByteTokenizer,
+    step: int,
+    args: argparse.Namespace,
+) -> None:
+    payload = {
+        "architecture_version": ARCHITECTURE_VERSION,
+        "model_state": model.state_dict(),
+        "optimizer_state": optimizer.state_dict(),
+        "model_config": model.config.to_dict(),
+        "tokenizer": tokenizer.to_dict(),
+        "step": step,
+        "train_args": vars(args),
+    }
+    torch.save(payload, path)
 
 
 def main() -> None:
@@ -228,88 +238,65 @@ def main() -> None:
         if args.eval_file
         else train_text
     )
-    out = Path(args.out_dir)
-    out.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    checkpoint = None
     previous_step = 0
+    checkpoint = None
     structural_change = False
-    migrated_checkpoint = False
-
     if args.resume:
         checkpoint = load_checkpoint(args.resume)
         tokenizer = DynamicByteTokenizer.from_dict(checkpoint["tokenizer"])
         old_vocab = tokenizer.vocab_size
-
-        tokens = list(args.add_token)
+        new_tokens = list(args.add_token)
         if args.auto_add_words:
-            tokens += tokenizer.discover_tokens(train_text)
-        tokenizer.add_tokens(tokens)
+            new_tokens.extend(tokenizer.discover_tokens(train_text))
+        tokenizer.add_tokens(new_tokens)
 
-        model_config = ModelConfig.from_dict(checkpoint["model_config"])
-        if args.cell_maturity_steps is not None:
-            model_config.cell_maturity_steps = args.cell_maturity_steps
-        model = ContinualCellTransformer(model_config)
-        missing, unexpected = model.load_compatible_state_dict(
-            checkpoint["model_state"]
+        model = ContinualCellTransformer(
+            ModelConfig.from_dict(checkpoint["model_config"])
         )
-        if missing or unexpected:
-            migrated_checkpoint = True
-            structural_change = True
-            print(
-                "checkpoint migration:",
-                f"missing={missing}",
-                f"unexpected={unexpected}",
-            )
-            print(
-                "Warning: bank/top-k checkpoints do not preserve their old "
-                "routing exactly under V4. For controlled results, retrain "
-                "the base task with V4 before continual learning."
-            )
-
+        model.load_state_dict(checkpoint["model_state"], strict=True)
         if tokenizer.vocab_size > old_vocab:
             model.resize_vocabulary(tokenizer.vocab_size)
             structural_change = True
         previous_step = int(checkpoint.get("step", 0))
     else:
         tokenizer = DynamicByteTokenizer()
-        tokens = list(args.add_token)
+        new_tokens = list(args.add_token)
         if args.auto_add_words:
-            tokens += tokenizer.discover_tokens(train_text)
-        tokenizer.add_tokens(tokens)
+            new_tokens.extend(tokenizer.discover_tokens(train_text))
+        tokenizer.add_tokens(new_tokens)
 
         cell_layers = tuple(
             index for index in (1, 3) if index < args.layers
         ) or (args.layers - 1,)
-        model_config = ModelConfig(
-            vocab_size=tokenizer.vocab_size,
-            d_model=args.d_model,
-            n_layers=args.layers,
-            n_heads=args.heads,
-            d_ff=args.d_ff,
-            max_seq_len=args.seq_len,
-            cell_layers=cell_layers,
-            max_cells=args.max_cells,
-            initial_active_cells=args.initial_cells,
-            recurrent_steps=args.recurrent_steps,
-            recurrent_fan_in=args.recurrent_fan_in,
-            initial_cell_threshold=args.initial_cell_threshold,
-            new_cell_threshold=args.new_cell_threshold,
-            cell_maturity_steps=(
-                args.cell_maturity_steps
-                if args.cell_maturity_steps is not None
-                else 2_000
-            ),
-            pad_token_id=tokenizer.pad_token_id,
-            bos_token_id=tokenizer.bos_token_id,
-            eos_token_id=tokenizer.eos_token_id,
+        model = ContinualCellTransformer(
+            ModelConfig(
+                vocab_size=tokenizer.vocab_size,
+                d_model=args.d_model,
+                n_layers=args.layers,
+                n_heads=args.heads,
+                d_ff=args.d_ff,
+                max_seq_len=args.seq_len,
+                cell_layers=cell_layers,
+                max_cells=args.max_cells,
+                initial_active_cells=args.initial_cells,
+                threshold_temperature=args.threshold_temperature,
+                initial_threshold=args.initial_threshold,
+                new_cell_threshold=args.new_cell_threshold,
+                recurrent_steps=args.recurrent_steps,
+                recurrent_fan_in=args.recurrent_fan_in,
+                pad_token_id=tokenizer.pad_token_id,
+                bos_token_id=tokenizer.bos_token_id,
+                eos_token_id=tokenizer.eos_token_id,
+            )
         )
-        model = ContinualCellTransformer(model_config)
 
     if args.seq_len > model.config.max_seq_len:
         raise ValueError(
-            f"--seq-len={args.seq_len} exceeds "
-            f"max_seq_len={model.config.max_seq_len}."
+            f"--seq-len={args.seq_len} exceeds model max_seq_len="
+            f"{model.config.max_seq_len}."
         )
 
     model.to(device)
@@ -325,30 +312,34 @@ def main() -> None:
             add_eos=True,
         )
 
-    allocation_count = max(args.allocate_cells, args.allocate_new_bank)
-    if args.allocate_new_bank > 0:
-        print(
-            "Deprecated --allocate-new-bank interpreted as --allocate-cells; "
-            "V4 uses one shared population."
+    if args.allocate_cells > 0:
+        seeds = collect_growth_seeds(
+            model,
+            train_ids,
+            min(args.batch_size, 32),
+            args.seq_len,
+            device,
+            args.allocation_seed_batches,
         )
-
-    if allocation_count > 0:
-        seeds, parents = collect_allocation_context(
-            model=model,
-            ids=train_ids,
-            batch_size=min(args.batch_size, 32),
-            seq_len=args.seq_len,
-            device=device,
-            batches=args.allocation_seed_batches,
+        model.eval()
+        probe_x, _ = sample_batch(
+            train_ids,
+            min(args.batch_size, 16),
+            args.seq_len,
+            device,
         )
-        allocated = model.allocate_cells(
-            allocation_count,
-            seeds,
-            parents,
-        )
+        before_logits = model(probe_x)["logits"].detach().clone()
+        allocation = model.allocate_cells(args.allocate_cells, seeds)
+        after_logits = model(probe_x)["logits"].detach()
+        allocation_drift = float((after_logits - before_logits).abs().max())
         structural_change = True
-        print(f"zero-impact cell allocation={allocated}")
-        print(f"active cells={[pool.active_count for pool in model.pools()]}")
+        print("one-time allocation:", allocation)
+        print("pool summaries:", model.pool_summaries())
+        print(f"zero-impact verification max_logit_drift={allocation_drift:.3e}")
+        if allocation_drift > 1e-5:
+            raise RuntimeError(
+                "Cell allocation changed existing outputs before training."
+            )
 
     train_config = TrainConfig(
         batch_size=args.batch_size,
@@ -363,36 +354,32 @@ def main() -> None:
         ffn_lr=args.ffn_lr,
         cell_lr=args.cell_lr,
         other_lr=args.other_lr,
-        mature_cell_scale=args.mature_cell_scale,
+        consolidated_cell_scale=args.consolidated_cell_scale,
         retention_replay_weight=args.retention_replay_weight,
+        plastic_sparsity_weight=args.plastic_sparsity_weight,
         retention_output_penalty=args.retention_output_penalty,
-        activity_sparsity_weight=args.activity_sparsity_weight,
         enable_growth=args.enable_growth,
         growth_warmup_steps=args.growth_warmup,
         growth_patience=args.growth_patience,
         growth_cells=args.growth_cells,
         growth_loss_floor=args.growth_loss_floor,
-        growth_active_fraction=args.growth_active_fraction,
+        growth_coverage_ceiling=args.growth_coverage_ceiling,
         max_growth_events=args.max_growth_events,
         growth_cooldown_steps=args.growth_cooldown,
         seed=args.seed,
     )
-    optimizer = optimizer_for(model, train_config)
-
+    optimizer = build_optimizer(model, train_config)
     if (
         args.resume
+        and args.restore_optimizer
         and not structural_change
-        and not args.reset_optimizer
         and checkpoint is not None
         and "optimizer_state" in checkpoint
     ):
-        try:
-            optimizer.load_state_dict(checkpoint["optimizer_state"])
-            print("restored optimizer state")
-        except Exception as error:
-            print("optimizer state restarted:", error)
+        optimizer.load_state_dict(checkpoint["optimizer_state"])
+        print("restored optimizer state")
     elif args.resume:
-        print("optimizer state restarted after migration/allocation/resize")
+        print("started a fresh optimizer for continual learning")
 
     initial_eval = evaluate(
         model,
@@ -404,8 +391,7 @@ def main() -> None:
     )
     print(
         f"initial eval loss={initial_eval:.4f} "
-        f"ppl={math.exp(min(initial_eval, 20)):.2f} "
-        f"file={args.eval_file or args.train_file}"
+        f"ppl={math.exp(min(initial_eval, 20)):.2f}"
     )
 
     retention_before = None
@@ -420,80 +406,68 @@ def main() -> None:
         )
         print(f"old-task loss before={retention_before:.4f}")
 
-    loss_ema = None
-    low_capacity_steps = 0
+    loss_ema: float | None = None
+    low_coverage_steps = 0
     growth_events = 0
     last_growth_step = -10**9
-    completed_steps = 0
-    final_eval = initial_eval
     best_eval = initial_eval
-    evaluations_without_improvement = 0
+    no_improvement = 0
+    final_eval = initial_eval
+    completed_steps = 0
 
     model.train()
     for local_step in range(1, args.steps + 1):
-        step = previous_step + local_step
         completed_steps = local_step
-
+        global_step = previous_step + local_step
         x, y = sample_batch(
             train_ids,
             args.batch_size,
             args.seq_len,
             device,
         )
+
         optimizer.zero_grad(set_to_none=True)
         result = model(x, labels=y)
         task_loss = result["loss"]
         total_loss = task_loss
-
         replay_loss = None
-        old_result = None
-        if retention_ids is not None and args.retention_replay_weight > 0:
+        replay_result = None
+
+        if retention_ids is not None and args.retention_replay_weight > 0.0:
             old_x, old_y = sample_batch(
                 retention_ids,
                 args.batch_size,
                 args.seq_len,
                 device,
             )
-            old_result = model(old_x, labels=old_y)
-            replay_loss = old_result["loss"]
+            replay_result = model(old_x, labels=old_y)
+            replay_loss = replay_result["loss"]
+            total_loss = total_loss + args.retention_replay_weight * replay_loss
+
+        if args.plastic_sparsity_weight > 0.0:
+            activity_source = replay_result if replay_result is not None else result
             total_loss = (
                 total_loss
-                + args.retention_replay_weight * replay_loss
+                + args.plastic_sparsity_weight
+                * activity_source["plastic_activity_mean"]
             )
 
-        if (
-            old_result is not None
-            and args.retention_output_penalty > 0
-        ):
+        if replay_result is not None and args.retention_output_penalty > 0.0:
             total_loss = (
                 total_loss
                 + args.retention_output_penalty
-                * old_result["plastic_output_rms"].square()
-            )
-
-        if args.activity_sparsity_weight > 0:
-            sparsity_source = old_result if old_result is not None else result
-            total_loss = (
-                total_loss
-                + args.activity_sparsity_weight
-                * sparsity_source["plastic_gate_mean"]
+                * replay_result["plastic_output_rms"].square()
             )
 
         total_loss.backward()
-        model.mask_cell_gradients(args.mature_cell_scale)
-        torch.nn.utils.clip_grad_norm_(
-            model.parameters(),
-            args.grad_clip,
-        )
+        model.mask_cell_gradients(args.consolidated_cell_scale)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
         optimizer.step()
         model.advance_maturity()
 
         task_loss_value = float(task_loss.detach())
         total_loss_value = float(total_loss.detach())
-        replay_loss_value = (
-            None if replay_loss is None else float(replay_loss.detach())
-        )
-        active_fraction = float(result["active_fraction"].detach())
+        coverage = float(result["coverage"].detach())
         loss_ema = (
             task_loss_value
             if loss_ema is None
@@ -509,56 +483,43 @@ def main() -> None:
         if (
             growth_ready
             and loss_ema > args.growth_loss_floor
-            and active_fraction >= args.growth_active_fraction
+            and coverage < args.growth_coverage_ceiling
         ):
-            low_capacity_steps += 1
+            low_coverage_steps += 1
         else:
-            low_capacity_steps = 0
+            low_coverage_steps = 0
 
-        if growth_ready and low_capacity_steps >= args.growth_patience:
+        if growth_ready and low_coverage_steps >= args.growth_patience:
             allocated = model.allocate_cells(
                 args.growth_cells,
                 result["growth_seeds"],
-                result["growth_parent_ids"],
             )
             growth_events += 1
             last_growth_step = local_step
-            low_capacity_steps = 0
+            low_coverage_steps = 0
             print(
-                f"growth event={growth_events} allocated={allocated} "
-                f"step={step} loss_ema={loss_ema:.4f} "
-                f"active_fraction={active_fraction:.3f}"
+                f"growth event={growth_events} step={global_step} "
+                f"allocated={allocated} loss_ema={loss_ema:.4f} "
+                f"coverage={coverage:.3f}"
             )
-            optimizer = optimizer_for(model, train_config)
 
         if local_step == 1 or local_step % args.log_interval == 0:
             replay_text = (
                 ""
-                if replay_loss_value is None
-                else f" replay_loss={replay_loss_value:.4f}"
-            )
-            old_output = (
-                None
-                if old_result is None
-                else float(old_result["plastic_output_rms"].detach())
+                if replay_loss is None
+                else f" replay_loss={float(replay_loss.detach()):.4f}"
             )
             print(
-                f"step={step} task_loss={task_loss_value:.4f} "
+                f"step={global_step} task_loss={task_loss_value:.4f} "
                 f"total_loss={total_loss_value:.4f}{replay_text} "
                 f"ppl={math.exp(min(task_loss_value, 20)):.2f} "
-                f"active_fraction={active_fraction:.3f} "
-                f"mean_gate={float(result['mean_gate'].detach()):.4f} "
-                f"plastic_gate={float(result['plastic_gate_mean'].detach()):.4f} "
+                f"coverage={coverage:.3f} "
+                f"plastic_activity={float(result['plastic_activity_mean'].detach()):.3f} "
                 f"plastic_output={float(result['plastic_output_rms'].detach()):.6f} "
-                f"old_plastic_output={old_output} "
-                f"cells={result['active_cells']} "
-                f"active_ids={result['active_cell_ids']}"
+                f"pools={result['pool_summaries']}"
             )
 
-        if (
-            local_step % args.eval_interval == 0
-            or local_step == args.steps
-        ):
+        if local_step % args.eval_interval == 0 or local_step == args.steps:
             final_eval = evaluate(
                 model,
                 eval_ids,
@@ -568,29 +529,37 @@ def main() -> None:
                 args.eval_batches,
             )
             print(
-                f"eval step={step} loss={final_eval:.4f} "
+                f"eval step={global_step} loss={final_eval:.4f} "
                 f"ppl={math.exp(min(final_eval, 20)):.2f}"
             )
 
             if final_eval < best_eval - args.early_stop_min_delta:
                 best_eval = final_eval
-                evaluations_without_improvement = 0
+                no_improvement = 0
+                save_checkpoint(
+                    out_dir / "best_checkpoint.pt",
+                    model,
+                    optimizer,
+                    tokenizer,
+                    global_step,
+                    args,
+                )
             else:
-                evaluations_without_improvement += 1
+                no_improvement += 1
 
             if (
                 args.early_stop_patience > 0
-                and evaluations_without_improvement
-                >= args.early_stop_patience
+                and no_improvement >= args.early_stop_patience
             ):
                 print(
-                    f"early stop at step={step}; "
-                    f"best_eval={best_eval:.4f}"
+                    f"early stopping after {no_improvement} evaluations "
+                    "without meaningful improvement"
                 )
                 break
 
-    if args.seal_active_cells:
-        model.seal_active_cells()
+    if args.consolidate_active_cells:
+        model.consolidate_active_cells()
+        print("Consolidated all currently active cells.")
 
     retention_after = None
     if retention_ids is not None:
@@ -608,23 +577,21 @@ def main() -> None:
         )
 
     final_step = previous_step + completed_steps
-    payload = {
-        "model_state": model.state_dict(),
-        "optimizer_state": optimizer.state_dict(),
-        "model_config": model.config.to_dict(),
-        "tokenizer": tokenizer.to_dict(),
-        "step": final_step,
-        "train_args": vars(args),
-        "architecture_version": 4,
-    }
-    torch.save(payload, out / "checkpoint.pt")
-    tokenizer.save(out / "tokenizer.json")
+    save_checkpoint(
+        out_dir / "checkpoint.pt",
+        model,
+        optimizer,
+        tokenizer,
+        final_step,
+        args,
+    )
+    tokenizer.save(out_dir / "tokenizer.json")
 
     summary = {
+        "architecture_version": ARCHITECTURE_VERSION,
         "step": final_step,
-        "architecture_version": 4,
         "vocab_size": tokenizer.vocab_size,
-        "active_cells": [pool.active_count for pool in model.pools()],
+        "pool_summaries": model.pool_summaries(),
         "train_file": args.train_file,
         "eval_file": args.eval_file or args.train_file,
         "initial_eval_loss": initial_eval,
@@ -633,13 +600,12 @@ def main() -> None:
         "retention_before": retention_before,
         "retention_after": retention_after,
         "growth_events": growth_events,
-        "migrated_checkpoint": migrated_checkpoint,
     }
-    (out / "summary.json").write_text(
+    (out_dir / "summary.json").write_text(
         json.dumps(summary, indent=2),
         encoding="utf-8",
     )
-    print("saved", out / "checkpoint.pt")
+    print("saved", out_dir / "checkpoint.pt")
 
 
 if __name__ == "__main__":
