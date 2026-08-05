@@ -35,11 +35,11 @@ class RotaryEmbedding(nn.Module):
         super().__init__()
         if head_dim % 2 != 0:
             raise ValueError("RoPE requires an even attention head dimension.")
-        inv = 1.0 / (
+        inv_freq = 1.0 / (
             base ** (torch.arange(0, head_dim, 2, dtype=torch.float32) / head_dim)
         )
         positions = torch.arange(max_seq_len, dtype=torch.float32)
-        angles = torch.repeat_interleave(torch.outer(positions, inv), 2, dim=-1)
+        angles = torch.repeat_interleave(torch.outer(positions, inv_freq), 2, dim=-1)
         self.register_buffer("cos", angles.cos(), persistent=False)
         self.register_buffer("sin", angles.sin(), persistent=False)
 
@@ -60,7 +60,7 @@ class RotaryEmbedding(nn.Module):
 class CausalSelfAttention(nn.Module):
     def __init__(self, config: ModelConfig) -> None:
         super().__init__()
-        self.heads = config.n_heads
+        self.n_heads = config.n_heads
         self.head_dim = config.d_model // config.n_heads
         self.dropout = config.dropout
         self.qkv = nn.Linear(config.d_model, 3 * config.d_model, bias=False)
@@ -79,7 +79,7 @@ class CausalSelfAttention(nn.Module):
             return tensor.view(
                 batch,
                 length,
-                self.heads,
+                self.n_heads,
                 self.head_dim,
             ).transpose(1, 2)
 
@@ -110,258 +110,274 @@ class SwiGLU(nn.Module):
 
 @dataclass
 class PoolStats:
-    seed: torch.Tensor
-    parent_ids: list[int]
-    active_count: int
-    active_fraction: torch.Tensor
-    active_ids: list[int]
-    mean_gate: torch.Tensor
-    plastic_gate_mean: torch.Tensor
+    confidence: torch.Tensor
+    coverage: torch.Tensor
+    mean_active: torch.Tensor
+    max_active: torch.Tensor
+    plastic_activity: torch.Tensor
     plastic_output_rms: torch.Tensor
+    active_count: int
+    consolidated_count: int
+    top_cell_ids: list[int]
+    seed: torch.Tensor
 
 
-class ThresholdRecurrentCellPool(nn.Module):
+class SharedThresholdCellPool(nn.Module):
     """
-    One shared recurrent population.
+    One shared append-only population.
 
-    Cells activate independently when their contextual match exceeds their own
-    threshold. There is no global top-k competition and no named domain bank.
+    Cells activate independently when contextual similarity crosses each cell's
+    learned threshold. There are no task-labelled banks and no global top-k, so
+    adding a cell cannot displace an old cell from the route.
 
-    New cells:
-      * are appended from a dormant reserve;
-      * receive keys/read vectors seeded from the new context;
-      * start with exactly zero write vectors, so insertion has zero immediate
-        effect on old outputs;
-      * receive inbound edges from established cells, but no new -> old edges.
+    New cells are inserted with exactly zero write vectors. Their initial forward
+    contribution is therefore exactly zero, while gradients can immediately train
+    those write vectors. Existing cells and existing old-target recurrent edges are
+    not modified by allocation.
     """
 
     def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         cells, dim = config.max_cells, config.d_model
         self.max_cells = cells
-        self.dim = dim
-        self.steps = config.recurrent_steps
-        self.fan_in = config.recurrent_fan_in
-        self.match_temperature = config.cell_match_temperature
+        self.d_model = dim
+        self.recurrent_steps = config.recurrent_steps
+        self.recurrent_fan_in = config.recurrent_fan_in
+        self.threshold_temperature = config.threshold_temperature
         self.new_cell_threshold = config.new_cell_threshold
-        self.output_normalizer = config.cell_output_normalizer
-        self.maturity_steps = config.cell_maturity_steps
+        self.maturity_steps = max(1, config.cell_maturity_steps)
 
         self.keys = nn.Parameter(torch.randn(cells, dim) * 0.02)
         self.read_vectors = nn.Parameter(torch.randn(cells, dim) * 0.02)
         self.write_vectors = nn.Parameter(torch.randn(cells, dim) * 0.01)
         self.bias = nn.Parameter(torch.zeros(cells))
         self.thresholds = nn.Parameter(
-            torch.full((cells,), config.initial_cell_threshold)
+            torch.full((cells,), float(config.initial_threshold))
         )
         self.recurrent = nn.Parameter(torch.zeros(cells, cells))
 
-        active = torch.zeros(cells, dtype=torch.bool)
-        active[: config.initial_active_cells] = True
-        self.register_buffer("active_mask", active)
+        active_mask = torch.zeros(cells, dtype=torch.bool)
+        active_mask[: config.initial_active_cells] = True
+        self.register_buffer("active_mask", active_mask)
+        self.register_buffer("consolidated_mask", torch.zeros(cells, dtype=torch.bool))
         self.register_buffer("maturity", torch.zeros(cells))
         self.register_buffer("usage_ema", torch.zeros(cells))
-        self.register_buffer(
-            "edge_mask",
-            torch.zeros(cells, cells, dtype=torch.bool),
-        )
+        self.register_buffer("edge_mask", torch.zeros(cells, cells, dtype=torch.bool))
 
         with torch.no_grad():
             self.keys.copy_(F.normalize(self.keys, dim=-1))
             self.read_vectors.copy_(F.normalize(self.read_vectors, dim=-1))
-            self._initialize_base_edges(
-                torch.arange(config.initial_active_cells)
-            )
+            self._initialize_base_edges(torch.arange(config.initial_active_cells))
 
     @property
     def active_count(self) -> int:
         return int(self.active_mask.sum().item())
 
+    @property
+    def consolidated_count(self) -> int:
+        return int((self.active_mask & self.consolidated_mask).sum().item())
+
     def _initialize_base_edges(self, indices: torch.Tensor) -> None:
         if indices.numel() == 0:
             return
         for target in indices.tolist():
-            count = min(self.fan_in, indices.numel())
-            order = torch.randperm(indices.numel(), device=indices.device)[:count]
-            sources = indices[order]
+            fan_in = min(self.recurrent_fan_in, indices.numel())
+            sources = indices[
+                torch.randperm(indices.numel(), device=indices.device)[:fan_in]
+            ]
             self.edge_mask[sources, target] = True
             self.recurrent[sources, target].normal_(0.0, 0.02)
             self.edge_mask[target, target] = True
             self.recurrent[target, target] = 0.01
 
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, PoolStats]:
-        indices = torch.nonzero(
-            self.active_mask,
-            as_tuple=False,
-        ).flatten()
+    def _straight_through_threshold(
+        self,
+        scores: torch.Tensor,
+        thresholds: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        soft = torch.sigmoid(
+            (scores - thresholds) / self.threshold_temperature
+        )
+        hard = (scores > thresholds).to(dtype=scores.dtype)
+        gate = hard + soft - soft.detach()
+        return gate, hard, soft
 
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, PoolStats]:
+        indices = torch.nonzero(self.active_mask, as_tuple=False).flatten()
         if indices.numel() == 0:
             zero = torch.zeros_like(x)
-            scalar = x.new_tensor(0.0)
+            scalar_zero = x.new_tensor(0.0)
             return zero, PoolStats(
-                seed=x.detach().mean(dim=(0, 1)),
-                parent_ids=[],
+                confidence=scalar_zero,
+                coverage=scalar_zero,
+                mean_active=scalar_zero,
+                max_active=scalar_zero,
+                plastic_activity=scalar_zero,
+                plastic_output_rms=scalar_zero,
                 active_count=0,
-                active_fraction=scalar,
-                active_ids=[],
-                mean_gate=scalar,
-                plastic_gate_mean=scalar,
-                plastic_output_rms=scalar,
+                consolidated_count=0,
+                top_cell_ids=[],
+                seed=x.detach().mean(dim=(0, 1)),
             )
 
-        normalized_x = F.normalize(x, dim=-1)
         keys = F.normalize(self.keys[indices], dim=-1)
         reads = F.normalize(self.read_vectors[indices], dim=-1)
         writes = self.write_vectors[indices]
+        thresholds = self.thresholds[indices]
 
-        matches = (
-            torch.einsum("btd,cd->btc", normalized_x, keys)
-            / self.match_temperature
-            + self.bias[indices]
+        normalized_x = F.normalize(x, dim=-1)
+        scores = torch.einsum("btd,cd->btc", normalized_x, keys)
+        gates, hard_gates, soft_gates = self._straight_through_threshold(
+            scores,
+            thresholds,
         )
-        margins = matches - self.thresholds[indices]
-        gates = torch.tanh(F.relu(margins))
 
-        read_signal = F.silu(
-            torch.einsum("btd,cd->btc", normalized_x, reads)
+        drive = gates * F.silu(
+            torch.einsum("btd,cd->btc", x, reads) + self.bias[indices]
         )
-        drive = gates * read_signal
 
         recurrent = (
             self.recurrent[indices][:, indices]
-            * self.edge_mask[indices][:, indices].to(x.dtype)
+            * self.edge_mask[indices][:, indices].to(dtype=x.dtype)
         )
         activity = drive
-        for _ in range(self.steps):
-            spread = torch.einsum("btc,cd->btd", activity, recurrent)
-            activity = F.silu(drive + spread)
+        for _ in range(self.recurrent_steps):
+            activity = F.silu(
+                drive + torch.einsum("btc,cd->btd", activity, recurrent)
+            )
 
+        # A fixed normalizer is essential: an active-count normalizer would let
+        # zero-output cell insertion change old outputs indirectly.
         output = (
             torch.einsum("btc,cd->btd", activity, writes)
-            / math.sqrt(self.output_normalizer)
+            / math.sqrt(max(1, self.recurrent_fan_in))
         )
 
-        plastic_local = self.maturity[indices] < 1.0
-        if plastic_local.any():
-            plastic_activity = activity * plastic_local.to(activity.dtype)[None, None, :]
-            plastic_output = (
-                torch.einsum("btc,cd->btd", plastic_activity, writes)
-                / math.sqrt(self.output_normalizer)
-            )
-            plastic_gate_mean = gates[..., plastic_local].mean()
-            plastic_output_rms = (
-                plastic_output.square().mean() + 1e-12
-            ).sqrt()
-        else:
-            plastic_gate_mean = x.new_tensor(0.0)
-            plastic_output_rms = x.new_tensor(0.0)
-
         with torch.no_grad():
-            selected = (gates > 0).float().mean(dim=(0, 1))
+            usage = hard_gates.mean(dim=(0, 1))
             global_usage = torch.zeros_like(self.usage_ema)
-            global_usage[indices] = selected
+            global_usage[indices] = usage
             self.usage_ema.mul_(0.99).add_(global_usage, alpha=0.01)
 
-            aggregate = gates.sum(dim=(0, 1))
-            nonzero = torch.nonzero(aggregate > 0, as_tuple=False).flatten()
-            if nonzero.numel() > 0:
-                count = min(16, nonzero.numel())
-                local_top = aggregate.topk(count).indices
-                active_ids = indices[local_top].tolist()
-            else:
-                active_ids = []
+            aggregate = hard_gates.sum(dim=(0, 1))
+            top_n = min(12, aggregate.numel())
+            top_local = aggregate.topk(top_n).indices
+            top_global = indices[top_local].tolist()
 
-            parent_count = min(self.fan_in, indices.numel())
-            parent_local = self.usage_ema[indices].topk(parent_count).indices
-            parent_ids = indices[parent_local].tolist()
+        plastic_local = ~self.consolidated_mask[indices]
+        if plastic_local.any():
+            plastic_activity = soft_gates[..., plastic_local].mean()
+            plastic_latent = (
+                torch.einsum(
+                    "btc,cd->btd",
+                    activity[..., plastic_local],
+                    writes[plastic_local],
+                )
+                / math.sqrt(max(1, self.recurrent_fan_in))
+            )
+            plastic_output_rms = (
+                plastic_latent.square().mean() + 1e-12
+            ).sqrt()
+        else:
+            plastic_activity = x.new_tensor(0.0)
+            plastic_output_rms = x.new_tensor(0.0)
 
-        active_fraction = (gates > 0).float().mean()
-        mean_gate = gates.mean()
+        max_soft = soft_gates.max(dim=-1).values
+        hard_counts = hard_gates.sum(dim=-1)
         return output, PoolStats(
-            seed=x.detach().mean(dim=(0, 1)),
-            parent_ids=parent_ids,
-            active_count=int(indices.numel()),
-            active_fraction=active_fraction,
-            active_ids=active_ids,
-            mean_gate=mean_gate,
-            plastic_gate_mean=plastic_gate_mean,
+            confidence=max_soft.mean(),
+            coverage=max_soft.mean(),
+            mean_active=hard_counts.mean(),
+            max_active=hard_counts.max(),
+            plastic_activity=plastic_activity,
             plastic_output_rms=plastic_output_rms,
+            active_count=self.active_count,
+            consolidated_count=self.consolidated_count,
+            top_cell_ids=top_global,
+            seed=x.detach().mean(dim=(0, 1)),
         )
 
     @torch.no_grad()
-    def allocate(
+    def allocate_cells(
         self,
         count: int,
         seed: torch.Tensor | None = None,
-        parent_ids: list[int] | None = None,
     ) -> list[int]:
-        dormant = torch.nonzero(
-            ~self.active_mask,
-            as_tuple=False,
-        ).flatten()
-        if count <= 0 or dormant.numel() == 0:
+        if count <= 0:
+            return []
+
+        dormant = torch.nonzero(~self.active_mask, as_tuple=False).flatten()
+        if dormant.numel() == 0:
             return []
 
         chosen = dormant[: min(count, dormant.numel())]
+        existing = torch.nonzero(self.active_mask, as_tuple=False).flatten()
+
         if seed is None:
-            seed = torch.randn(self.dim, device=self.keys.device)
+            seed = torch.randn(self.d_model, device=self.keys.device)
         seed = F.normalize(seed.to(self.keys), dim=-1)
 
-        established = torch.nonzero(
-            self.active_mask,
-            as_tuple=False,
-        ).flatten()
-        valid_parents = [
-            int(value)
-            for value in (parent_ids or [])
-            if 0 <= int(value) < self.max_cells and self.active_mask[int(value)]
-        ]
-        if not valid_parents and established.numel() > 0:
-            count_parents = min(self.fan_in, established.numel())
-            top = self.usage_ema[established].topk(count_parents).indices
-            valid_parents = established[top].tolist()
+        if existing.numel() > 0:
+            similarities = torch.mv(
+                F.normalize(self.keys[existing], dim=-1),
+                seed,
+            )
+            parent_count = min(self.recurrent_fan_in, existing.numel())
+            parents = existing[similarities.topk(parent_count).indices]
+        else:
+            parents = existing
 
         for row in chosen.tolist():
             noise = 0.05 * torch.randn_like(seed)
-            initial = F.normalize(seed + noise, dim=-1)
-            self.keys[row].copy_(initial)
-            self.read_vectors[row].copy_(initial)
+            initialized = F.normalize(seed + noise, dim=-1)
+            self.keys[row].copy_(initialized)
+            self.read_vectors[row].copy_(initialized)
+
+            # Zero-impact insertion: no output change at allocation time.
             self.write_vectors[row].zero_()
             self.bias[row] = 0.0
             self.thresholds[row] = self.new_cell_threshold
             self.maturity[row] = 0.0
             self.usage_ema[row] = 0.0
+            self.consolidated_mask[row] = False
             self.active_mask[row] = True
 
-            if valid_parents:
-                parents = torch.tensor(
-                    valid_parents[: self.fan_in],
-                    device=self.keys.device,
-                    dtype=torch.long,
-                )
+            # Existing cells may drive the new cell, but new cells do not alter
+            # existing old targets. Allocation therefore preserves old dynamics.
+            if parents.numel() > 0:
                 self.edge_mask[parents, row] = True
                 self.recurrent[parents, row].normal_(0.0, 0.02)
-
             self.edge_mask[row, row] = True
             self.recurrent[row, row] = 0.01
 
         for target in chosen.tolist():
-            if chosen.numel() <= 1:
-                continue
-            count_sources = min(self.fan_in, chosen.numel())
+            source_count = min(self.recurrent_fan_in, chosen.numel())
             sources = chosen[
-                torch.randperm(chosen.numel(), device=chosen.device)[:count_sources]
+                torch.randperm(chosen.numel(), device=chosen.device)[:source_count]
             ]
             self.edge_mask[sources, target] = True
             self.recurrent[sources, target].normal_(0.0, 0.02)
+            self.edge_mask[target, target] = True
+            self.recurrent[target, target] = 0.01
 
         return chosen.tolist()
 
-    def mask_gradients(self, mature_scale: float) -> None:
-        active = self.active_mask.to(self.keys.dtype)
-        row_scale = active * (
-            mature_scale
-            + (1.0 - mature_scale) * (1.0 - self.maturity)
+    @torch.no_grad()
+    def consolidate_active_cells(self) -> None:
+        self.consolidated_mask[self.active_mask] = True
+        self.maturity[self.active_mask] = 1.0
+
+    @torch.no_grad()
+    def advance_maturity(self) -> None:
+        plastic = self.active_mask & ~self.consolidated_mask
+        self.maturity[plastic].add_(1.0 / self.maturity_steps).clamp_(max=1.0)
+
+    def mask_gradients(self, consolidated_scale: float) -> None:
+        row_scale = self.active_mask.to(dtype=self.keys.dtype)
+        row_scale = row_scale * torch.where(
+            self.consolidated_mask,
+            torch.full_like(row_scale, consolidated_scale),
+            torch.ones_like(row_scale),
         )
 
         for parameter in (
@@ -377,21 +393,18 @@ class ThresholdRecurrentCellPool(nn.Module):
                 parameter.grad.mul_(row_scale)
 
         if self.recurrent.grad is not None:
+            # An edge changes the target cell's dynamics, so plasticity follows
+            # the target row. Old consolidated targets remain stable.
             edge_scale = row_scale[None, :] * self.edge_mask.to(row_scale.dtype)
             self.recurrent.grad.mul_(edge_scale)
 
-    @torch.no_grad()
-    def advance_maturity(self) -> None:
-        increment = 1.0 / self.maturity_steps
-        self.maturity[self.active_mask].add_(increment).clamp_(max=1.0)
-
-    @torch.no_grad()
-    def seal(self) -> None:
-        self.maturity[self.active_mask] = 1.0
-
-    @torch.no_grad()
-    def repair_metadata(self) -> None:
-        self.thresholds.data.clamp_(-1.0, 2.0)
+    def summary(self) -> dict[str, int]:
+        return {
+            "active": self.active_count,
+            "consolidated": self.consolidated_count,
+            "plastic": self.active_count - self.consolidated_count,
+            "reserve": self.max_cells - self.active_count,
+        }
 
 
 class Block(nn.Module):
@@ -400,7 +413,7 @@ class Block(nn.Module):
         self.attn_norm = RMSNorm(config.d_model)
         self.attn = CausalSelfAttention(config)
         self.pool_norm = RMSNorm(config.d_model) if use_pool else None
-        self.pool = ThresholdRecurrentCellPool(config) if use_pool else None
+        self.pool = SharedThresholdCellPool(config) if use_pool else None
         self.ffn_norm = RMSNorm(config.d_model)
         self.ffn = SwiGLU(config)
         self.dropout = nn.Dropout(config.dropout)
@@ -420,6 +433,8 @@ class Block(nn.Module):
 
 
 class ContinualCellTransformer(nn.Module):
+    ARCHITECTURE_VERSION = 4
+
     def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         self.config = config
@@ -435,55 +450,25 @@ class ContinualCellTransformer(nn.Module):
             ]
         )
         self.final_norm = RMSNorm(config.d_model)
-        self.lm_head = nn.Linear(
-            config.d_model,
-            config.vocab_size,
-            bias=False,
-        )
-        self.apply(self._init)
+        self.lm_head = nn.Linear(config.d_model, config.vocab_size, bias=False)
+        self.apply(self._init_weights)
 
     @staticmethod
-    def _init(module: nn.Module) -> None:
-        if isinstance(module, (nn.Linear, nn.Embedding)):
-            nn.init.normal_(module.weight, 0.0, 0.02)
+    def _init_weights(module: nn.Module) -> None:
+        if isinstance(module, nn.Linear):
+            nn.init.normal_(module.weight, mean=0.0, std=0.02)
+        elif isinstance(module, nn.Embedding):
+            nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.padding_idx is not None:
+                with torch.no_grad():
+                    module.weight[module.padding_idx].zero_()
 
-    def pools(self) -> list[ThresholdRecurrentCellPool]:
+    def pools(self) -> list[SharedThresholdCellPool]:
         return [
             block.pool
             for block in self.blocks
             if block.pool is not None
         ]
-
-    def load_compatible_state_dict(
-        self,
-        state_dict: dict[str, torch.Tensor],
-    ) -> tuple[list[str], list[str]]:
-        migrated: dict[str, torch.Tensor] = {}
-        for name, value in state_dict.items():
-            new_name = name.replace(".input_vectors", ".read_vectors")
-            new_name = new_name.replace(".output_vectors", ".write_vectors")
-            new_name = new_name.replace(".recurrent_mask", ".edge_mask")
-            if any(
-                token in new_name
-                for token in (
-                    "bank_adapters",
-                    "bank_gate_keys",
-                    "bank_gate_bias",
-                    "bank_ids",
-                    "bank_active",
-                    "bank_sealed",
-                )
-            ):
-                continue
-            migrated[new_name] = value
-
-        incompatible = self.load_state_dict(migrated, strict=False)
-        for pool in self.pools():
-            pool.repair_metadata()
-        return (
-            list(incompatible.missing_keys),
-            list(incompatible.unexpected_keys),
-        )
 
     def forward(
         self,
@@ -491,7 +476,7 @@ class ContinualCellTransformer(nn.Module):
         labels: torch.Tensor | None = None,
     ) -> dict[str, Any]:
         if input_ids.size(1) > self.config.max_seq_len:
-            raise ValueError("Sequence exceeds max_seq_len")
+            raise ValueError("Sequence exceeds max_seq_len.")
 
         x = self.token_embedding(input_ids)
         stats: list[PoolStats] = []
@@ -501,41 +486,55 @@ class ContinualCellTransformer(nn.Module):
                 stats.append(item)
 
         logits = self.lm_head(self.final_norm(x))
-        loss = (
-            None
-            if labels is None
-            else F.cross_entropy(
+        loss = None
+        if labels is not None:
+            loss = F.cross_entropy(
                 logits.flatten(0, 1),
                 labels.flatten(),
                 ignore_index=self.config.pad_token_id,
             )
-        )
 
-        def mean_metric(name: str) -> torch.Tensor:
-            if not stats:
-                return logits.new_tensor(0.0)
-            return torch.stack(
-                [getattr(item, name) for item in stats]
+        if stats:
+            confidence = torch.stack([item.confidence for item in stats]).mean()
+            coverage = torch.stack([item.coverage for item in stats]).mean()
+            plastic_activity = torch.stack(
+                [item.plastic_activity for item in stats]
             ).mean()
+            plastic_output_rms = torch.stack(
+                [item.plastic_output_rms for item in stats]
+            ).mean()
+        else:
+            confidence = logits.new_tensor(1.0)
+            coverage = logits.new_tensor(1.0)
+            plastic_activity = logits.new_tensor(0.0)
+            plastic_output_rms = logits.new_tensor(0.0)
 
         return {
             "logits": logits,
             "loss": loss,
+            "cell_confidence": confidence,
+            "coverage": coverage,
+            "plastic_activity_mean": plastic_activity,
+            "plastic_output_rms": plastic_output_rms,
             "growth_seeds": [item.seed for item in stats],
-            "growth_parent_ids": [item.parent_ids for item in stats],
-            "active_cells": [item.active_count for item in stats],
-            "active_cell_ids": [item.active_ids for item in stats],
-            "active_fraction": mean_metric("active_fraction"),
-            "mean_gate": mean_metric("mean_gate"),
-            "plastic_gate_mean": mean_metric("plastic_gate_mean"),
-            "plastic_output_rms": mean_metric("plastic_output_rms"),
+            "pool_summaries": [
+                {
+                    "active": item.active_count,
+                    "consolidated": item.consolidated_count,
+                    "plastic": item.active_count - item.consolidated_count,
+                    "mean_active_per_token": float(item.mean_active.detach()),
+                    "max_active_per_token": int(item.max_active.detach().item()),
+                    "top_cell_ids": item.top_cell_ids,
+                }
+                for item in stats
+            ],
         }
 
     @torch.no_grad()
     def resize_vocabulary(self, new_size: int) -> None:
         old_size = self.config.vocab_size
         if new_size < old_size:
-            raise ValueError("Vocabulary shrinking is unsupported")
+            raise ValueError("Vocabulary shrinking is unsupported.")
         if new_size == old_size:
             return
 
@@ -549,10 +548,13 @@ class ContinualCellTransformer(nn.Module):
             new_size,
             bias=False,
         ).to(self.lm_head.weight)
-        nn.init.normal_(embedding.weight, 0.0, 0.02)
-        nn.init.normal_(head.weight, 0.0, 0.02)
+        nn.init.normal_(embedding.weight, mean=0.0, std=0.02)
+        nn.init.normal_(head.weight, mean=0.0, std=0.02)
         embedding.weight[:old_size].copy_(self.token_embedding.weight)
         head.weight[:old_size].copy_(self.lm_head.weight)
+        if self.config.pad_token_id is not None:
+            embedding.weight[self.config.pad_token_id].zero_()
+
         self.token_embedding = embedding
         self.lm_head = head
         self.config.vocab_size = new_size
@@ -560,21 +562,19 @@ class ContinualCellTransformer(nn.Module):
     @torch.no_grad()
     def allocate_cells(
         self,
-        count: int,
+        count_per_pool: int,
         seeds: list[torch.Tensor] | None = None,
-        parent_ids: list[list[int]] | None = None,
     ) -> list[list[int]]:
         pools = self.pools()
         seeds = seeds or [None] * len(pools)
-        parent_ids = parent_ids or [[] for _ in pools]
         return [
-            pool.allocate(count, seed, parents)
-            for pool, seed, parents in zip(pools, seeds, parent_ids)
+            pool.allocate_cells(count_per_pool, seed)
+            for pool, seed in zip(pools, seeds)
         ]
 
-    def mask_cell_gradients(self, mature_scale: float) -> None:
+    def mask_cell_gradients(self, consolidated_scale: float) -> None:
         for pool in self.pools():
-            pool.mask_gradients(mature_scale)
+            pool.mask_gradients(consolidated_scale)
 
     @torch.no_grad()
     def advance_maturity(self) -> None:
@@ -582,9 +582,12 @@ class ContinualCellTransformer(nn.Module):
             pool.advance_maturity()
 
     @torch.no_grad()
-    def seal_active_cells(self) -> None:
+    def consolidate_active_cells(self) -> None:
         for pool in self.pools():
-            pool.seal()
+            pool.consolidate_active_cells()
+
+    def pool_summaries(self) -> list[dict[str, int]]:
+        return [pool.summary() for pool in self.pools()]
 
     @torch.no_grad()
     def generate(
@@ -596,27 +599,22 @@ class ContinualCellTransformer(nn.Module):
         eos_token_id: int | None = None,
     ) -> torch.Tensor:
         self.eval()
+        generated = ids
         for _ in range(max_new_tokens):
-            logits = self(
-                ids[:, -self.config.max_seq_len :]
-            )["logits"][:, -1]
+            context = generated[:, -self.config.max_seq_len :]
+            logits = self(context)["logits"][:, -1]
+
             if temperature <= 0.0 or top_k == 1:
-                token = logits.argmax(dim=-1, keepdim=True)
+                token = torch.argmax(logits, dim=-1, keepdim=True)
             else:
                 logits = logits / max(temperature, 1e-5)
                 if top_k > 0:
-                    threshold = logits.topk(
-                        min(top_k, logits.size(-1))
-                    ).values[:, -1:]
-                    logits = logits.masked_fill(
-                        logits < threshold,
-                        float("-inf"),
-                    )
+                    selected = min(top_k, logits.size(-1))
+                    threshold = logits.topk(selected).values[:, -1:]
+                    logits = logits.masked_fill(logits < threshold, float("-inf"))
                 token = torch.multinomial(logits.softmax(dim=-1), 1)
-            ids = torch.cat((ids, token), dim=1)
-            if (
-                eos_token_id is not None
-                and torch.all(token == eos_token_id)
-            ):
+
+            generated = torch.cat((generated, token), dim=1)
+            if eos_token_id is not None and torch.all(token == eos_token_id):
                 break
-        return ids
+        return generated
