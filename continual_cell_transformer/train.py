@@ -125,7 +125,10 @@ def arguments():
     parser.add_argument("--enable-micro-growth", action="store_true")
     parser.add_argument("--micro-growth-patience", type=int, default=30)
     parser.add_argument("--micro-growth-count", type=int, default=1)
-    parser.add_argument("--micro-growth-saturation", type=float, default=0.8)
+    parser.add_argument("--micro-growth-saturation", type=float, default=0.75)
+    parser.add_argument("--micro-growth-min-score", type=float, default=0.05)
+    parser.add_argument("--micro-growth-max-cells", type=int, default=4)
+    parser.add_argument("--micro-growth-fallback-cells", type=int, default=1)
     parser.add_argument("--max-micro-growth-events", type=int, default=8)
     parser.add_argument("--consolidate-active-cells", action="store_true")
     parser.add_argument("--d-model", type=int, default=128)
@@ -274,23 +277,15 @@ def main():
     retention_before = None
     if retention_ids is not None:
         retention_before = evaluate(
-            model,
-            retention_ids,
-            args.batch_size,
-            args.seq_len,
-            device,
-            args.eval_batches,
+            model, retention_ids, args.batch_size, args.seq_len, device, args.eval_batches
         )
     print(f"initial eval={initial_eval:.4f}")
     if retention_before is not None:
         print(f"old-task before={retention_before:.4f}")
 
     best = initial_eval
-    stale = 0
-    plateau = 0
-    micro_plateau = 0
-    cell_events = 0
-    micro_events = 0
+    stale = plateau = micro_plateau = 0
+    cell_events = micro_events = 0
     loss_ema = None
     last_growth = -10**9
     completed = 0
@@ -312,6 +307,9 @@ def main():
 
         total_loss = total_loss + args.plastic_sparsity_weight * result["plastic_activity"]
         total_loss.backward()
+
+        # Measure unresolved pressure before gradient masking/clipping changes it.
+        model.update_growth_signals()
         model.mask_cell_gradients(args.consolidated_cell_scale)
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
         optim.step()
@@ -350,15 +348,22 @@ def main():
             args.enable_micro_growth
             and micro_events < args.max_micro_growth_events
             and micro_plateau >= args.micro_growth_patience
-            and float(result["micro_saturation"]) >= args.micro_growth_saturation
         ):
-            zero_impact(
+            growth_result = zero_impact(
                 model,
                 x,
-                lambda: model.grow_micro_neurons(args.micro_growth_count),
-                f"micro growth {micro_events + 1}",
+                lambda: model.intelligent_capacity_growth(
+                    micro_count=args.micro_growth_count,
+                    outer_cell_count=args.micro_growth_fallback_cells,
+                    seed=result["growth_seed"],
+                    max_candidate_cells=args.micro_growth_max_cells,
+                    minimum_score=args.micro_growth_min_score,
+                    minimum_saturation=args.micro_growth_saturation,
+                ),
+                f"intelligent growth {micro_events + 1}",
             )
-            micro_events += 1
+            if growth_result.get("grown"):
+                micro_events += 1
             micro_plateau = 0
 
         if local_step == 1 or local_step % args.log_interval == 0:
@@ -369,17 +374,13 @@ def main():
                 f"active={float(result['mean_active']):.3f} "
                 f"plastic={float(result['plastic_activity']):.3f} "
                 f"micro_sat={float(result['micro_saturation']):.3f} "
-                f"pool={model.pool_summary()}"
+                f"pool={model.pool_summary()} "
+                f"growth_candidates={model.growth_diagnostics(4)}"
             )
 
         if local_step % args.eval_interval == 0 or local_step == args.steps:
             eval_loss = evaluate(
-                model,
-                eval_ids,
-                args.batch_size,
-                args.seq_len,
-                device,
-                args.eval_batches,
+                model, eval_ids, args.batch_size, args.seq_len, device, args.eval_batches
             )
             print(f"eval step={step} loss={eval_loss:.4f}")
             if eval_loss < best - args.early_stop_min_delta:
@@ -397,12 +398,7 @@ def main():
     retention_after = None
     if retention_ids is not None:
         retention_after = evaluate(
-            model,
-            retention_ids,
-            args.batch_size,
-            args.seq_len,
-            device,
-            args.eval_batches,
+            model, retention_ids, args.batch_size, args.seq_len, device, args.eval_batches
         )
         print(
             f"old-task after={retention_after:.4f}; "
@@ -431,6 +427,7 @@ def main():
                 "pool": model.pool_summary(),
                 "cell_growth_events": cell_events,
                 "micro_growth_events": micro_events,
+                "growth_candidates": model.growth_diagnostics(8),
             },
             indent=2,
         ),
