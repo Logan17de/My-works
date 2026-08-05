@@ -27,13 +27,13 @@ class ModelConfig:
 
     # Append-only banks. Each bank routes independently.
     max_cell_banks: int = 8
-    new_bank_adapter_scale: float = 0.10
+    new_bank_adapter_scale: float = 1.0
     bank_context_scale: float = 0.25
 
     # V3: every post-base bank has a local token-wise gate.
     # Bank 0 remains always on, so old routes cannot be displaced.
     bank_gate_temperature: float = 0.70
-    new_bank_gate_bias: float = -4.0
+    new_bank_gate_bias: float = -2.0
 
     pad_token_id: int = 0
     bos_token_id: int = 1
