@@ -126,9 +126,6 @@ def optimizer_for(
     for name, parameters in groups.items():
         if not parameters:
             continue
-
-        # Cell rows and local routers share tensors across sealed/dormant banks.
-        # Decoupled weight decay would move those rows even with zero gradients.
         group_weight_decay = (
             0.0 if name in {"cells", "router"} else cfg.weight_decay
         )
@@ -213,10 +210,10 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--initial-cells", type=int, default=64)
     parser.add_argument("--top-k-cells", type=int, default=8)
     parser.add_argument("--max-cell-banks", type=int, default=8)
-    parser.add_argument("--new-bank-adapter-scale", type=float, default=0.10)
+    parser.add_argument("--new-bank-adapter-scale", type=float, default=1.0)
     parser.add_argument("--bank-context-scale", type=float, default=0.25)
     parser.add_argument("--bank-gate-temperature", type=float, default=0.70)
-    parser.add_argument("--new-bank-gate-bias", type=float, default=-4.0)
+    parser.add_argument("--new-bank-gate-bias", type=float, default=-2.0)
     parser.add_argument("--seed", type=int, default=17)
     return parser.parse_args()
 
