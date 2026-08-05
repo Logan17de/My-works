@@ -25,11 +25,15 @@ class ModelConfig:
     cell_temperature: float = 0.7
     cell_maturity_steps: int = 500
 
-    # V2: each allocation event gets an independent routing bank.
-    # Top-k competition happens inside a bank, never across banks.
+    # Append-only banks. Each bank routes independently.
     max_cell_banks: int = 8
     new_bank_adapter_scale: float = 0.10
     bank_context_scale: float = 0.25
+
+    # V3: every post-base bank has a local token-wise gate.
+    # Bank 0 remains always on, so old routes cannot be displaced.
+    bank_gate_temperature: float = 0.70
+    new_bank_gate_bias: float = -4.0
 
     pad_token_id: int = 0
     bos_token_id: int = 1
@@ -44,6 +48,8 @@ class ModelConfig:
             raise ValueError("top_k_cells must be positive.")
         if self.max_cell_banks < 2:
             raise ValueError("max_cell_banks must be at least 2.")
+        if self.bank_gate_temperature <= 0:
+            raise ValueError("bank_gate_temperature must be positive.")
         if any(layer < 0 or layer >= self.n_layers for layer in self.cell_layers):
             raise ValueError("Every cell_layers index must refer to an existing block.")
 
@@ -73,8 +79,13 @@ class TrainConfig:
     attention_lr: float = 2e-5
     ffn_lr: float = 5e-5
     cell_lr: float = 2e-4
+    router_lr: float = 1e-3
     other_lr: float = 5e-5
     mature_cell_scale: float = 0.02
+
+    # Optional old-task replay teaches new gates when to stay closed.
+    retention_replay_weight: float = 0.0
+    gate_sparsity_weight: float = 0.0
 
     enable_growth: bool = False
     growth_warmup_steps: int = 100
