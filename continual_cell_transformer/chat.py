@@ -70,10 +70,7 @@ def generate_until_stop(
             )
 
         token_id = int(next_token.item())
-        generated = torch.cat(
-            (generated, next_token),
-            dim=1,
-        )
+        generated = torch.cat((generated, next_token), dim=1)
         answer_ids.append(token_id)
 
         if token_id == tokenizer.eos_token_id:
@@ -116,7 +113,7 @@ def main() -> None:
     parser.add_argument(
         "--show-routing",
         action="store_true",
-        help="Print selected cells and bank gate strengths for each prompt.",
+        help="Show active shared-population cells and activity statistics.",
     )
     args = parser.parse_args()
 
@@ -142,10 +139,13 @@ def main() -> None:
         print("Initialized missing architecture fields:", missing)
     if unexpected:
         print("Ignored unexpected fields:", unexpected)
-    model.to(device).eval()
 
-    print("Continual Cell Transformer. Type /quit to exit.")
-    print("Routing banks:", model.bank_summaries())
+    model.to(device).eval()
+    print("Continual Cell Transformer V4. Type /quit to exit.")
+    print(
+        "Shared population:",
+        [pool.active_count for pool in model.pools()],
+    )
 
     while True:
         try:
@@ -175,9 +175,20 @@ def main() -> None:
 
         if args.show_routing:
             routing = model(input_ids)
-            print("Selected cells:", routing["bank_top_ids"])
-            print("Gate means:", routing["bank_gate_means"])
-            print("Gate maxes:", routing["bank_gate_maxes"])
+            print("Active cells:", routing["active_cell_ids"])
+            print(
+                "Active fraction:",
+                float(routing["active_fraction"]),
+            )
+            print("Mean gate:", float(routing["mean_gate"]))
+            print(
+                "Plastic gate:",
+                float(routing["plastic_gate_mean"]),
+            )
+            print(
+                "Plastic output RMS:",
+                float(routing["plastic_output_rms"]),
+            )
 
         answer = generate_until_stop(
             model=model,
