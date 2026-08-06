@@ -15,8 +15,12 @@ def load_checkpoint(path: str | Path) -> dict:
         checkpoint = torch.load(path, map_location="cpu", weights_only=False)
     except TypeError:
         checkpoint = torch.load(path, map_location="cpu")
-    if int(checkpoint.get("architecture_version", 0)) != ContinualCellTransformer.ARCHITECTURE_VERSION:
-        raise ValueError("Checkpoint is not V5")
+    version = int(checkpoint.get("architecture_version", 0))
+    expected = ContinualCellTransformer.ARCHITECTURE_VERSION
+    if version != expected:
+        raise ValueError(
+            f"Checkpoint V{version} is incompatible with V{expected}"
+        )
     return checkpoint
 
 
@@ -43,7 +47,7 @@ def main() -> None:
     model.load_state_dict(checkpoint["model_state"], strict=True)
     model.to(device).eval()
 
-    print("Continual Cell Transformer V5. Type /quit to exit.")
+    print("Continual Cell Transformer V7. Type /quit to exit.")
     print("Pool:", model.pool_summary())
 
     while True:
@@ -62,14 +66,34 @@ def main() -> None:
         input_ids = torch.tensor([ids], dtype=torch.long, device=device)
 
         if args.show_routing:
-            routing = model(input_ids, adaptive_inference=True)
+            with torch.no_grad():
+                routing = model(input_ids, adaptive_inference=True)
             print("Depth used:", routing["used_depth"])
             print("Expected depth:", float(routing["expected_depth"]))
-            print("Halt probabilities:", routing["halt_probs"].squeeze(0).tolist())
-            print("Coverage:", float(routing["coverage"]))
-            print("Mean active cells:", float(routing["mean_active"]))
+            print(
+                "Conditional halt probabilities:",
+                routing["halt_probs"].squeeze(0).tolist(),
+            )
+            print(
+                "Cumulative halt mass:",
+                routing["halt_cumulative"].squeeze(0).tolist(),
+            )
+            print("Route coverage:", float(routing["route_coverage"]))
+            print("Active-cell fraction:", float(routing["active_fraction"]))
+            print("Mean active-cell count:", float(routing["mean_active_cells"]))
+            print(
+                "Effective-cell fraction:",
+                float(routing["effective_cell_fraction"]),
+            )
             print("Top cells:", routing["top_cell_ids"])
-            print("Micro-neuron saturation:", float(routing["micro_saturation"]))
+            print(
+                "Micro-neuron utilization:",
+                float(routing["micro_utilization"]),
+            )
+            print(
+                "Micro-neuron capacity allocated:",
+                float(routing["micro_capacity_fraction"]),
+            )
 
         generated = model.generate(
             input_ids,
@@ -77,7 +101,7 @@ def main() -> None:
             eos_token_id=tokenizer.eos_token_id,
         )
         answer = tokenizer.decode(generated[0, len(ids) :].tolist())
-        for marker in ("<END>", "<Q>"):
+        for marker in ("<END>", "<Q>", "\n"):
             if marker in answer:
                 answer = answer.split(marker, 1)[0]
         print("Model:", answer.strip() or "[no answer generated]")
