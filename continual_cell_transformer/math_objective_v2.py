@@ -6,7 +6,7 @@ from train_math import EncodedMathRecord, MathRecord
 
 OBJECTIVE_VERSION = "math_answer_eos_v2"
 ANSWER_WEIGHT = 1.0
-EOS_WEIGHT = 0.05
+EOS_WEIGHT = 0.01
 
 
 def encode_math_records(
@@ -18,7 +18,7 @@ def encode_math_records(
 
     Supervised targets are only:
     1. the answer digits;
-    2. a very low-weight EOS token used only to teach generation to stop.
+    2. a tiny-weight EOS token used only to teach generation to stop.
 
     The prompt, newline, <END>, and all other formatting receive zero loss.
     """
@@ -53,7 +53,7 @@ def encode_math_records(
             weights[index] = ANSWER_WEIGHT
 
         # EOS is useful for clean autoregressive generation, but its weight is
-        # deliberately tiny so it cannot create a misleading loss reduction.
+        # tiny enough to contribute below 1% for a one-digit answer.
         labels[eos_index] = next_ids[eos_index]
         weights[eos_index] = EOS_WEIGHT
 
