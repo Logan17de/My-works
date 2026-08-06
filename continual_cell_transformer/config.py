@@ -27,13 +27,13 @@ class ModelConfig:
     recurrent_steps: int = 2
     recurrent_fan_in: int = 8
     cell_residual_scale: float = 0.10
-    threshold_temperature: float = 0.08
-    initial_threshold: float = 0.10
-    new_cell_threshold: float = 0.00
+    threshold_temperature: float = 0.10
+    initial_threshold: float = 0.25
+    new_cell_threshold: float = 0.20
+    target_active_fraction: float = 0.15
     cell_maturity_steps: int = 500
 
     # Internal growth inside each cell.
-    # Every cell has a fixed reserve of micro-neurons, but only a subset is active.
     max_micro_neurons: int = 16
     initial_micro_neurons: int = 4
     micro_hidden_scale: float = 1.0
@@ -57,6 +57,8 @@ class ModelConfig:
             raise ValueError("recurrent_fan_in must be positive")
         if self.threshold_temperature <= 0:
             raise ValueError("threshold_temperature must be positive")
+        if not 0 < self.target_active_fraction < 1:
+            raise ValueError("target_active_fraction must be in (0, 1)")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -85,21 +87,20 @@ class TrainConfig:
     consolidated_cell_scale: float = 0.01
 
     depth_penalty: float = 0.01
+    routing_loss_weight: float = 0.05
     retention_replay_weight: float = 0.0
     plastic_sparsity_weight: float = 0.0
     retention_output_penalty: float = 0.0
 
-    # Autonomous outer growth.
     enable_cell_growth: bool = False
     cell_growth_warmup: int = 100
     cell_growth_patience: int = 40
     cell_growth_count: int = 2
     cell_growth_loss_floor: float = 1.0
-    cell_growth_coverage_floor: float = 0.75
+    cell_growth_coverage_floor: float = 0.12
     max_cell_growth_events: int = 4
     growth_cooldown: int = 100
 
-    # Autonomous internal growth.
     enable_micro_growth: bool = False
     micro_growth_patience: int = 30
     micro_growth_count: int = 1
