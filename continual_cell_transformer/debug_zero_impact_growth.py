@@ -3,6 +3,7 @@ from __future__ import annotations
 import torch
 
 from config import ModelConfig
+from growth_safety import zero_impact
 from model import ContinualCellTransformer
 from zero_impact_growth import apply_zero_impact_growth_patch
 
@@ -36,21 +37,21 @@ def main() -> None:
         pool.micro_in[0, :2].fill_(1.0)
         pool.micro_out[0, :2].normal_(0.0, 0.5)
         model.consolidate_active_cells()
-
         inputs = torch.randint(0, 300, (2, 12))
-        before = model(inputs, adaptive_inference=False)["logits"].clone()
-        grown = model.grow_micro_neurons(1, [0])
-        after = model(inputs, adaptive_inference=False)["logits"]
 
-    drift = float((after - before).abs().max())
+    grown = zero_impact(
+        model,
+        inputs,
+        lambda: model.grow_micro_neurons(1, [0]),
+        "forced-active micro growth",
+    )
+
     assert grown == {0: [2]}, grown
-    assert drift <= 1e-5, drift
     assert torch.count_nonzero(pool.micro_out[0, 2]).item() == 0
     assert not bool(pool.micro_consolidated_mask[0, 2])
 
     print("Zero-impact growth regression passed.")
     print("grown:", grown)
-    print(f"max_logit_drift={drift:.3e}")
 
 
 if __name__ == "__main__":
