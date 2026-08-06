@@ -17,12 +17,16 @@ class RMSNorm(nn.Module):
         self.eps = eps
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return x * torch.rsqrt(x.square().mean(dim=-1, keepdim=True) + self.eps) * self.weight
+        return (
+            x
+            * torch.rsqrt(x.square().mean(dim=-1, keepdim=True) + self.eps)
+            * self.weight
+        )
 
 
 def rotate_half(x: torch.Tensor) -> torch.Tensor:
-    a, b = x[..., ::2], x[..., 1::2]
-    return torch.stack((-b, a), dim=-1).flatten(-2)
+    first, second = x[..., ::2], x[..., 1::2]
+    return torch.stack((-second, first), dim=-1).flatten(-2)
 
 
 class RotaryEmbedding(nn.Module):
@@ -30,17 +34,30 @@ class RotaryEmbedding(nn.Module):
         super().__init__()
         if head_dim % 2:
             raise ValueError("RoPE head dimension must be even")
-        inv = 1.0 / (base ** (torch.arange(0, head_dim, 2).float() / head_dim))
-        pos = torch.arange(max_seq_len).float()
-        angles = torch.repeat_interleave(torch.outer(pos, inv), 2, dim=-1)
+        inverse = 1.0 / (
+            base ** (torch.arange(0, head_dim, 2).float() / head_dim)
+        )
+        positions = torch.arange(max_seq_len).float()
+        angles = torch.repeat_interleave(
+            torch.outer(positions, inverse),
+            2,
+            dim=-1,
+        )
         self.register_buffer("cos", angles.cos(), persistent=False)
         self.register_buffer("sin", angles.sin(), persistent=False)
 
-    def forward(self, q: torch.Tensor, k: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         length = q.size(-2)
         cos = self.cos[:length].to(q)[None, None]
         sin = self.sin[:length].to(q)[None, None]
-        return q * cos + rotate_half(q) * sin, k * cos + rotate_half(k) * sin
+        return (
+            q * cos + rotate_half(q) * sin,
+            k * cos + rotate_half(k) * sin,
+        )
 
 
 class CausalSelfAttention(nn.Module):
@@ -51,14 +68,23 @@ class CausalSelfAttention(nn.Module):
         self.dropout = config.dropout
         self.qkv = nn.Linear(config.d_model, 3 * config.d_model, bias=False)
         self.proj = nn.Linear(config.d_model, config.d_model, bias=False)
-        self.rope = RotaryEmbedding(self.head_dim, config.max_seq_len, config.rope_base)
+        self.rope = RotaryEmbedding(
+            self.head_dim,
+            config.max_seq_len,
+            config.rope_base,
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch, length, dim = x.shape
         q, k, v = self.qkv(x).chunk(3, dim=-1)
 
         def split(tensor: torch.Tensor) -> torch.Tensor:
-            return tensor.view(batch, length, self.heads, self.head_dim).transpose(1, 2)
+            return tensor.view(
+                batch,
+                length,
+                self.heads,
+                self.head_dim,
+            ).transpose(1, 2)
 
         q, k, v = map(split, (q, k, v))
         q, k = self.rope(q, k)
@@ -69,7 +95,12 @@ class CausalSelfAttention(nn.Module):
             dropout_p=self.dropout if self.training else 0.0,
             is_causal=True,
         )
-        return self.proj(attended.transpose(1, 2).contiguous().view(batch, length, dim))
+        attended = attended.transpose(1, 2).contiguous().view(
+            batch,
+            length,
+            dim,
+        )
+        return self.proj(attended)
 
 
 class SwiGLU(nn.Module):
@@ -105,7 +136,7 @@ class RecurrentTransformerBlock(nn.Module):
 
 
 class ContinualCellTransformer(nn.Module):
-    ARCHITECTURE_VERSION = 6
+    ARCHITECTURE_VERSION = 7
 
     def __init__(self, config: ModelConfig) -> None:
         super().__init__()
@@ -142,36 +173,60 @@ class ContinualCellTransformer(nn.Module):
 
         x = self.token_embedding(input_ids)
         weighted = torch.zeros_like(x)
-        remaining = torch.ones(x.size(0), device=x.device, dtype=x.dtype)
+        remaining = torch.ones(
+            x.size(0),
+            device=x.device,
+            dtype=x.dtype,
+        )
+        cumulative = torch.zeros_like(remaining)
         expected_depth = torch.zeros_like(remaining)
-        halt_probs: list[torch.Tensor] = []
+        conditional_probs: list[torch.Tensor] = []
+        cumulative_probs: list[torch.Tensor] = []
         stats_per_depth: list[PoolStats] = []
         used_depth = self.config.max_depth
 
         for depth in range(1, self.config.max_depth + 1):
             x, stats = self.block(x)
             stats_per_depth.append(stats)
+
             summary = self.halt_norm(x).mean(dim=1)
             probability = torch.sigmoid(
-                self.halt_head(summary).squeeze(-1) / self.config.halt_temperature
+                self.halt_head(summary).squeeze(-1)
+                / self.config.halt_temperature
             )
             if depth < self.config.min_depth:
                 probability = torch.zeros_like(probability)
             if depth == self.config.max_depth:
                 probability = torch.ones_like(probability)
-            halt_probs.append(probability)
 
-            weight = remaining * probability
-            weighted = weighted + weight[:, None, None] * x
-            expected_depth = expected_depth + weight * depth
-            remaining = remaining * (1.0 - probability)
-
-            if (
+            raw_weight = remaining * probability
+            next_cumulative = cumulative + raw_weight
+            should_stop = (
                 adaptive_inference
                 and depth >= self.config.min_depth
-                and torch.all(probability >= self.config.halt_threshold)
-            ):
+                and torch.all(
+                    next_cumulative >= self.config.halt_threshold
+                )
+            )
+
+            if should_stop:
+                # Assign all unresolved probability mass to the current state.
+                # This keeps the mixture normalized during true early exit.
+                weight = remaining
+                cumulative = torch.ones_like(cumulative)
+                remaining = torch.zeros_like(remaining)
                 used_depth = depth
+            else:
+                weight = raw_weight
+                cumulative = next_cumulative
+                remaining = remaining * (1.0 - probability)
+
+            weighted = weighted + weight[:, None, None] * x
+            expected_depth = expected_depth + weight * depth
+            conditional_probs.append(probability)
+            cumulative_probs.append(cumulative)
+
+            if should_stop:
                 break
 
         logits = self.lm_head(self.final_norm(weighted))
@@ -189,12 +244,18 @@ class ContinualCellTransformer(nn.Module):
             "loss": loss,
             "expected_depth": expected_depth.mean(),
             "used_depth": used_depth,
-            "halt_probs": torch.stack(halt_probs, dim=1),
-            "coverage": last.coverage,
-            "mean_active": last.mean_active,
+            "halt_probs": torch.stack(conditional_probs, dim=1),
+            "halt_cumulative": torch.stack(cumulative_probs, dim=1),
+            "coverage": last.active_fraction,
+            "route_coverage": last.route_coverage,
+            "active_fraction": last.active_fraction,
+            "mean_active_cells": last.mean_active_cells,
+            "effective_cell_fraction": last.effective_cell_fraction,
+            "routing_loss": last.routing_loss,
             "plastic_activity": last.plastic_activity,
             "plastic_output_rms": last.plastic_output_rms,
-            "micro_saturation": last.micro_saturation,
+            "micro_utilization": last.micro_utilization,
+            "micro_capacity_fraction": last.micro_capacity_fraction,
             "active_cells": last.active_count,
             "consolidated_cells": last.consolidated_count,
             "top_cell_ids": last.top_cell_ids,
@@ -213,7 +274,11 @@ class ContinualCellTransformer(nn.Module):
             self.config.d_model,
             padding_idx=self.config.pad_token_id,
         ).to(self.token_embedding.weight)
-        head = nn.Linear(self.config.d_model, new_size, bias=False).to(self.lm_head.weight)
+        head = nn.Linear(
+            self.config.d_model,
+            new_size,
+            bias=False,
+        ).to(self.lm_head.weight)
         nn.init.normal_(embedding.weight, 0.0, 0.02)
         nn.init.normal_(head.weight, 0.0, 0.02)
         embedding.weight[:old_size].copy_(self.token_embedding.weight)
@@ -223,7 +288,11 @@ class ContinualCellTransformer(nn.Module):
         self.config.vocab_size = new_size
 
     @torch.no_grad()
-    def allocate_cells(self, count: int, seed: torch.Tensor | None = None) -> list[int]:
+    def allocate_cells(
+        self,
+        count: int,
+        seed: torch.Tensor | None = None,
+    ) -> list[int]:
         return self.block.cells.allocate_cells(count, seed)
 
     @torch.no_grad()
@@ -253,7 +322,10 @@ class ContinualCellTransformer(nn.Module):
             return {
                 "mode": "micro",
                 "candidates": candidates,
-                "grown": self.grow_micro_neurons(micro_count, candidates),
+                "grown": self.grow_micro_neurons(
+                    micro_count,
+                    candidates,
+                ),
             }
         return {
             "mode": "outer_cell",
@@ -266,7 +338,10 @@ class ContinualCellTransformer(nn.Module):
         self.block.cells.update_growth_signals()
 
     @torch.no_grad()
-    def growth_diagnostics(self, limit: int = 8) -> list[dict[str, float | int]]:
+    def growth_diagnostics(
+        self,
+        limit: int = 8,
+    ) -> list[dict[str, float | int]]:
         return self.block.cells.growth_diagnostics(limit)
 
     def mask_cell_gradients(self, consolidated_scale: float) -> None:
@@ -282,12 +357,23 @@ class ContinualCellTransformer(nn.Module):
 
     def pool_summary(self) -> dict[str, int]:
         pool = self.block.cells
+        active_micro = int(pool.micro_active_mask.sum().item())
+        consolidated_micro = int(
+            (
+                pool.micro_active_mask
+                & pool.micro_consolidated_mask
+            ).sum().item()
+        )
         return {
             "active": pool.active_count,
             "consolidated": pool.consolidated_count,
             "reserve": pool.max_cells - pool.active_count,
-            "active_micro": int(pool.micro_active_mask.sum().item()),
-            "micro_capacity": int(pool.active_mask.sum().item() * pool.max_micro),
+            "active_micro": active_micro,
+            "consolidated_micro": consolidated_micro,
+            "plastic_micro": active_micro - consolidated_micro,
+            "micro_capacity": int(
+                pool.active_mask.sum().item() * pool.max_micro
+            ),
         }
 
     @torch.no_grad()
@@ -310,10 +396,17 @@ class ContinualCellTransformer(nn.Module):
             else:
                 logits = logits / max(temperature, 1e-5)
                 if top_k > 0:
-                    cutoff = logits.topk(min(top_k, logits.size(-1))).values[:, -1:]
-                    logits = logits.masked_fill(logits < cutoff, float("-inf"))
+                    cutoff = logits.topk(
+                        min(top_k, logits.size(-1))
+                    ).values[:, -1:]
+                    logits = logits.masked_fill(
+                        logits < cutoff,
+                        float("-inf"),
+                    )
                 token = torch.multinomial(logits.softmax(-1), 1)
             ids = torch.cat((ids, token), dim=1)
-            if eos_token_id is not None and torch.all(token == eos_token_id):
+            if eos_token_id is not None and torch.all(
+                token == eos_token_id
+            ):
                 break
         return ids
