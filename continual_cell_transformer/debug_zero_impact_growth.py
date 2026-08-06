@@ -39,16 +39,21 @@ def main() -> None:
         model.consolidate_active_cells()
         inputs = torch.randint(0, 300, (2, 12))
 
+    def mutation() -> dict[int, list[int]]:
+        grown = model.grow_micro_neurons(1, [0])
+        assert grown == {0: [2]}, grown
+        assert torch.count_nonzero(pool.micro_out[0, 2]).item() == 0, (
+            "new micro output was not written as zero"
+        )
+        assert not bool(pool.micro_consolidated_mask[0, 2])
+        return grown
+
     grown = zero_impact(
         model,
         inputs,
-        lambda: model.grow_micro_neurons(1, [0]),
+        mutation,
         "forced-active micro growth",
     )
-
-    assert grown == {0: [2]}, grown
-    assert torch.count_nonzero(pool.micro_out[0, 2]).item() == 0
-    assert not bool(pool.micro_consolidated_mask[0, 2])
 
     print("Zero-impact growth regression passed.")
     print("grown:", grown)
