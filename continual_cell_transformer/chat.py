@@ -27,8 +27,10 @@ def load_checkpoint(path: str | Path) -> dict:
 def prepare_prompt(text: str) -> str:
     text = text.strip()
     if text.startswith("<Q>"):
-        return text if "<A>" in text else text + "\n<A>"
-    return f"<Q> {text}\n<A>"
+        if "<A>" in text:
+            return text if text.endswith(" ") else text + " "
+        return text + "\n<A> "
+    return f"<Q> {text}\n<A> "
 
 
 def main() -> None:
