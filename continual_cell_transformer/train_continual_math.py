@@ -13,10 +13,16 @@ from config import ModelConfig
 from math_objective_v2 import OBJECTIVE_VERSION, encode_math_records
 from model import ContinualCellTransformer
 from tokenizer import DynamicByteTokenizer
+from zero_impact_growth import apply_zero_impact_growth_patch
 
 
 LEGACY_OBJECTIVES = {"math_answer_only_v1", "math_answer_eos_v2"}
 _original_build_model_and_tokenizer = train_math.build_model_and_tokenizer
+
+
+# Ensure micro-neuron insertion preserves logits even though the pool
+# normalizes by sqrt(active_micro_count).
+apply_zero_impact_growth_patch()
 
 
 def build_model_and_tokenizer_compatible(args, train_text: str):
