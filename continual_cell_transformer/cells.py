@@ -178,7 +178,14 @@ class SharedExpandableCellPool(nn.Module):
             micro_hidden,
             self.micro_out[indices],
         )
-        per_cell_denom = micro_mask.sum(dim=-1).clamp_min(1).float().sqrt()
+        # Keep normalization independent of growth. Newly activated slots start
+        # with zero output, so insertion leaves all existing computation and
+        # logits exactly unchanged instead of rescaling the cell by a new
+        # sqrt(active_micro_count) denominator.
+        per_cell_denom = x.new_full(
+            (indices.numel(),),
+            float(max(1, self.initial_micro)) ** 0.5,
+        )
         cell_outputs = cell_outputs / per_cell_denom[None, None, :, None]
         output = cell_outputs.sum(dim=2)
 
