@@ -10,6 +10,7 @@ training objective used for new-task and retention batches changes.
 
 import train_math
 from config import ModelConfig
+from growth_safety import zero_impact
 from math_objective_v2 import OBJECTIVE_VERSION, encode_math_records
 from model import ContinualCellTransformer
 from tokenizer import DynamicByteTokenizer
@@ -20,8 +21,8 @@ LEGACY_OBJECTIVES = {"math_answer_only_v1", "math_answer_eos_v2"}
 _original_build_model_and_tokenizer = train_math.build_model_and_tokenizer
 
 
-# Ensure micro-neuron insertion preserves logits even though the pool
-# normalizes by sqrt(active_micro_count).
+# Zero-impact growth is implemented directly in cells.py. The compatibility
+# call remains harmless, while verification uses deterministic math attention.
 apply_zero_impact_growth_patch()
 
 
@@ -59,11 +60,13 @@ def build_model_and_tokenizer_compatible(args, train_text: str):
     return model, tokenizer, previous_step
 
 
-# Patch every path used by train_math.main(): encoding, resume validation, and
-# checkpoint metadata all use the V2 objective after this point.
+# Patch every path used by train_math.main(): encoding, resume validation,
+# checkpoint metadata, and structural-growth verification all use the current
+# continual-learning behavior after this point.
 train_math.OBJECTIVE_VERSION = OBJECTIVE_VERSION
 train_math.encode_math_records = encode_math_records
 train_math.build_model_and_tokenizer = build_model_and_tokenizer_compatible
+train_math.zero_impact = zero_impact
 
 
 if __name__ == "__main__":
