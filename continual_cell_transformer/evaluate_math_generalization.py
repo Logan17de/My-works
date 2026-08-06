@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import random
 import re
+import time
 from pathlib import Path
 
 import torch
@@ -106,10 +108,19 @@ def main() -> None:
     parser.add_argument("--heldout-digit", type=int, default=7)
     parser.add_argument("--data-dir", default="data")
     parser.add_argument("--max-new-tokens", type=int, default=6)
+    parser.add_argument(
+        "--limit-per-split",
+        type=int,
+        default=0,
+        help="Randomly sample at most this many examples from each split; 0 runs all.",
+    )
+    parser.add_argument("--seed", type=int, default=17)
     args = parser.parse_args()
 
     if not 0 <= args.heldout_digit <= 9:
         raise ValueError("--heldout-digit must be between 0 and 9")
+    if args.limit_per_split < 0:
+        raise ValueError("--limit-per-split must be non-negative")
 
     data_dir = Path(args.data_dir)
     prefix = args.operation
@@ -144,10 +155,22 @@ def main() -> None:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device).eval()
+    print(f"device={device}", flush=True)
 
     results: dict[str, dict] = {}
-    for name, path in files.items():
+    total_start = time.perf_counter()
+    for split_index, (name, path) in enumerate(files.items()):
         examples = load_examples(path)
+        original_count = len(examples)
+        if args.limit_per_split and len(examples) > args.limit_per_split:
+            rng = random.Random(args.seed + split_index)
+            examples = rng.sample(examples, args.limit_per_split)
+
+        print(
+            f"evaluating {name}: {len(examples)}/{original_count} examples...",
+            flush=True,
+        )
+        split_start = time.perf_counter()
         results[name] = evaluate_math_mastery(
             model,
             tokenizer,
@@ -155,9 +178,22 @@ def main() -> None:
             device,
             args.max_new_tokens,
         )
+        elapsed = time.perf_counter() - split_start
+        result = results[name]
+        print(
+            f"finished {name}: {result['correct']}/{result['total']} "
+            f"in {elapsed:.1f}s",
+            flush=True,
+        )
 
+    print(f"total evaluation time: {time.perf_counter() - total_start:.1f}s")
     print(f"Generalization report: {args.operation}")
     print(f"Held-out operand digit: {args.heldout_digit}")
+    if args.limit_per_split:
+        print(
+            f"Sampled evaluation: up to {args.limit_per_split} examples per split "
+            f"with seed {args.seed}"
+        )
     print()
     print(f"{'split':28} {'correct':>10} {'accuracy':>10} {'avg_depth':>10}")
     print("-" * 62)
