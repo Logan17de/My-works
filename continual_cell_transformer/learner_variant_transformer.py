@@ -31,24 +31,7 @@ class BottleneckLearner(nn.Module):
 
 
 class VariantBlock(nn.Module):
-    """One ordinary Transformer block plus one learner placement variant.
-
-    Placements:
-      post_ffn_all:
-        attention -> FFN -> learner(hidden), with learner as a residual branch
-        after the completed FFN residual.
-
-      standalone_all:
-        an independent learner reads the layer input and bypasses the complete
-        attention+FFN path; its output is added after the ordinary block.
-
-      pre_activation_all:
-        learner(hidden) is added to the SwiGLU gate before SiLU.
-
-      post_activation_all:
-        learner(z) is added to the activated SwiGLU intermediate z before the
-        FFN down projection.
-    """
+    """One ordinary Transformer block plus one learner placement variant."""
 
     def __init__(
         self,
@@ -61,6 +44,7 @@ class VariantBlock(nn.Module):
             raise ValueError(f"Unknown variant {variant!r}; choose from {VARIANTS}")
 
         self.variant = variant
+        self.learner_enabled = True
         self.attn_norm = RMSNorm(config.d_model)
         self.attn = CausalSelfAttention(config)
         self.ffn_norm = RMSNorm(config.d_model)
@@ -91,12 +75,12 @@ class VariantBlock(nn.Module):
     def _ffn(self, h: torch.Tensor) -> torch.Tensor:
         gate, value = self.ffn_up(h).chunk(2, dim=-1)
 
-        if self.variant == "pre_activation_all":
+        if self.variant == "pre_activation_all" and self.learner_enabled:
             gate = gate + self.learner(h)
 
         z = F.silu(gate) * value
 
-        if self.variant == "post_activation_all":
+        if self.variant == "post_activation_all" and self.learner_enabled:
             z = z + self.learner(z)
 
         return self.dropout(self.ffn_down(z))
@@ -106,9 +90,9 @@ class VariantBlock(nn.Module):
         x = x + self.dropout(self.attn(self.attn_norm(x)))
         x = x + self._ffn(self.ffn_norm(x))
 
-        if self.variant == "post_ffn_all":
+        if self.learner_enabled and self.variant == "post_ffn_all":
             x = x + self.dropout(self.learner(self.learner_norm(x)))
-        elif self.variant == "standalone_all":
+        elif self.learner_enabled and self.variant == "standalone_all":
             # True bypass branch: the learner sees the representation that
             # entered this Transformer layer, not the already transformed x.
             x = x + self.dropout(self.learner(self.learner_norm(layer_input)))
@@ -139,6 +123,7 @@ class LearnerVariantTransformer(nn.Module):
         self.num_layers = int(num_layers)
         self.variant = variant
         self.learner_dim = int(learner_dim)
+        self.learners_enabled = True
 
         self.token_embedding = nn.Embedding(
             config.vocab_size,
@@ -157,6 +142,12 @@ class LearnerVariantTransformer(nn.Module):
     def _init(module: nn.Module) -> None:
         if isinstance(module, (nn.Linear, nn.Embedding)):
             nn.init.normal_(module.weight, 0.0, 0.02)
+
+    def set_learners_enabled(self, enabled: bool) -> None:
+        """Enable or bypass every learner without changing any weights."""
+        self.learners_enabled = bool(enabled)
+        for layer in self.layers:
+            layer.learner_enabled = self.learners_enabled
 
     def forward(
         self,
@@ -182,6 +173,7 @@ class LearnerVariantTransformer(nn.Module):
             "logits": logits,
             "used_depth": self.num_layers,
             "expected_depth": depth,
+            "learners_enabled": self.learners_enabled,
         }
 
     @torch.no_grad()
