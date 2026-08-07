@@ -53,6 +53,31 @@ def arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def checkpoint_payload(
+    model: BasicTransformer,
+    optimizer: torch.optim.Optimizer,
+    tokenizer: DynamicByteTokenizer,
+    args: argparse.Namespace,
+    step: int,
+    parameter_count: int,
+    eval_loss: float,
+) -> dict:
+    return {
+        "model_type": BasicTransformer.MODEL_TYPE,
+        "architecture_version": BasicTransformer.ARCHITECTURE_VERSION,
+        "training_objective": OBJECTIVE_VERSION,
+        "model_state": model.state_dict(),
+        "optimizer_state": optimizer.state_dict(),
+        "model_config": model.config.to_dict(),
+        "num_layers": args.layers,
+        "tokenizer": tokenizer.to_dict(),
+        "step": step,
+        "eval_loss": float(eval_loss),
+        "train_args": vars(args),
+        "parameter_count": parameter_count,
+    }
+
+
 def main() -> None:
     args = arguments()
     random.seed(args.seed)
@@ -92,6 +117,9 @@ def main() -> None:
         weight_decay=args.weight_decay,
     )
 
+    output_dir = Path(args.out_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     parameter_count = model.parameter_count()
     print(
         f"model=basic_transformer objective={OBJECTIVE_VERSION} "
@@ -113,9 +141,26 @@ def main() -> None:
     print(f"initial answer-only eval={initial_eval:.4f}")
 
     best_eval = initial_eval
+    best_step = 0
+    final_eval = initial_eval
     stale_evals = 0
     mastery_streak = 0
     completed = 0
+
+    torch.save(
+        checkpoint_payload(
+            model,
+            optimizer,
+            tokenizer,
+            args,
+            step=0,
+            parameter_count=parameter_count,
+            eval_loss=initial_eval,
+        ),
+        output_dir / "best_checkpoint.pt",
+    )
+    print(f"best checkpoint step=0 eval={initial_eval:.4f}")
+
     model.train()
 
     for step in range(1, args.steps + 1):
@@ -149,11 +194,26 @@ def main() -> None:
                 tokenizer.pad_token_id,
                 device,
             )
+            final_eval = eval_loss
             print(f"eval step={step} answer-only loss={eval_loss:.4f}")
 
             if eval_loss < best_eval - args.early_stop_min_delta:
                 best_eval = eval_loss
+                best_step = step
                 stale_evals = 0
+                torch.save(
+                    checkpoint_payload(
+                        model,
+                        optimizer,
+                        tokenizer,
+                        args,
+                        step=step,
+                        parameter_count=parameter_count,
+                        eval_loss=eval_loss,
+                    ),
+                    output_dir / "best_checkpoint.pt",
+                )
+                print(f"NEW BEST step={step} eval={eval_loss:.4f} -> best_checkpoint.pt")
             else:
                 stale_evals += 1
 
@@ -188,30 +248,30 @@ def main() -> None:
                 print(f"loss early stop at step={step}")
                 break
 
-    output_dir = Path(args.out_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "model_type": BasicTransformer.MODEL_TYPE,
-        "architecture_version": BasicTransformer.ARCHITECTURE_VERSION,
-        "training_objective": OBJECTIVE_VERSION,
-        "model_state": model.state_dict(),
-        "optimizer_state": optimizer.state_dict(),
-        "model_config": model.config.to_dict(),
-        "num_layers": args.layers,
-        "tokenizer": tokenizer.to_dict(),
-        "step": completed,
-        "train_args": vars(args),
-        "parameter_count": parameter_count,
-    }
+    payload = checkpoint_payload(
+        model,
+        optimizer,
+        tokenizer,
+        args,
+        step=completed,
+        parameter_count=parameter_count,
+        eval_loss=final_eval,
+    )
     torch.save(payload, output_dir / "checkpoint.pt")
     tokenizer.save(output_dir / "tokenizer.json")
 
+    overfit_delta = float(final_eval - best_eval)
+    overfit_percent = 100.0 * overfit_delta / max(abs(best_eval), 1e-12)
     summary = {
         "model_type": BasicTransformer.MODEL_TYPE,
         "architecture_version": BasicTransformer.ARCHITECTURE_VERSION,
         "training_objective": OBJECTIVE_VERSION,
         "step": completed,
+        "best_step": best_step,
         "best_answer_only_eval": best_eval,
+        "final_answer_only_eval": final_eval,
+        "overfit_delta": overfit_delta,
+        "overfit_percent": overfit_percent,
         "mastery_streak": mastery_streak,
         "train_examples": len(train_records),
         "eval_examples": len(eval_records),
@@ -222,7 +282,13 @@ def main() -> None:
         json.dumps(summary, indent=2),
         encoding="utf-8",
     )
-    print("saved", output_dir / "checkpoint.pt")
+    print("saved final", output_dir / "checkpoint.pt")
+    print("saved best ", output_dir / "best_checkpoint.pt")
+    print(
+        f"best_eval={best_eval:.4f} at step={best_step}; "
+        f"final_eval={final_eval:.4f}; "
+        f"overfit_delta={overfit_delta:+.4f} ({overfit_percent:+.2f}%)"
+    )
 
 
 if __name__ == "__main__":
