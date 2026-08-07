@@ -7,6 +7,7 @@ import torch
 
 from basic_transformer import BasicTransformer
 from config import ModelConfig
+from learner_variant_transformer import LearnerVariantTransformer
 from mastery_eval import evaluate_math_mastery
 from model import ContinualCellTransformer
 from plain_math_compat import parse_math_records
@@ -22,18 +23,36 @@ def load_checkpoint(path: str | Path) -> dict:
 
 def build_model(checkpoint: dict):
     config = ModelConfig.from_dict(checkpoint["model_config"])
-    if checkpoint.get("model_type") == BasicTransformer.MODEL_TYPE:
-        model = BasicTransformer(config, num_layers=int(checkpoint["num_layers"]))
-        label = f"basic_transformer/{int(checkpoint['num_layers'])}layers"
+    model_type = checkpoint.get("model_type")
+
+    if model_type == BasicTransformer.MODEL_TYPE:
+        layers = int(checkpoint["num_layers"])
+        model = BasicTransformer(config, num_layers=layers)
+        label = f"basic_transformer/{layers}layers"
+    elif model_type == LearnerVariantTransformer.MODEL_TYPE:
+        layers = int(checkpoint["num_layers"])
+        variant = str(checkpoint["variant"])
+        learner_dim = int(checkpoint["learner_dim"])
+        model = LearnerVariantTransformer(
+            config,
+            num_layers=layers,
+            variant=variant,
+            learner_dim=learner_dim,
+        )
+        label = (
+            f"learner_variant/{variant}/{layers}layers/"
+            f"learner{learner_dim}"
+        )
     else:
         version = int(checkpoint.get("architecture_version", 0))
         if version != ContinualCellTransformer.ARCHITECTURE_VERSION:
             raise ValueError(
-                f"Unsupported checkpoint architecture version {version}; "
-                f"expected V{ContinualCellTransformer.ARCHITECTURE_VERSION} or a basic Transformer checkpoint."
+                f"Unsupported checkpoint model_type={model_type!r} "
+                f"architecture_version={version}."
             )
         model = ContinualCellTransformer(config)
         label = f"continual_cell_transformer/V{version}"
+
     model.load_state_dict(checkpoint["model_state"], strict=True)
     return model, label
 
