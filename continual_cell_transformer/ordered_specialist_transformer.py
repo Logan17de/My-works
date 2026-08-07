@@ -83,7 +83,8 @@ class OrderedAttentionLayer(nn.Module):
         multiply_token_id: int,
     ) -> torch.Tensor:
         x = x + self.dropout(self.attn(self.attn_norm(x)))
-        x = x + self.dropout(shared_ffn(self.shared_norm(x)))
+        # SwiGLU already contains the same FFN dropout used by the baseline.
+        x = x + shared_ffn(self.shared_norm(x))
 
         masks = self._ordered_operator_masks(
             input_ids,
@@ -94,8 +95,8 @@ class OrderedAttentionLayer(nn.Module):
             h = self.specialist_norm(x)
             # Compute both branches once and select per row/token. The routing
             # masks themselves are fixed from the visible operator sequence.
-            add_delta = self.dropout(add_ffn(h))
-            multiply_delta = self.dropout(multiply_ffn(h))
+            add_delta = add_ffn(h)
+            multiply_delta = multiply_ffn(h)
             x = (
                 x
                 + add_delta * plus_mask.unsqueeze(-1).to(add_delta.dtype)
