@@ -11,8 +11,9 @@ export default function SignalDashboard() {
   const [status, setStatus] = useState("waiting for Supabase configuration");
 
   useEffect(() => {
-    const client = browserSupabase();
-    if (!client) return;
+    const maybeClient = browserSupabase();
+    if (!maybeClient) return;
+    const client = maybeClient;
     let mounted = true;
     async function loadLatest() {
       const { data, error } = await client.from("signals").select("payload")
