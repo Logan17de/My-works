@@ -11,11 +11,11 @@ export default function SignalDashboard() {
   const [status, setStatus] = useState("waiting for Supabase configuration");
 
   useEffect(() => {
-    const supabase = browserSupabase();
-    if (!supabase) return;
+    const client = browserSupabase();
+    if (!client) return;
     let mounted = true;
     async function loadLatest() {
-      const { data, error } = await supabase.from("signals").select("payload")
+      const { data, error } = await client.from("signals").select("payload")
         .order("observed_at", { ascending: false }).limit(1).maybeSingle();
       if (!mounted) return;
       if (error) setStatus(error.message);
@@ -23,14 +23,14 @@ export default function SignalDashboard() {
       else setStatus("connected — no signals yet");
     }
     void loadLatest();
-    const channel = supabase.channel("signals-dashboard").on(
+    const channel = client.channel("signals-dashboard").on(
       "postgres_changes", { event: "INSERT", schema: "public", table: "signals" },
       (payload) => {
         const row = payload.new as { payload?: SignalPayload };
         if (row.payload) { setSignal(row.payload); setStatus("live"); }
       },
     ).subscribe();
-    return () => { mounted = false; void supabase.removeChannel(channel); };
+    return () => { mounted = false; void client.removeChannel(channel); };
   }, []);
 
   return (
