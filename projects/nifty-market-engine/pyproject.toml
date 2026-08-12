@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nifty-market-engine"
+version = "0.1.0"
+description = "NIFTY 50 level-event engine using constituent participation, futures confirmation, and option Greeks."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "growwapi==1.5.0",
+  "pyotp>=2.9,<3",
+  "supabase>=2.15,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+  "pytest-cov>=6,<7",
+  "ruff>=0.9,<1",
+  "mypy>=1.14,<2",
+]
+
+[project.scripts]
+nifty-engine = "nifty_engine.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nifty_engine"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
