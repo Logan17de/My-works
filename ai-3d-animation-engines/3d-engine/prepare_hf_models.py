@@ -1,32 +1,35 @@
 #!/usr/bin/env python3
 """Authenticate to Hugging Face and pre-download TRELLIS.2 dependencies with visible progress.
 
-The goal is to make the expensive model-download phase explicit before TRELLIS inference.
-A valid HF_TOKEN (environment variable or previously logged-in token) is required because
-TRELLIS.2 uses the gated Meta DINOv3 encoder.
+A valid personal HF_TOKEN is required. TRELLIS.2 depends on gated models from
+Meta (DINOv3) and BRIA (RMBG-2.0), so both access agreements must be accepted
+on the Hugging Face website before this script can download them.
 """
 from __future__ import annotations
 
 import argparse
 import fnmatch
 import os
-import sys
 import time
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
 from typing import Iterable
 
-# Keep model files on fast ephemeral Colab storage, not Google Drive.
 os.environ.setdefault("HF_HOME", "/content/huggingface")
 os.environ.pop("HF_HUB_DISABLE_PROGRESS_BARS", None)
 
-from huggingface_hub import HfApi, get_token, hf_hub_download
+from huggingface_hub import HfApi, get_token, hf_hub_download, login
 from huggingface_hub.utils import GatedRepoError, HfHubHTTPError, enable_progress_bars
 
 DINO_REPO = "facebook/dinov3-vitl16-pretrain-lvd1689m"
 TRELLIS_REPO = "microsoft/TRELLIS.2-4B"
 TRELLIS_IMAGE_REPO = "microsoft/TRELLIS-image-large"
 RMBG_REPO = "briaai/RMBG-2.0"
+
+GATED_CHECKS = (
+    (DINO_REPO, "config.json", "Meta DINOv3 image encoder"),
+    (RMBG_REPO, "config.json", "BRIA RMBG-2.0 background-removal model"),
+)
 
 
 @dataclass(frozen=True)
@@ -57,8 +60,14 @@ PLANS = (
     ),
     RepoPlan(
         RMBG_REPO,
-        ("*.json", "*.py", "*.safetensors", "*.bin"),
-        "RMBG-2.0 background-removal model",
+        (
+            "config.json",
+            "preprocessor_config.json",
+            "BiRefNet_config.py",
+            "birefnet.py",
+            "model.safetensors",
+        ),
+        "RMBG-2.0 background-removal model (gated)",
     ),
 )
 
@@ -84,8 +93,12 @@ def select_files(siblings: Iterable[object], patterns: tuple[str, ...]) -> list[
         name = getattr(item, "rfilename", "")
         if any(fnmatch.fnmatch(name, pattern) for pattern in patterns):
             selected.append(item)
-    # Config/code first, then large weights. This exposes access/config errors early.
-    selected.sort(key=lambda x: (str(getattr(x, "rfilename", "")).endswith((".safetensors", ".bin")), getattr(x, "rfilename", "")))
+    selected.sort(
+        key=lambda x: (
+            str(getattr(x, "rfilename", "")).endswith((".safetensors", ".bin")),
+            getattr(x, "rfilename", ""),
+        )
+    )
     return selected
 
 
@@ -99,26 +112,30 @@ def get_hf_token() -> str:
     return token.strip()
 
 
-def verify_auth_and_gate(api: HfApi, token: str) -> str:
+def verify_auth_and_gates(api: HfApi, token: str) -> str:
+    login(token=token, add_to_git_credential=False, skip_if_logged_in=False)
     who = api.whoami(token=token)
     username = who.get("name") or who.get("fullname") or "authenticated user"
     print(f"[HF AUTH] ✅ Logged in as: {username}", flush=True)
-    print(f"[HF ACCESS] Checking gated dependency: {DINO_REPO}", flush=True)
-    try:
-        hf_hub_download(DINO_REPO, "config.json", token=token)
-    except GatedRepoError as exc:
-        raise RuntimeError(
-            "Your token is valid, but this Hugging Face account has not been granted access to "
-            f"{DINO_REPO}. Open that model page in your browser, accept/request access, then rerun this cell."
-        ) from exc
-    except HfHubHTTPError as exc:
-        if getattr(exc.response, "status_code", None) in (401, 403):
+
+    for repo_id, probe_file, label in GATED_CHECKS:
+        print(f"[HF ACCESS] Checking {label}: {repo_id}", flush=True)
+        try:
+            hf_hub_download(repo_id, probe_file, token=token)
+        except GatedRepoError as exc:
             raise RuntimeError(
-                f"Hugging Face authentication/access check failed for {DINO_REPO}. "
-                "Confirm the token belongs to the same account that accepted the DINOv3 terms."
+                f"Your Hugging Face token is valid, but this account does not yet have access to {repo_id}. "
+                "Open that model page in your browser while signed into the SAME account, accept/request the "
+                "repository terms, then rerun the HF sign-in/download cell."
             ) from exc
-        raise
-    print("[HF ACCESS] ✅ DINOv3 access confirmed.", flush=True)
+        except HfHubHTTPError as exc:
+            if getattr(exc.response, "status_code", None) in (401, 403):
+                raise RuntimeError(
+                    f"Hugging Face authentication/access failed for {repo_id}. Confirm the token belongs to "
+                    "the same account that accepted the repository terms."
+                ) from exc
+            raise
+        print(f"[HF ACCESS] ✅ Access confirmed: {repo_id}", flush=True)
     return str(username)
 
 
@@ -144,10 +161,13 @@ def download_plan(api: HfApi, token: str, plan: RepoPlan, index: int, total_plan
             f"\n[HF FILE][{file_index}/{len(files)}] {filename} | {gib(size)} | overall {before_pct:5.1f}%",
             flush=True,
         )
-        # huggingface_hub/hf_xet renders the live per-file byte progress bar here.
         path = hf_hub_download(plan.repo_id, filename, token=token)
         completed_known += size
-        after_pct = (completed_known / known_total * 100.0) if known_total else (file_index / len(files) * 100.0)
+        after_pct = (
+            completed_known / known_total * 100.0
+            if known_total
+            else file_index / len(files) * 100.0
+        )
         print(f"[HF FILE] ✅ ready | overall {after_pct:5.1f}% | cache: {path}", flush=True)
 
     elapsed = time.time() - started_repo
@@ -156,7 +176,11 @@ def download_plan(api: HfApi, token: str, plan: RepoPlan, index: int, total_plan
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--check-only", action="store_true", help="Validate token + DINOv3 access without downloading all weights")
+    parser.add_argument(
+        "--check-only",
+        action="store_true",
+        help="Validate token + all gated TRELLIS dependencies without downloading every weight",
+    )
     args = parser.parse_args()
 
     enable_progress_bars()
@@ -174,24 +198,39 @@ def main() -> None:
     ram_gib = total_ram_gib()
     if ram_gib >= 64 and "HF_XET_HIGH_PERFORMANCE" not in os.environ:
         os.environ["HF_XET_HIGH_PERFORMANCE"] = "1"
-    print(f"[HF SETUP] huggingface_hub={hub_ver} | hf_xet={xet_ver or 'not installed'} | RAM={ram_gib:.1f} GiB", flush=True)
+    print(
+        f"[HF SETUP] huggingface_hub={hub_ver} | hf_xet={xet_ver or 'not installed'} | RAM={ram_gib:.1f} GiB",
+        flush=True,
+    )
     print(f"[HF SETUP] HF_HOME={os.environ['HF_HOME']}", flush=True)
-    print(f"[HF SETUP] HF_XET_HIGH_PERFORMANCE={os.environ.get('HF_XET_HIGH_PERFORMANCE', '0')}", flush=True)
+    print(
+        f"[HF SETUP] HF_XET_HIGH_PERFORMANCE={os.environ.get('HF_XET_HIGH_PERFORMANCE', '0')}",
+        flush=True,
+    )
 
     api = HfApi(token=token)
-    verify_auth_and_gate(api, token)
+    verify_auth_and_gates(api, token)
     if args.check_only:
-        print("[HF READY] ✅ Authentication and gated-model access are ready.", flush=True)
+        print("[HF READY] ✅ Authentication and all gated-model access checks passed.", flush=True)
         return
 
     print("\n[HF DOWNLOAD] Starting explicit TRELLIS dependency pre-download.", flush=True)
-    print("[HF DOWNLOAD] Large files will show Hugging Face byte progress bars; each completed file updates the overall percentage.", flush=True)
+    print(
+        "[HF DOWNLOAD] Large files show Hugging Face byte progress bars; each completed file updates the overall percentage.",
+        flush=True,
+    )
     for i, plan in enumerate(PLANS, start=1):
         download_plan(api, token, plan, i, len(PLANS))
 
     print("\n" + "=" * 78, flush=True)
-    print("[HF READY] ✅ All TRELLIS.2 runtime model files are present in the local Hugging Face cache.", flush=True)
-    print("[HF READY] TRELLIS generation can now load from local cache instead of downloading silently.", flush=True)
+    print(
+        "[HF READY] ✅ All TRELLIS.2 runtime model files are present in the local Hugging Face cache.",
+        flush=True,
+    )
+    print(
+        "[HF READY] TRELLIS generation can now load from local cache instead of downloading silently.",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":
