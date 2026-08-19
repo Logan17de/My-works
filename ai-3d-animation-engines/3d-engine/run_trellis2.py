@@ -5,10 +5,25 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 
 os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
+# TRELLIS.2 is a source-tree package (the upstream repo has trellis2/ but no
+# root setup.py/pyproject package installer). Upstream example.py works because
+# it lives in the repository root. Our runner lives in My-works, so explicitly
+# add the pinned TRELLIS source root to sys.path before importing trellis2.
+TRELLIS_ROOT = Path(os.environ.get("TRELLIS2_ROOT", "/content/TRELLIS.2")).expanduser().resolve()
+TRELLIS_PACKAGE = TRELLIS_ROOT / "trellis2" / "__init__.py"
+if not TRELLIS_PACKAGE.is_file():
+    raise RuntimeError(
+        f"TRELLIS.2 source package not found at {TRELLIS_PACKAGE}. "
+        "Run the 3D Engine installer first or set TRELLIS2_ROOT to the TRELLIS.2 checkout."
+    )
+if str(TRELLIS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TRELLIS_ROOT))
 
 import cv2
 import imageio.v2 as imageio
@@ -118,6 +133,7 @@ def main() -> None:
     p.step("Validating input, output path and GPU")
     input_path, output_dir = validate_args(args)
     props = torch.cuda.get_device_properties(0)
+    p.info(f"TRELLIS source: {TRELLIS_ROOT}")
     p.info(f"Input: {input_path.name}")
     p.info(f"Asset type: {args.asset_type} | target {args.target_axis}={args.target_size_m:g} m")
     p.info(f"GPU: {props.name} | VRAM: {props.total_memory / (1024**3):.1f} GiB")
