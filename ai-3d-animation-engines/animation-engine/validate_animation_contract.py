@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate scale, timing and motion transfer across the Animation Engine with live progress."""
 from __future__ import annotations
-import argparse, json, math
+import argparse, json, math, os, sys
 from pathlib import Path
 import bpy, numpy as np
 from progress_utils import Progress
@@ -68,6 +68,13 @@ def rms(a,b): return float(np.sqrt(np.mean(np.sum((a-b)**2,axis=-1))))
 def energy(a): return float(np.sqrt(np.mean(np.sum(a**2,axis=-1))))
 def ratio(t,s): return None if s<1e-5 else float(t/s)
 
+def _hard_exit_after_success(progress):
+    progress.info("Validation report is fully written; exiting without Blender/Python teardown")
+    try:
+        sys.stdout.flush(); sys.stderr.flush()
+    finally:
+        os._exit(0)
+
 def main():
     p=Progress("CONTRACT CHECK",6); a=parse_args()
     paths={"character_source":Path(a.character_source).expanduser().resolve(),"rigged_target":Path(a.rigged_target).expanduser().resolve(),"source_animation":Path(a.source_animation).expanduser().resolve(),"animated_target":Path(a.animated_target).expanduser().resolve()}
@@ -119,4 +126,5 @@ def main():
     p.ok(f"Report: {out}")
     if failures and a.strict: raise RuntimeError("Animation I/O contract validation failed: "+" | ".join(failures))
     p.done("Animation contract validation complete")
+    _hard_exit_after_success(p)
 if __name__=="__main__": main()
