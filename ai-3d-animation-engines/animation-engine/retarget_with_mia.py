@@ -27,6 +27,19 @@ def set_scene_fps(scene,fps):
     actual=float(scene.render.fps)/float(scene.render.fps_base)
     if abs(actual-fps)>1e-6: raise RuntimeError(f"Could not set Blender scene FPS to {fps}; got {actual}")
 
+def _hard_exit_after_success(progress):
+    """Exit without running bpy/C-extension interpreter teardown.
+
+    On Colab, embedded Blender occasionally segfaults after a completely successful
+    retarget/export while Python is shutting down. At this point the FBX (and optional
+    GLB preview) are already written and validated, so bypass interpreter finalizers.
+    """
+    progress.info("Retarget artifacts are fully written; exiting without Blender/Python teardown")
+    try:
+        sys.stdout.flush(); sys.stderr.flush()
+    finally:
+        os._exit(0)
+
 def main():
     p=Progress("RETARGET",7); a=parse_args()
     p.step("Validating rigged character, ARDY source FBX and FPS")
@@ -109,5 +122,6 @@ def main():
         except Exception as exc: p.warn(f"GLB preview export failed; FBX remains valid: {exc}")
     else: p.info("No preview GLB requested")
     p.done("Retarget and export complete")
+    _hard_exit_after_success(p)
 
 if __name__=="__main__": main()
