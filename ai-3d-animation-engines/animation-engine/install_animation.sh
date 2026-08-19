@@ -7,6 +7,10 @@ STEP=0
 START_TS=$(date +%s)
 CURRENT_STAGE="starting"
 CURRENT_ACTION="starting"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENGINE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$ENGINE_ROOT/cache_common.sh"
+cache_init
 
 elapsed() {
   local now diff h m s
@@ -26,7 +30,8 @@ trap 'code=$?; printf "\n[ANIMATION INSTALL][%d/%d][%s] ❌ FAILED\n  Stage: %s\
 
 echo "============================================================"
 echo " ARDY + Make-It-Animatable Colab installer"
-echo " Progress is streamed live. Model/weight downloads may be large."
+echo " Fresh runtime + optional Google Drive source/build cache"
+echo " ARDY/Llama runtime model weights are NOT stored in Drive."
 echo "============================================================"
 
 stage "Installing Linux build tools"
@@ -50,13 +55,14 @@ source /opt/conda/etc/profile.d/conda.sh
 info "Conda: $(conda --version)"
 info "Environment creation uses conda-forge with --override-channels."
 
-stage "Downloading pinned ARDY source"
-action "Removing stale ARDY checkout"
-rm -rf /content/ardy
-action "Cloning NVIDIA ARDY"
-git clone --progress https://github.com/nv-tlabs/ardy.git /content/ardy
-action "Checking out pinned ARDY revision"
-git -C /content/ardy checkout "$ARDY_REF"
+stage "Restoring/downloading pinned ARDY source"
+action "Checking Google Drive source cache before GitHub"
+cache_git_repo \
+  "ARDY" \
+  "https://github.com/nv-tlabs/ardy.git" \
+  "$ARDY_REF" \
+  "/content/ardy" \
+  "plain"
 info "Pinned ARDY commit: $ARDY_REF"
 
 stage "Creating ARDY environment"
@@ -65,14 +71,17 @@ conda env remove -n ardy -y >/dev/null 2>&1 || true
 action "Creating Python 3.11 ARDY environment from conda-forge only"
 conda create -n ardy --override-channels -c conda-forge python=3.11 pip -y
 action "Upgrading ARDY pip/build helpers"
-conda run --no-capture-output -n ardy python -m pip install --progress-bar on --upgrade pip setuptools wheel
+conda run --no-capture-output -n ardy python -m pip install --progress-bar on --upgrade pip setuptools wheel cmake packaging
 
 stage "Installing ARDY + PyTorch dependencies"
 action "Installing PyTorch 2.6.0 cu124"
 conda run --no-capture-output -n ardy python -m pip install --progress-bar on torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
-action "Installing ARDY package"
+action "Restoring/building cached ARDY wheel (includes native MotionCorrection extension)"
 cd /content/ardy
-conda run --no-capture-output -n ardy python -m pip install -e .
+ARDY_WHEEL_KEY="ardy-${ARDY_REF:0:8}-cp311-torch260-linux-x86_64"
+# cache helper uses the currently active python command; run it inside the ardy env shell.
+conda run --no-capture-output -n ardy bash -lc \
+  "source '$ENGINE_ROOT/cache_common.sh'; export ENGINE_CACHE_ROOT='${ENGINE_CACHE_ROOT:-}'; cache_init; cache_install_or_build_wheel 'ardy' '$ARDY_WHEEL_KEY' '/content/ardy' 'with-deps'"
 action "Installing ARDY preview dependency"
 conda run --no-capture-output -n ardy python -m pip install matplotlib
 
@@ -80,16 +89,16 @@ stage "Running ARDY smoke test"
 action "Checking ARDY skeleton import and GPU visibility"
 conda run --no-capture-output -n ardy python -c 'import torch; from ardy.skeleton import CoreSkeleton27; assert len(CoreSkeleton27().bone_order_names)==27; assert torch.cuda.is_available(), "ARDY environment cannot see the NVIDIA GPU"; print("ARDY smoke test: OK", torch.__version__, torch.cuda.get_device_name(0), flush=True)'
 
-stage "Downloading pinned Make-It-Animatable source"
-action "Removing stale MIA checkout and temporary weights"
-rm -rf /content/Make-It-Animatable /tmp/mia-hf-data
-action "Cloning Make-It-Animatable with submodules"
-git clone --progress --recursive https://github.com/jasongzy/Make-It-Animatable /content/Make-It-Animatable
-action "Checking out pinned MIA revision"
-git -C /content/Make-It-Animatable checkout "$MIA_REF"
-action "Synchronizing MIA submodules"
-git -C /content/Make-It-Animatable submodule sync --recursive
-git -C /content/Make-It-Animatable submodule update --init --recursive --force --progress
+stage "Restoring/downloading pinned Make-It-Animatable source"
+action "Removing stale temporary MIA model-weight checkout"
+rm -rf /tmp/mia-hf-data
+action "Checking Google Drive source cache before GitHub"
+cache_git_repo \
+  "Make-It-Animatable" \
+  "https://github.com/jasongzy/Make-It-Animatable" \
+  "$MIA_REF" \
+  "/content/Make-It-Animatable" \
+  "recursive"
 info "Pinned MIA commit: $MIA_REF"
 
 stage "Creating Make-It-Animatable environment"
@@ -105,8 +114,10 @@ printf "gradio>=5.25,<6\n" >/tmp/mia-constraints.txt
 PIP_CONSTRAINT=/tmp/mia-constraints.txt conda run --no-capture-output -n mia python -m pip install -r requirements.txt
 
 stage "Downloading MIA templates and model weights"
+info "These neural-network weights are intentionally downloaded fresh to local /content."
 action "Initializing Git-LFS"
 git lfs install --skip-repo >/dev/null
+rm -rf data/Mixamo
 mkdir -p data
 action "Cloning Mixamo template dataset metadata"
 GIT_LFS_SKIP_SMUDGE=1 git -C data clone --progress https://huggingface.co/datasets/jasongzy/Mixamo
@@ -117,9 +128,13 @@ git -C data/Mixamo lfs pull -I 'bones*.fbx'
 action "Downloading Make-It-Animatable neural-network weights through Git-LFS"
 git -C /tmp/mia-hf-data lfs pull -I 'output/best/new'
 mkdir -p output/best
+rm -rf output/best/new
 cp -r /tmp/mia-hf-data/output/best/new output/best/
-action "Downloading FBX2glTF helper"
-wget --progress=bar:force:noscroll https://github.com/facebookincubator/FBX2glTF/releases/download/v0.9.7/FBX2glTF-linux-x64 -O util/FBX2glTF
+action "Restoring/downloading FBX2glTF helper binary"
+cache_download_file \
+  "FBX2glTF-linux-x64-v0.9.7" \
+  "https://github.com/facebookincubator/FBX2glTF/releases/download/v0.9.7/FBX2glTF-linux-x64" \
+  "util/FBX2glTF"
 chmod +x util/FBX2glTF
 
 stage "Validating downloaded MIA assets"
@@ -136,4 +151,8 @@ stage "Running Make-It-Animatable / Blender smoke test"
 action "Importing MIA/Blender stack and checking GPU visibility"
 conda run --no-capture-output -n mia python -c 'import torch,bpy,trimesh,pytorch3d; assert torch.cuda.is_available(), "MIA environment cannot see the NVIDIA GPU"; print("MIA smoke test: OK", flush=True); print("PyTorch:", torch.__version__, "GPU:", torch.cuda.get_device_name(0), flush=True); print("Blender:", bpy.app.version_string, flush=True)'
 
-printf '\n[ANIMATION INSTALL][%d/%d][%s] ✅ Installation complete. You can now run the Animation Engine.\n' "$TOTAL" "$TOTAL" "$(elapsed)"
+printf '\n[ANIMATION INSTALL][%d/%d][%s] ✅ Installation complete.\n' "$TOTAL" "$TOTAL" "$(elapsed)"
+if [ "$CACHE_ENABLED" -eq 1 ]; then
+  printf '[CACHE] Persistent sources/builds are in: %s\n' "$ENGINE_CACHE_ROOT"
+fi
+printf 'You can now run the Animation Engine.\n'
