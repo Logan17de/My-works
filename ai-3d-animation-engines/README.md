@@ -2,33 +2,31 @@
 
 Two independent Colab-first engines for AI-assisted Unreal asset production.
 
-## Recommended — one Colab, two engines
+## Recommended notebooks
 
-Open [`AI_3D_Animation_Engine_Colab.ipynb`](AI_3D_Animation_Engine_Colab.ipynb).
+- `TRELLIS2_A100_Optimized_Colab.ipynb` — 3D generation on A100.
+- `Animation_Engine_L4_Low_Disk_Colab.ipynb` — animation on L4 24 GB.
+- `AI_3D_Animation_Engine_Colab.ipynb` — combined/reference workflow with both engines available.
 
-The **3D Engine and Animation Engine live in the same Colab notebook**, but remain independent:
-
-- run only the 3D section for objects, environments or unanimated characters;
-- run only the Animation section when you already have a humanoid;
-- run 3D first and then manually select its generated GLB in the Animation section without downloading/re-uploading it.
+The 3D Engine and Animation Engine remain independent. Generate a GLB with TRELLIS when needed, then start a fresh animation runtime and upload/select that humanoid explicitly.
 
 The heavy environments remain isolated:
 
 ```text
 trellis2 Conda env  -> TRELLIS.2 3D generation
 ardy Conda env      -> ARDY motion generation
-mia Conda env       -> Make-It-Animatable + Blender + retarget
+mia Conda env       -> Make-It-Animatable rigging + Blender direct bake/export
 ```
 
-## Fresh-A100 + Google Drive build cache
+## Disposable Colab runtimes + Google Drive build cache
 
-The notebook assumes disposable Colab runtimes. An optional Drive cache cell mounts:
+The notebooks assume disposable Colab runtimes. An optional Drive cache mounts:
 
 ```text
 /content/drive/MyDrive/AI3D_Engine_Cache
 ```
 
-The cache automatically stores and reuses:
+The cache stores reusable source/build artifacts:
 
 ```text
 AI3D_Engine_Cache/
@@ -37,15 +35,7 @@ AI3D_Engine_Cache/
 └── downloads/   small reusable helper binaries
 ```
 
-The first compatible run prints `CACHE MISS`, downloads/builds locally, then saves the reusable result to Drive. Later fresh runtimes print `CACHE HIT` and restore the compatible source/build artifact instead of rebuilding it.
-
-TRELLIS compiled-wheel cache keys include the pinned TRELLIS revision, Python version, PyTorch version, CUDA version and GPU compute capability. This is intended to prevent, for example, an A100 `sm80` build from being treated as the same artifact as a different GPU architecture.
-
-### Deliberately not cached in Drive
-
-TRELLIS, ARDY and Llama runtime model weights are intentionally **not** placed in the Drive build cache. They download fresh into local Colab storage and still have to be loaded into CPU/GPU memory each fresh runtime.
-
-This keeps Drive focused on avoiding repeat source downloads and expensive native/CUDA compilation rather than turning it into the runtime model filesystem.
+TRELLIS, ARDY and Llama runtime model weights are intentionally not kept in the Drive build cache. They download to local Colab storage for the current runtime.
 
 ## Architecture
 
@@ -64,13 +54,13 @@ REFERENCE IMAGE
                  |
           manual selection only
                  v
-       +--------------------------+
-       | ANIMATION ENGINE         |
-       | Make-It-Animatable       |
-       | + ARDY Core              |
-       | + Auto-Rig-Pro retarget  |
-       | + contract validator     |
-       +--------------------------+
+       +-------------------------------+
+       | ANIMATION ENGINE              |
+       | Make-It-Animatable auto-rig   |
+       | + NVIDIA ARDY Core motion     |
+       | + direct rest-space baker     |
+       | + skinned-mesh validator      |
+       +-------------------------------+
                  |
                  +--> character_animated.fbx
                  +--> character_material_source.glb
@@ -84,10 +74,10 @@ Generating a 3D asset never automatically sends it into animation.
 
 ## Engine 1 — 3D Engine
 
-The combined notebook calls:
+The 3D notebook calls:
 
 - `3d-engine/install_3d.sh`
-- `3d-engine/run_trellis2.py`
+- `3d-engine/run_trellis2.py` or the A100-profiled runner
 
 **Input**
 - one reference image;
@@ -99,41 +89,56 @@ The combined notebook calls:
 - `asset_manifest.json` — scale/material/downstream I/O contract;
 - optional turntable MP4.
 
-The installer uses `cache_common.sh` to restore/download the pinned TRELLIS source and to reuse/build cached wheels for the expensive native stack, including FlashAttention, nvdiffrast, nvdiffrec, CuMesh, O-Voxel and FlexGEMM.
-
 ### 3D I/O guarantees
 
-1. **Real-world scale is mandatory.** The notebook requires one target dimension in meters and uniformly scales the generated mesh before export.
-2. **No required WebP GLB extension.** The export uses standard GLB textures for broader Unreal/glTF compatibility.
+1. Real-world scale is mandatory.
+2. Standard GLB texture encoding is used for broader Unreal/glTF compatibility.
 3. The manifest records dimensions, scale, PBR texture presence, alpha status and downstream eligibility.
 
 ## Engine 2 — Animation Engine
 
-The combined notebook calls:
+The animation notebook calls:
 
-- `animation-engine/install_animation.sh`
+- `animation-engine/install_animation_low_disk.sh`
 - `animation-engine/run_animation_pipeline.py`
 
 **Input**
 - one manually selected humanoid `.glb`, `.fbx`, `.obj`, or polygon `.ply`;
 - an ARDY text motion prompt.
 
-**Pipeline**
+**Current pipeline**
 
 1. ARDY Core generates `.npz` motion.
-2. `enrich_ardy_motion.py` validates the exact motion tensors and attaches Core skeleton metadata.
+2. `enrich_ardy_motion.py` validates the tensors and attaches Core skeleton metadata in `motion_bridge.npz`.
 3. `preview_ardy_motion.py` renders a skeleton MP4.
-4. `ardy_motion_to_fbx.py` creates a validated ARDY source FBX.
-5. `rig_character_mia.py` auto-rigs the selected mesh with Make-It-Animatable.
-6. `retarget_with_mia.py` retargets ARDY motion while preserving FPS.
-7. `validate_animation_contract.py` checks scale, timing and motion transfer.
-8. `run_animation_pipeline.py` creates the Unreal handoff ZIP.
+4. `rig_character_mia.py` auto-rigs the selected mesh with Make-It-Animatable.
+5. `retarget_ardy_direct.py` reads ARDY global joint rotations directly from `motion_bridge.npz`, converts them into the target MIA rig's own rest-space, and bakes the target action without Auto-Rig-Pro motion retargeting.
+6. `validate_animation_contract.py` checks static scale, FPS, normalized motion trajectories, and the actual evaluated/skinned mesh deformation over sampled animation frames.
+7. `run_animation_pipeline.py` creates the Unreal handoff ZIP only after the strict validator passes.
 
-The Animation installer also caches the pinned ARDY and Make-It-Animatable source snapshots. ARDY's package wheel includes its native MotionCorrection extension and is persisted in the Drive wheel cache. MIA neural-network weights remain fresh/local by design.
+### Why the direct retargeter replaced the ARP bridge
+
+ARDY Core and the MIA/Mixamo rig share semantic body-joint names, but their rest axes, bone rolls, proportions and helper-joint hierarchy are not identical. A synthetic ARDY FBX with Mixamo-like names can therefore look compatible while still interpreting rotations in the wrong local coordinate frames.
+
+The current direct baker does not copy ARDY bone rolls and does not resize either armature. Instead it:
+
+```text
+ARDY global joint rotation
+        ↓ coordinate conversion
+motion delta in Blender space
+        ↓ target armature object-space conversion
+compose with target bone's own rest orientation
+        ↓
+bake directly onto the MIA target bone
+```
+
+Only root motion is scaled by the target/source skeleton-height ratio.
+
+`ardy_motion_to_fbx.py` and `retarget_with_mia.py` remain legacy/debug helpers and are not used by the current production pipeline.
 
 ## Character material contract
 
-FBX is treated as the **skeletal/animation master**, not the canonical PBR material master.
+FBX is treated as the skeletal/animation master, not the canonical PBR material master.
 
 If the selected character is a GLB, the pipeline preserves it as:
 
@@ -143,11 +148,13 @@ character_material_source.glb
 
 Use that as the PBR reference if Unreal's FBX material conversion does not reproduce the original metallic/roughness/alpha appearance.
 
-## ARDY ↔ Mixamo skeleton contract
+## ARDY ↔ MIA body contract
 
-ARDY Core has 27 joints. The no-finger Make-It-Animatable body rig has 22 shared Mixamo body bones.
+ARDY Core has 27 joints. The no-finger MIA/Mixamo body rig has 22 shared body bones.
 
-Shared body bones are mapped by exact `mixamorig:*` names. ARDY-only joints remain source helpers. Because this is semantic retargeting rather than skeleton identity, the final validator compares normalized motion trajectories instead of assuming success because an FBX file exists.
+The current direct baker uses the 22 shared body joints. ARDY-only helpers such as `Spine3` and hand-end helper joints are not exported as animation targets on the MIA rig. Missing finger bones are expected when `--no-fingers` is selected.
+
+The validator does not assume success merely because an FBX file exists. It compares ARDY bridge trajectories to final target trajectories and also inspects the evaluated skinned mesh for severe edge stretching/compression or implausible animated extents.
 
 ## Unreal handoff
 
@@ -158,29 +165,26 @@ In short:
 - static props/environments → import the 3D Engine GLB;
 - animated characters → import `character_animated.fbx` as Skeletal Mesh/Animation;
 - keep `character_material_source.glb` as the PBR reference when present;
-- preserve the ARDY sample rate from the package/contract report;
-- scale is resolved by the 3D Engine manifest.
+- preserve the ARDY sample rate from the package/contract report.
 
 ## Recommended runtime sequence
 
 ```text
-Fresh A100
-   ↓
-Shared Setup
-   ↓
-Mount Drive build cache
-   ↓
-Install only the engine needed
-   ↓
-CACHE HIT: restore compatible build artifacts
-CACHE MISS: build/download once and save to Drive
-   ↓
-Generate multiple assets while the runtime is alive
-   ↓
-Download outputs
-   ↓
-Disconnect A100
+A100 runtime
+  -> TRELLIS 3D generation
+  -> download GLB
+  -> disconnect
+
+Fresh L4 24 GB runtime
+  -> Animation low-disk install
+  -> upload humanoid GLB
+  -> ARDY + MIA rig + direct bake
+  -> strict deformation validation
+  -> download Unreal package
+  -> disconnect
 ```
+
+This separation also avoids keeping the TRELLIS environment/model cache on the same ~113 GB Colab disk as ARDY/Llama/MIA.
 
 ## Pinned upstream revisions
 
@@ -197,7 +201,7 @@ Disconnect A100
 - Microsoft TRELLIS.2 — MIT
 - NVIDIA ARDY code — Apache-2.0; model weights use NVIDIA's model license
 - Make-It-Animatable — MIT
-- Auto-Rig-Pro fork bundled by Make-It-Animatable
+- Auto-Rig-Pro fork bundled by Make-It-Animatable (legacy/debug retarget path only in this repo)
 - Meta Llama 3 8B Instruct — used by ARDY's text encoder and gated on Hugging Face
 
 Review upstream licenses before redistributing checkpoints, bundled code or generated assets.
