@@ -15,6 +15,26 @@ REQUIRED_BASE_BONES={
 def parse_args():
     p=argparse.ArgumentParser(); p.add_argument("--input",required=True); p.add_argument("--output",required=True); p.add_argument("--no-fingers",action="store_true",default=False); return p.parse_args()
 
+def _patch_gradio_for_headless(progress):
+    """MIA's app replaces gradio.helpers.log_message with a UI-context logger.
+
+    In our headless Colab subprocess there is no active Gradio Blocks context, so
+    gr.Info/gr.Warning otherwise raise LookupError(ContextVar 'blocks'). Replace
+    only notification logging with console output; model/inference APIs stay intact.
+    """
+    import gradio.helpers as gr_helpers
+
+    def headless_log_message(message, level="info", duration=None, visible=True, *args, **kwargs):
+        text=str(message)
+        if str(level).lower() in {"warning","error"}:
+            progress.warn(f"MIA: {text}")
+        else:
+            progress.info(f"MIA: {text}")
+        return None
+
+    gr_helpers.log_message=headless_log_message
+    progress.info("Patched MIA Gradio notifications for headless Colab execution")
+
 def main():
     p=Progress("AUTO-RIG",7); a=parse_args(); ip=Path(a.input).expanduser().resolve()
     p.step("Validating selected humanoid mesh")
@@ -29,7 +49,6 @@ def main():
     # When this helper is launched by absolute path, Python puts the helper's
     # directory (My-works/animation-engine) in sys.path, not the later cwd.
     # chdir() alone therefore does not make MIA's top-level `app.py` importable.
-    # Add the pinned MIA checkout explicitly before importing its modules.
     mia_root_str=str(mia_root)
     if mia_root_str not in sys.path:
         sys.path.insert(0,mia_root_str)
@@ -41,6 +60,7 @@ def main():
 
     import app as mia
     from util import blender_utils
+    _patch_gradio_for_headless(p)
     p.ok(f"Loaded MIA app module: {Path(mia.__file__).resolve()}")
     for name in ("state","output_joints_coarse","output_normed_input","output_sample","output_joints","output_bw","output_rest_vis","output_rest_lbs","output_anim_vis","output_anim"):
         setattr(mia,name,name)
