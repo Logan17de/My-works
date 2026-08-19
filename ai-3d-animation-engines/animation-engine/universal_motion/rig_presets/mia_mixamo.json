@@ -1,0 +1,32 @@
+{
+  "id": "mia_mixamo",
+  "provider": "Make-It-Animatable",
+  "status": "active",
+  "semantic_bones": {
+    "hips": "mixamorig:Hips",
+    "spine": "mixamorig:Spine",
+    "spine_1": "mixamorig:Spine1",
+    "chest": "mixamorig:Spine2",
+    "neck": "mixamorig:Neck",
+    "head": "mixamorig:Head",
+    "left_shoulder": "mixamorig:LeftShoulder",
+    "left_upper_arm": "mixamorig:LeftArm",
+    "left_forearm": "mixamorig:LeftForeArm",
+    "left_hand": "mixamorig:LeftHand",
+    "right_shoulder": "mixamorig:RightShoulder",
+    "right_upper_arm": "mixamorig:RightArm",
+    "right_forearm": "mixamorig:RightForeArm",
+    "right_hand": "mixamorig:RightHand",
+    "left_upper_leg": "mixamorig:LeftUpLeg",
+    "left_lower_leg": "mixamorig:LeftLeg",
+    "left_foot": "mixamorig:LeftFoot",
+    "left_toe": "mixamorig:LeftToeBase",
+    "right_upper_leg": "mixamorig:RightUpLeg",
+    "right_lower_leg": "mixamorig:RightLeg",
+    "right_foot": "mixamorig:RightFoot",
+    "right_toe": "mixamorig:RightToeBase"
+  },
+  "motion_chains": {
+    "chest": ["chest", "upper_chest"]
+  }
+}
