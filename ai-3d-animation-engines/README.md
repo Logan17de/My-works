@@ -2,6 +2,29 @@
 
 Two independent Colab-first engines for AI-assisted Unreal asset production.
 
+## Recommended — one Colab, two engines
+
+Open [`AI_3D_Animation_Engine_Colab.ipynb`](AI_3D_Animation_Engine_Colab.ipynb).
+
+This is now the primary entry point. The **3D Engine and Animation Engine live in the same Colab notebook**, but remain independent:
+
+- run only the 3D section when you want objects, environments or unanimated characters;
+- run only the Animation section when you already have a humanoid;
+- run 3D first and then manually choose its generated GLB in the Animation section without downloading/re-uploading it.
+
+The heavy environments are still isolated so their dependencies do not collide:
+
+```text
+trellis2 Conda env  -> TRELLIS.2 3D generation
+ardy Conda env      -> ARDY motion generation
+mia Conda env       -> Make-It-Animatable + Blender + retarget
+```
+
+The older per-engine notebooks are retained as focused/debug notebooks:
+
+- [`3d-engine/TRELLIS2_Colab.ipynb`](3d-engine/TRELLIS2_Colab.ipynb)
+- [`animation-engine/ARDY_Animation_Colab.ipynb`](animation-engine/ARDY_Animation_Colab.ipynb)
+
 ## Architecture
 
 ```text
@@ -39,7 +62,7 @@ The engines are deliberately separate. Generating a 3D asset never implies that 
 
 ## Engine 1 — 3D Engine
 
-Open [`3d-engine/TRELLIS2_Colab.ipynb`](3d-engine/TRELLIS2_Colab.ipynb).
+The combined notebook calls `3d-engine/install_3d.sh` and `3d-engine/run_trellis2.py`.
 
 **Input**
 - one reference image;
@@ -70,7 +93,7 @@ TRELLIS/O-Voxel currently exports material alpha in an OPAQUE material by defaul
 
 ## Engine 2 — Animation Engine
 
-Open [`animation-engine/ARDY_Animation_Colab.ipynb`](animation-engine/ARDY_Animation_Colab.ipynb).
+The combined notebook calls `animation-engine/install_animation.sh` and then `animation-engine/run_animation_pipeline.py`.
 
 **Input**
 - one humanoid `.glb`, `.fbx`, `.obj`, or polygon `.ply` selected manually;
@@ -94,13 +117,13 @@ Open [`animation-engine/ARDY_Animation_Colab.ipynb`](animation-engine/ARDY_Anima
    - final FBX FPS matches ARDY;
    - root motion was not lost;
    - head/hand/foot motion was not frozen or catastrophically distorted.
-8. A final Unreal package ZIP is produced.
+8. `run_animation_pipeline.py` packages the validated Unreal handoff ZIP.
 
 ### Character material contract
 
 FBX is treated as the **skeletal/animation master**, not the canonical PBR material master.
 
-If the selected character is a GLB, the notebook preserves it as:
+If the selected character is a GLB, the pipeline preserves it as:
 
 `character_material_source.glb`
 
@@ -128,10 +151,10 @@ In short:
 
 ## Colab strategy
 
-The notebooks use disposable runtimes and separate Conda environments to avoid dependency conflicts.
+The unified notebook uses one disposable Colab runtime while keeping the three heavy software environments separate.
 
 Keep permanently:
-- notebooks/scripts in GitHub;
+- the unified notebook/scripts in GitHub;
 - source images/models;
 - GLB/FBX outputs;
 - manifests and validation reports.
