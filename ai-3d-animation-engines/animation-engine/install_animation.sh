@@ -79,9 +79,9 @@ conda run --no-capture-output -n ardy python -m pip install --progress-bar on to
 action "Restoring/building cached ARDY wheel (includes native MotionCorrection extension)"
 cd /content/ardy
 ARDY_WHEEL_KEY="ardy-${ARDY_REF:0:8}-cp311-torch260-linux-x86_64"
-# cache helper uses the currently active python command; run it inside the ardy env shell.
-conda run --no-capture-output -n ardy bash -lc \
-  "source '$ENGINE_ROOT/cache_common.sh'; export ENGINE_CACHE_ROOT='${ENGINE_CACHE_ROOT:-}'; cache_init; cache_install_or_build_wheel 'ardy' '$ARDY_WHEEL_KEY' '/content/ardy' 'with-deps'"
+CACHE_PYTHON="/opt/conda/envs/ardy/bin/python"
+cache_install_or_build_wheel "ardy" "$ARDY_WHEEL_KEY" "/content/ardy" "with-deps"
+CACHE_PYTHON="python"
 action "Installing ARDY preview dependency"
 conda run --no-capture-output -n ardy python -m pip install matplotlib
 
