@@ -13,6 +13,7 @@ def parse_args():
     p.add_argument("--output-dir",default="/content/animation_outputs")
     p.add_argument("--no-fingers",action="store_true")
     p.add_argument("--already-rigged",action="store_true")
+    p.add_argument("--reuse-existing-rig",action="store_true",help="Reuse output-dir/character_rigged.fbx when it already exists and is non-empty")
     return p.parse_args()
 
 
@@ -61,6 +62,10 @@ def main():
     if a.already_rigged:
         if character.suffix.lower()!=".fbx": raise ValueError("--already-rigged requires FBX input")
         shutil.copy2(character,rigged)
+        p.info("Character marked already-rigged; copied input FBX")
+    elif a.reuse_existing_rig and rigged.is_file() and rigged.stat().st_size>0:
+        p.ok(f"Reusing existing rig artifact: {rigged} ({rigged.stat().st_size/1024**2:.1f} MiB)")
+        p.info("The next retarget/validation stages will verify that this FBX is actually usable.")
     else:
         gpu_preflight("mia",p,"MIA")
         cmd=["/opt/conda/bin/conda","run","--no-capture-output","-n","mia","python",str(tools/"rig_character_mia.py"),"--input",str(character),"--output",str(rigged)]
