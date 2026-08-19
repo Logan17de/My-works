@@ -56,14 +56,7 @@ conda run --no-capture-output -n ardy python -m pip install -e .
 conda run --no-capture-output -n ardy python -m pip install matplotlib
 
 stage "Running ARDY smoke test"
-conda run --no-capture-output -n ardy python - <<'PY'
-import torch
-from ardy.skeleton import CoreSkeleton27
-assert len(CoreSkeleton27().bone_order_names) == 27
-if not torch.cuda.is_available():
-    raise RuntimeError("ARDY environment cannot see the NVIDIA GPU")
-print("ARDY smoke test: OK", torch.__version__, torch.cuda.get_device_name(0), flush=True)
-PY
+conda run --no-capture-output -n ardy python -c 'import torch; from ardy.skeleton import CoreSkeleton27; assert len(CoreSkeleton27().bone_order_names)==27; assert torch.cuda.is_available(), "ARDY environment cannot see the NVIDIA GPU"; print("ARDY smoke test: OK", torch.__version__, torch.cuda.get_device_name(0), flush=True)'
 
 stage "Downloading pinned Make-It-Animatable source"
 rm -rf /content/Make-It-Animatable /tmp/mia-hf-data
@@ -106,13 +99,6 @@ info "Template: $BONE_FILE"
 info "Weight files: $(find output/best/new -type f -name '*.pth' | wc -l)"
 
 stage "Running Make-It-Animatable / Blender smoke test"
-conda run --no-capture-output -n mia python - <<'PY'
-import torch, bpy, trimesh, pytorch3d
-if not torch.cuda.is_available():
-    raise RuntimeError("MIA environment cannot see the NVIDIA GPU")
-print("MIA smoke test: OK", flush=True)
-print("PyTorch:", torch.__version__, "GPU:", torch.cuda.get_device_name(0), flush=True)
-print("Blender:", bpy.app.version_string, flush=True)
-PY
+conda run --no-capture-output -n mia python -c 'import torch,bpy,trimesh,pytorch3d; assert torch.cuda.is_available(), "MIA environment cannot see the NVIDIA GPU"; print("MIA smoke test: OK", flush=True); print("PyTorch:", torch.__version__, "GPU:", torch.cuda.get_device_name(0), flush=True); print("Blender:", bpy.app.version_string, flush=True)'
 
 printf '\n[ANIMATION INSTALL][%d/%d][%s] ✅ Installation complete. You can now run the Animation Engine.\n' "$TOTAL" "$TOTAL" "$(elapsed)"
