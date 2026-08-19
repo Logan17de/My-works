@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Direct TRELLIS.2 image-to-3D runner with explicit Unreal I/O contracts."""
-
+"""Direct TRELLIS.2 image-to-3D runner with explicit Unreal I/O contracts and live progress."""
 from __future__ import annotations
 
 import argparse
@@ -22,12 +21,9 @@ from trellis2.pipelines import Trellis2ImageTo3DPipeline
 from trellis2.renderers import EnvMap
 from trellis2.utils import render_utils
 
+from progress_utils import Progress
 
-AXIS_INDEX = {
-    "width": 0,   # glTF X
-    "height": 1,  # glTF Y (up)
-    "depth": 2,   # glTF Z
-}
+AXIS_INDEX = {"width": 0, "height": 1, "depth": 2}
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,12 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--name", default="asset")
     parser.add_argument("--asset-type", choices=["object", "character", "environment", "other"], default="object")
     parser.add_argument("--target-axis", choices=["width", "height", "depth", "longest"], required=True)
-    parser.add_argument(
-        "--target-size-m",
-        type=float,
-        required=True,
-        help="Real-world size in meters along --target-axis. This makes scale explicit before Unreal import.",
-    )
+    parser.add_argument("--target-size-m", type=float, required=True)
     parser.add_argument("--decimation-target", type=int, default=1_000_000)
     parser.add_argument("--texture-size", type=int, default=4096)
     parser.add_argument("--preview-fps", type=int, default=15)
@@ -55,7 +46,6 @@ def parse_args() -> argparse.Namespace:
 def validate_args(args: argparse.Namespace) -> tuple[Path, Path]:
     if not torch.cuda.is_available():
         raise RuntimeError("TRELLIS.2 requires an NVIDIA CUDA GPU.")
-
     input_path = Path(args.input).expanduser().resolve()
     if not input_path.is_file():
         raise FileNotFoundError(f"Input image not found: {input_path}")
@@ -65,7 +55,6 @@ def validate_args(args: argparse.Namespace) -> tuple[Path, Path]:
         raise ValueError("--texture-size must be positive")
     if not np.isfinite(args.target_size_m) or args.target_size_m <= 0:
         raise ValueError("--target-size-m must be a finite positive number")
-
     output_dir = Path(args.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     return input_path, output_dir
@@ -110,64 +99,71 @@ def scale_to_contract(mesh, target_axis: str, target_size_m: float) -> tuple[np.
     before = np.asarray(mesh.extents, dtype=np.float64)
     if before.shape != (3,) or not np.isfinite(before).all() or np.any(before <= 0):
         raise RuntimeError(f"Invalid generated mesh extents: {before}")
-
-    if target_axis == "longest":
-        current = float(before.max())
-    else:
-        current = float(before[AXIS_INDEX[target_axis]])
+    current = float(before.max()) if target_axis == "longest" else float(before[AXIS_INDEX[target_axis]])
     if current <= 1e-9:
         raise RuntimeError(f"Generated mesh has zero extent along target axis {target_axis!r}")
-
     scale_factor = float(target_size_m / current)
     mesh.apply_scale(scale_factor)
     after = np.asarray(mesh.extents, dtype=np.float64)
-
     actual = float(after.max()) if target_axis == "longest" else float(after[AXIS_INDEX[target_axis]])
     if not np.isclose(actual, target_size_m, rtol=1e-5, atol=1e-7):
-        raise RuntimeError(
-            f"Scale contract failed: requested {target_size_m} m on {target_axis}, got {actual} m"
-        )
+        raise RuntimeError(f"Scale contract failed: requested {target_size_m} m on {target_axis}, got {actual} m")
     return before, after, scale_factor
 
 
 def main() -> None:
+    p = Progress("3D GENERATION", 7)
     args = parse_args()
+
+    p.step("Validating input, output path and GPU")
     input_path, output_dir = validate_args(args)
-
     props = torch.cuda.get_device_properties(0)
-    print(f"GPU: {props.name} | VRAM: {props.total_memory / (1024**3):.1f} GiB")
+    p.info(f"Input: {input_path.name}")
+    p.info(f"Asset type: {args.asset_type} | target {args.target_axis}={args.target_size_m:g} m")
+    p.info(f"GPU: {props.name} | VRAM: {props.total_memory / (1024**3):.1f} GiB")
 
-    print(f"Loading TRELLIS.2 model: {args.model}")
-    pipeline = Trellis2ImageTo3DPipeline.from_pretrained(args.model)
-    pipeline.cuda()
+    p.step(f"Loading TRELLIS.2 model: {args.model}")
+    with p.heartbeat("model download/load", every=30):
+        pipeline = Trellis2ImageTo3DPipeline.from_pretrained(args.model)
+        pipeline.cuda()
+    p.ok("Model loaded on GPU")
 
+    p.step("Generating high-resolution 3D representation from the image")
     image = Image.open(input_path)
-    mesh = pipeline.run(image)[0]
-    mesh.simplify(16_777_216)  # nvdiffrast face-count limit from upstream example.
+    p.info(f"Reference image: {image.width}×{image.height} px, mode={image.mode}")
+    with p.heartbeat("TRELLIS inference", every=20):
+        mesh = pipeline.run(image)[0]
+    p.ok(f"Generation finished: {mesh.vertices.shape[0]:,} vertices, {mesh.faces.shape[0]:,} faces")
 
-    glb = o_voxel.postprocess.to_glb(
-        vertices=mesh.vertices,
-        faces=mesh.faces,
-        attr_volume=mesh.attrs,
-        coords=mesh.coords,
-        attr_layout=mesh.layout,
-        voxel_size=mesh.voxel_size,
-        aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
-        decimation_target=args.decimation_target,
-        texture_size=args.texture_size,
-        remesh=True,
-        remesh_band=1,
-        remesh_project=0,
-        verbose=True,
-    )
+    p.step("Preparing mesh and baking PBR textures into GLB")
+    mesh.simplify(16_777_216)
+    p.info(f"Decimation target: {args.decimation_target:,} faces | texture: {args.texture_size}×{args.texture_size}")
+    with p.heartbeat("O-Voxel remesh / UV unwrap / texture bake", every=20):
+        glb = o_voxel.postprocess.to_glb(
+            vertices=mesh.vertices,
+            faces=mesh.faces,
+            attr_volume=mesh.attrs,
+            coords=mesh.coords,
+            attr_layout=mesh.layout,
+            voxel_size=mesh.voxel_size,
+            aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
+            decimation_target=args.decimation_target,
+            texture_size=args.texture_size,
+            remesh=True,
+            remesh_band=1,
+            remesh_project=0,
+            verbose=True,
+        )
 
-    normalized_extents, extents_m, scale_factor = scale_to_contract(
-        glb, args.target_axis, args.target_size_m
-    )
+    p.step("Applying explicit real-world scale")
+    normalized_extents, extents_m, scale_factor = scale_to_contract(glb, args.target_axis, args.target_size_m)
+    p.info(f"Scale factor from TRELLIS normalized space: {scale_factor:.6g}")
+    p.info(f"Final size: W={extents_m[0]:.3f} m, H={extents_m[1]:.3f} m, D={extents_m[2]:.3f} m")
 
-    # Do not require EXT_texture_webp: keep the GLB portable to Unreal and other core glTF consumers.
+    p.step("Exporting Unreal-safe GLB and asset manifest")
     glb_path = output_dir / f"{args.name}.glb"
-    glb.export(str(glb_path), extension_webp=False)
+    with p.heartbeat("GLB serialization / texture embedding", every=20):
+        glb.export(str(glb_path), extension_webp=False)
     if not glb_path.is_file() or glb_path.stat().st_size == 0:
         raise RuntimeError(f"GLB export did not create a valid file: {glb_path}")
 
@@ -176,11 +172,7 @@ def main() -> None:
         "asset_name": args.name,
         "asset_type": args.asset_type,
         "source_image": input_path.name,
-        "producer": {
-            "engine": "TRELLIS.2",
-            "model": args.model,
-            "format": "GLB",
-        },
+        "producer": {"engine": "TRELLIS.2", "model": args.model, "format": "GLB"},
         "geometry": {
             "coordinate_system": "glTF 2.0 right-handed, Y-up",
             "units": "meters",
@@ -193,42 +185,31 @@ def main() -> None:
             "scale_resolved": True,
         },
         "consumer_contracts": {
-            "unreal_static_asset": {
-                "ready": True,
-                "preferred_input": glb_path.name,
-                "note": "Real-world scale is baked into geometry; standard GLB textures are used.",
-            },
-            "animation_engine": {
-                "eligible": args.asset_type == "character",
-                "note": "Only manually selected humanoids should enter the Animation Engine.",
-            },
+            "unreal_static_asset": {"ready": True, "preferred_input": glb_path.name, "note": "Real-world scale is baked into geometry; standard GLB textures are used."},
+            "animation_engine": {"eligible": args.asset_type == "character", "note": "Only manually selected humanoids should enter the Animation Engine."},
         },
         **material_contract(glb),
     }
-
     manifest_path = output_dir / f"{args.name}_manifest.json"
     manifest_path.write_text(json.dumps(contract, indent=2), encoding="utf-8")
+    p.ok(f"GLB: {glb_path} ({glb_path.stat().st_size / 1024**2:.1f} MiB)")
+    p.ok(f"Manifest: {manifest_path}")
 
-    print(f"GLB: {glb_path}")
-    print(f"Manifest: {manifest_path}")
-    print(
-        "Final extents (m): "
-        f"width={extents_m[0]:.4f}, height={extents_m[1]:.4f}, depth={extents_m[2]:.4f}"
-    )
-
+    p.step("Rendering optional turntable preview")
     if args.skip_preview:
-        return
+        p.info("Preview skipped by --skip-preview")
+    else:
+        preview_path = output_dir / f"{args.name}_preview.mp4"
+        try:
+            with p.heartbeat("preview render", every=20):
+                envmap = load_envmap(args.envmap)
+                frames = render_utils.make_pbr_vis_frames(render_utils.render_video(mesh, envmap=envmap))
+                imageio.mimsave(preview_path, frames, fps=args.preview_fps)
+            p.ok(f"Preview: {preview_path}")
+        except Exception as exc:
+            p.warn(f"Preview failed, but the GLB is valid: {exc}")
 
-    preview_path = output_dir / f"{args.name}_preview.mp4"
-    try:
-        envmap = load_envmap(args.envmap)
-        frames = render_utils.make_pbr_vis_frames(
-            render_utils.render_video(mesh, envmap=envmap)
-        )
-        imageio.mimsave(preview_path, frames, fps=args.preview_fps)
-        print(f"Preview: {preview_path}")
-    except Exception as exc:
-        print(f"WARNING: preview rendering failed, but GLB export succeeded: {exc}")
+    p.done("3D Engine finished successfully")
 
 
 if __name__ == "__main__":
