@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Headless Make-It-Animatable wrapper with output validation and live progress."""
 from __future__ import annotations
-import argparse, os, shutil
+import argparse, os, shutil, sys, importlib
 from pathlib import Path
 from progress_utils import Progress
 
@@ -25,9 +25,23 @@ def main():
     p.step("Loading Make-It-Animatable code and Blender integration")
     mia_root=Path(os.environ.get("MIA_ROOT","/content/Make-It-Animatable")).resolve()
     if not (mia_root/"app.py").is_file(): raise FileNotFoundError(f"Make-It-Animatable not found at {mia_root}")
+
+    # When this helper is launched by absolute path, Python puts the helper's
+    # directory (My-works/animation-engine) in sys.path, not the later cwd.
+    # chdir() alone therefore does not make MIA's top-level `app.py` importable.
+    # Add the pinned MIA checkout explicitly before importing its modules.
+    mia_root_str=str(mia_root)
+    if mia_root_str not in sys.path:
+        sys.path.insert(0,mia_root_str)
+    existing_pythonpath=os.environ.get("PYTHONPATH","")
+    os.environ["PYTHONPATH"]=mia_root_str+(os.pathsep+existing_pythonpath if existing_pythonpath else "")
     os.chdir(mia_root)
+    importlib.invalidate_caches()
+    p.info(f"MIA import root: {mia_root}")
+
     import app as mia
     from util import blender_utils
+    p.ok(f"Loaded MIA app module: {Path(mia.__file__).resolve()}")
     for name in ("state","output_joints_coarse","output_normed_input","output_sample","output_joints","output_bw","output_rest_vis","output_rest_lbs","output_anim_vis","output_anim"):
         setattr(mia,name,name)
 
