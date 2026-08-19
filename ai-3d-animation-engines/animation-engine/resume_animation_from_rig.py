@@ -76,7 +76,7 @@ def main():
 
     p.step("Retargeting existing ARDY motion")
     final_fbx=out/"character_animated.fbx"; preview_glb=out/"character_animated_preview.glb"
-    if a.reuse_existing_retarg et and final_fbx.is_file() and final_fbx.stat().st_size>0:
+    if a.reuse_existing_retarget and final_fbx.is_file() and final_fbx.stat().st_size>0:
         p.ok(f"Reusing existing animated FBX: {final_fbx} ({final_fbx.stat().st_size/1024**2:.1f} MiB)")
         if preview_glb.is_file() and preview_glb.stat().st_size>0:
             p.info(f"Existing preview GLB: {preview_glb} ({preview_glb.stat().st_size/1024**2:.1f} MiB)")
