@@ -10,6 +10,16 @@ from pathlib import Path
 
 os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+os.environ.setdefault("HF_HOME", "/content/huggingface")
+
+# If the notebook's HF preparation step completed, force every downstream HF /
+# Transformers lookup to resolve from the already-downloaded local cache. These
+# variables are intentionally set BEFORE importing trellis2/transformers/HF.
+HF_READY_MARKER = Path(os.environ["HF_HOME"]) / "trellis2_preload_ready.json"
+HF_CACHE_ONLY = HF_READY_MARKER.is_file()
+if HF_CACHE_ONLY:
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
 # TRELLIS.2 is a source-tree package (the upstream repo has trellis2/ but no
 # root setup.py/pyproject package installer). Upstream example.py works because
@@ -130,16 +140,21 @@ def main() -> None:
     p = Progress("3D GENERATION", 7)
     args = parse_args()
 
-    p.step("Validating input, output path and GPU")
+    p.step("Validating input, output path, GPU and HF cache mode")
     input_path, output_dir = validate_args(args)
     props = torch.cuda.get_device_properties(0)
     p.info(f"TRELLIS source: {TRELLIS_ROOT}")
+    p.info(f"HF_HOME: {os.environ['HF_HOME']}")
+    if HF_CACHE_ONLY:
+        p.ok(f"HF cache-only mode active: {HF_READY_MARKER}")
+    else:
+        p.warn("HF preload marker not found; model loading may access the network. Run the HF sign-in/download cell first.")
     p.info(f"Input: {input_path.name}")
     p.info(f"Asset type: {args.asset_type} | target {args.target_axis}={args.target_size_m:g} m")
     p.info(f"GPU: {props.name} | VRAM: {props.total_memory / (1024**3):.1f} GiB")
 
     p.step(f"Loading TRELLIS.2 model: {args.model}")
-    with p.heartbeat("model download/load", every=30):
+    with p.heartbeat("local model load" if HF_CACHE_ONLY else "model download/load", every=30):
         pipeline = Trellis2ImageTo3DPipeline.from_pretrained(args.model)
         pipeline.cuda()
     p.ok("Model loaded on GPU")
@@ -189,6 +204,11 @@ def main() -> None:
         "asset_type": args.asset_type,
         "source_image": input_path.name,
         "producer": {"engine": "TRELLIS.2", "model": args.model, "format": "GLB"},
+        "model_loading": {
+            "hf_home": os.environ["HF_HOME"],
+            "cache_only": HF_CACHE_ONLY,
+            "preload_marker": str(HF_READY_MARKER) if HF_CACHE_ONLY else None,
+        },
         "geometry": {
             "coordinate_system": "glTF 2.0 right-handed, Y-up",
             "units": "meters",
