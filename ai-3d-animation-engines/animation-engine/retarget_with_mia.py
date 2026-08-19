@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Retarget an ARDY source FBX onto a Make-It-Animatable humanoid rig with live progress."""
 from __future__ import annotations
-import argparse, math, os
+import argparse, math, os, sys, importlib
 from pathlib import Path
 from progress_utils import Progress
 
@@ -36,7 +36,14 @@ def main():
     p.step("Loading Make-It-Animatable / Auto-Rig-Pro Blender tools")
     mia_root=Path(os.environ.get("MIA_ROOT","/content/Make-It-Animatable")).resolve()
     if not (mia_root/"util"/"blender_utils.py").is_file(): raise FileNotFoundError(f"Make-It-Animatable not found at {mia_root}")
-    os.chdir(mia_root); from util import blender_utils; bpy=blender_utils.bpy
+    mia_root_str=str(mia_root)
+    if mia_root_str not in sys.path:
+        sys.path.insert(0,mia_root_str)
+    existing_pythonpath=os.environ.get("PYTHONPATH","")
+    os.environ["PYTHONPATH"]=mia_root_str+(os.pathsep+existing_pythonpath if existing_pythonpath else "")
+    os.chdir(mia_root); importlib.invalidate_caches()
+    from util import blender_utils; bpy=blender_utils.bpy
+    p.info(f"MIA import root: {mia_root}")
     blender_utils.reset(); set_scene_fps(bpy.context.scene,a.fps)
 
     p.step("Importing target character and ARDY source skeleton")
