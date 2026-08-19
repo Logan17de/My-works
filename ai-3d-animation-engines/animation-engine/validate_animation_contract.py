@@ -213,13 +213,26 @@ def evaluated_world_vertices(obj) -> np.ndarray:
     eval_obj = obj.evaluated_get(deps)
     mesh = eval_obj.to_mesh()
     try:
-        mw = eval_obj.matrix_world
-        return np.asarray(
-            [[(mw @ v.co).x, (mw @ v.co).y, (mw @ v.co).z] for v in mesh.vertices],
-            dtype=np.float64,
-        )
+        flat = np.empty(len(mesh.vertices) * 3, dtype=np.float64)
+        mesh.vertices.foreach_get("co", flat)
+        local = flat.reshape(-1, 3)
+        mw = np.asarray(eval_obj.matrix_world, dtype=np.float64)
+        return local @ mw[:3, :3].T + mw[:3, 3]
     finally:
         eval_obj.to_mesh_clear()
+
+
+def sampled_edges(mesh_obj, max_edges=50000) -> np.ndarray:
+    edge_count = len(mesh_obj.data.edges)
+    if edge_count == 0:
+        return np.empty((0, 2), dtype=np.int64)
+    flat = np.empty(edge_count * 2, dtype=np.int32)
+    mesh_obj.data.edges.foreach_get("vertices", flat)
+    edges = flat.reshape(-1, 2).astype(np.int64, copy=False)
+    if edge_count > max_edges:
+        pick = np.linspace(0, edge_count - 1, max_edges, dtype=np.int64)
+        edges = edges[pick]
+    return edges
 
 
 def deformation_contract(path: Path, samples: int, progress: Progress):
@@ -241,17 +254,20 @@ def deformation_contract(path: Path, samples: int, progress: Progress):
     frames = np.rint(np.linspace(start, end, max(3, samples))).astype(int)
 
     arm.animation_data.action = None
+    for pb in arm.pose.bones:
+        pb.matrix_basis.identity()
     bpy.context.scene.frame_set(start)
     bpy.context.view_layer.update()
     references = {}
     for mesh_obj in meshes:
         verts = evaluated_world_vertices(mesh_obj)
-        edges = np.asarray([[e.vertices[0], e.vertices[1]] for e in mesh_obj.data.edges], dtype=np.int64)
+        edges = sampled_edges(mesh_obj)
         if len(edges) == 0:
             continue
         lengths = np.linalg.norm(verts[edges[:, 0]] - verts[edges[:, 1]], axis=1)
         keep = lengths > 1e-7
         references[mesh_obj.name] = (edges[keep], lengths[keep])
+        progress.info(f"deformation reference {mesh_obj.name}: sampled {int(keep.sum()):,} edges")
     arm.animation_data.action = action
     if not references:
         raise RuntimeError("Could not build reference mesh-edge set")
