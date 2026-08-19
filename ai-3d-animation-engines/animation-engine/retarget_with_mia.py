@@ -131,26 +131,33 @@ def main():
     target_skel=skeleton_height_world(target_armature)
     source_skel=skeleton_height_world(source_armature)
     factor=target_skel/source_skel
+    if not math.isfinite(factor) or not (0.01 <= factor <= 100.0):
+        raise RuntimeError(f"Implausible ARDY-to-target scale ratio: {factor}")
     p.info(f"Scale contract: target mesh={target_mesh_before:.4f} | target skeleton={target_skel:.4f} | source skeleton={source_skel:.4f}")
-    p.info(f"Scaling ARDY source rig only by {factor:.6f}x; target character scale is locked")
-    source_armature.scale=tuple(float(x)*factor for x in source_armature.scale)
-    bpy.context.view_layer.update()
-    p.info(f"Source skeleton after scale={skeleton_height_world(source_armature):.4f}")
+    p.info(f"Root-motion scale ratio={factor:.6f}x")
+    p.info(f"Object scales before retarget: target={tuple(round(float(x),6) for x in target_armature.scale)} | source={tuple(round(float(x),6) for x in source_armature.scale)}")
     p.ok(f"Shared body contract: {len(BASE_BONES)} exact Mixamo bones")
 
-    p.step("Building exact source->target bone mapping without target auto-scale")
-    blender_utils.set_action(target_armature,source_action)
+    p.step("Building exact source->target bone mapping with locked target scale")
     blender_utils.enable_arp(target_armature)
+    if target_armature.animation_data is None:
+        target_armature.animation_data_create()
+    target_armature.animation_data.action=None
+
     scn=bpy.context.scene; set_scene_fps(scn,a.fps)
-    scn.source_rig=source_armature.name; scn.target_rig=target_armature.name
+    scn.source_rig=source_armature.name
+    scn.target_rig=target_armature.name
+    scn.source_action=source_action.name
+    # ARP documents global_scale as a root-location scale. Keep both armature
+    # objects untouched and put the body-height ratio here instead.
+    scn.global_scale=float(factor)
+    if hasattr(scn,"loc_mult"):
+        scn.loc_mult=1.0
     if a.inplace:
         scn.arp_retarget_in_place=True
     bpy.context.view_layer.objects.active=target_armature
     target_armature.select_set(True)
 
-    # ARDY and MIA can use different scale conventions. Auto-Rig-Pro's
-    # auto_scale can resize the already-correct target character, so normalize
-    # only the source rig above and build the mapping without target auto-scale.
     bpy.ops.arp.build_bones_list()
     mapping={item.name:item for item in scn.bones_map_v2}
     missing=sorted(BASE_BONES-mapping.keys())
@@ -161,6 +168,9 @@ def main():
     hips=mapping["mixamorig:Hips"]
     scn.bones_map_index=list(scn.bones_map_v2).index(hips)
     hips.set_as_root=True
+    if hasattr(hips,"loc_mult"):
+        hips.loc_mult=1.0
+    p.info(f"ARP global_scale forced to {scn.global_scale:.6f}; neither armature object was resized")
     p.ok("Exact shared-bone map built; target auto-scale disabled")
 
     p.step("Retargeting and baking ARDY motion onto the character")
@@ -168,6 +178,7 @@ def main():
         bpy.ops.arp.retarget()
     blender_utils.update(); set_scene_fps(scn,a.fps)
 
+    p.info(f"Object scales after retarget: target={tuple(round(float(x),6) for x in target_armature.scale)} | source={tuple(round(float(x),6) for x in source_armature.scale)}")
     target_mesh_after=mesh_height_world(character)
     drift=abs(target_mesh_after/target_mesh_before-1.0)
     p.info(f"Target scale guard: before={target_mesh_before:.4f} | after={target_mesh_after:.4f} | drift={drift*100:.2f}%")
