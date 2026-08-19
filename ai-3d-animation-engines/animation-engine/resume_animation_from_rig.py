@@ -14,6 +14,7 @@ def parse_args():
     p.add_argument("--no-fingers",action="store_true")
     p.add_argument("--already-rigged",action="store_true")
     p.add_argument("--reuse-existing-rig",action="store_true",help="Reuse output-dir/character_rigged.fbx when it already exists and is non-empty")
+    p.add_argument("--reuse-existing-retarget",action="store_true",help="Reuse output-dir/character_animated.fbx when it already exists and is non-empty")
     return p.parse_args()
 
 
@@ -75,7 +76,13 @@ def main():
 
     p.step("Retargeting existing ARDY motion")
     final_fbx=out/"character_animated.fbx"; preview_glb=out/"character_animated_preview.glb"
-    run(["/opt/conda/bin/conda","run","--no-capture-output","-n","mia","python",str(tools/"retarget_with_mia.py"),"--target",str(rigged),"--animation",str(ardy_source),"--output",str(final_fbx),"--preview-glb",str(preview_glb),"--fps",str(fps)],p,"retarget/export",env=env)
+    if a.reuse_existing_retarg et and final_fbx.is_file() and final_fbx.stat().st_size>0:
+        p.ok(f"Reusing existing animated FBX: {final_fbx} ({final_fbx.stat().st_size/1024**2:.1f} MiB)")
+        if preview_glb.is_file() and preview_glb.stat().st_size>0:
+            p.info(f"Existing preview GLB: {preview_glb} ({preview_glb.stat().st_size/1024**2:.1f} MiB)")
+        p.info("Skipping Blender retarget because artifacts were already exported; strict validation runs next.")
+    else:
+        run(["/opt/conda/bin/conda","run","--no-capture-output","-n","mia","python",str(tools/"retarget_with_mia.py"),"--target",str(rigged),"--animation",str(ardy_source),"--output",str(final_fbx),"--preview-glb",str(preview_glb),"--fps",str(fps)],p,"retarget/export",env=env)
     require(final_fbx,"final animated FBX")
 
     p.step("Validating final scale/FPS/motion contract")
