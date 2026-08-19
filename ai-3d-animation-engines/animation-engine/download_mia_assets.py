@@ -2,7 +2,9 @@
 """Download only the Hugging Face assets required by Make-It-Animatable.
 
 Uses HF_TOKEN from the environment so gated Mixamo access works in Colab without
-embedding credentials in Git URLs or command-line arguments.
+embedding credentials in Git URLs or command-line arguments. Temporary model
+staging is deleted immediately after the required weights are copied into the
+Make-It-Animatable checkout to keep Colab disk usage low.
 """
 from __future__ import annotations
 
@@ -36,8 +38,6 @@ def verify_access(token: str) -> None:
 
     print(f"[MIA HF] Checking gated dataset access: {MIXAMO_REPO}", flush=True)
     try:
-        # model_info/dataset_info alone can list a gated repo; the actual file
-        # download below is the definitive access check.
         api.dataset_info(MIXAMO_REPO, token=token)
     except HfHubHTTPError as exc:
         raise RuntimeError(
@@ -89,27 +89,35 @@ def download_weights(token: str, temp_root: Path, mia_root: Path) -> None:
     print("[MIA HF] Files: output/best/new/**", flush=True)
     if temp_root.exists():
         shutil.rmtree(temp_root)
-    snapshot_download(
-        repo_id=MIA_REPO,
-        repo_type="model",
-        token=token,
-        allow_patterns=["output/best/new/**"],
-        local_dir=str(temp_root),
-    )
 
-    src = temp_root / "output" / "best" / "new"
-    if not src.is_dir():
-        raise RuntimeError(f"Expected MIA weight directory missing after download: {src}")
-    weights = sorted(src.rglob("*.pth"))
-    if not weights:
-        raise RuntimeError(f"No .pth MIA weights found in {src}")
+    try:
+        snapshot_download(
+            repo_id=MIA_REPO,
+            repo_type="model",
+            token=token,
+            allow_patterns=["output/best/new/**"],
+            local_dir=str(temp_root),
+        )
 
-    dst = mia_root / "output" / "best" / "new"
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    if dst.exists():
-        shutil.rmtree(dst)
-    shutil.copytree(src, dst)
-    print(f"[MIA HF] ✅ Installed {len(weights)} weight files into {dst}", flush=True)
+        src = temp_root / "output" / "best" / "new"
+        if not src.is_dir():
+            raise RuntimeError(f"Expected MIA weight directory missing after download: {src}")
+        weights = sorted(src.rglob("*.pth"))
+        if not weights:
+            raise RuntimeError(f"No .pth MIA weights found in {src}")
+
+        dst = mia_root / "output" / "best" / "new"
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if dst.exists():
+            shutil.rmtree(dst)
+        shutil.copytree(src, dst)
+        print(f"[MIA HF] ✅ Installed {len(weights)} weight files into {dst}", flush=True)
+    finally:
+        # The same multi-GB files must not remain twice on the small Colab disk.
+        if temp_root.exists():
+            size_gib = sum(p.stat().st_size for p in temp_root.rglob("*") if p.is_file()) / (1024**3)
+            print(f"[MIA HF] Cleaning temporary staging ({size_gib:.2f} GiB): {temp_root}", flush=True)
+            shutil.rmtree(temp_root, ignore_errors=True)
 
 
 def main() -> None:
