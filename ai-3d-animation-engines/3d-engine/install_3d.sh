@@ -2,10 +2,6 @@
 set -Eeuo pipefail
 
 TRELLIS_REF="75fbf0183001ed9876c8dbb35de6b68552ee08bd"
-NVDIFFRAST_REF="253ac4fcea7de5f396371124af597e6cc957bfae"
-NVDIFFREC_REF="b296927cc7fd01c2ac1087c8065c4d7248f72da4"
-CUMESH_REF="12289e1062f0603f2f0d0771b02e1395d247f26f"
-FLEXGEMM_REF="6dd94a859c26ee8246888502eada3dd8ad85532e"
 TOTAL=9
 STEP=0
 START_TS=$(date +%s)
@@ -113,52 +109,22 @@ cd /content/TRELLIS.2
 action "Running upstream setup.sh --basic"
 . ./setup.sh --basic
 
-stage "Restoring/building TRELLIS CUDA/native extensions"
-info "Drive cache stores compiled wheels keyed by Python/PyTorch/CUDA/GPU architecture."
-action "Computing binary compatibility key"
-GPU_CC="$(python -c 'import torch; a,b=torch.cuda.get_device_capability(0); print(f"{a}{b}")')"
-PY_TAG="$(python -c 'import sys; print(f"cp{sys.version_info.major}{sys.version_info.minor}")')"
-TORCH_TAG="$(python -c 'import torch; print(torch.__version__.split("+")[0].replace(".", ""))')"
-WHEEL_KEY="trellis-${TRELLIS_REF:0:8}-${PY_TAG}-torch${TORCH_TAG}-cu124-sm${GPU_CC}"
-export TORCH_CUDA_ARCH_LIST="${GPU_CC:0:1}.${GPU_CC:1:1}"
-info "Compiled-wheel cache key: $WHEEL_KEY"
-info "TORCH_CUDA_ARCH_LIST=$TORCH_CUDA_ARCH_LIST"
-
-mkdir -p /tmp/extensions
-
-action "flash-attn: use cached wheel or build once"
-cache_install_or_build_wheel "flash-attn" "$WHEEL_KEY" "flash-attn==2.7.3" "no-deps"
-
-action "nvdiffrast: restore source only on cache miss, then use/build wheel"
-cache_git_repo "nvdiffrast" "https://github.com/NVlabs/nvdiffrast.git" "$NVDIFFRAST_REF" "/tmp/extensions/nvdiffrast" "plain"
-cache_install_or_build_wheel "nvdiffrast" "$WHEEL_KEY" "/tmp/extensions/nvdiffrast" "no-deps"
-
-action "nvdiffrec renderutils: restore source only on cache miss, then use/build wheel"
-cache_git_repo "nvdiffrec" "https://github.com/JeffreyXiang/nvdiffrec.git" "$NVDIFFREC_REF" "/tmp/extensions/nvdiffrec" "plain"
-cache_install_or_build_wheel "nvdiffrec" "$WHEEL_KEY" "/tmp/extensions/nvdiffrec" "no-deps"
-
-action "CuMesh: restore source only on cache miss, then use/build wheel"
-cache_git_repo "CuMesh" "https://github.com/JeffreyXiang/CuMesh.git" "$CUMESH_REF" "/tmp/extensions/CuMesh" "recursive"
-cache_install_or_build_wheel "cumesh" "$WHEEL_KEY" "/tmp/extensions/CuMesh" "no-deps"
-
-action "O-Voxel: use cached wheel or build from pinned TRELLIS source"
-cache_install_or_build_wheel "o-voxel" "$WHEEL_KEY" "/content/TRELLIS.2/o-voxel" "no-deps"
-
-action "FlexGEMM: restore source only on cache miss, then use/build wheel"
-cache_git_repo "FlexGEMM" "https://github.com/JeffreyXiang/FlexGEMM.git" "$FLEXGEMM_REF" "/tmp/extensions/FlexGEMM" "recursive"
-cache_install_or_build_wheel "flexgemm" "$WHEEL_KEY" "/tmp/extensions/FlexGEMM" "no-deps"
+stage "Restoring/installing TRELLIS CUDA/native extensions"
+action "Running resumable native-extension installer"
+bash "$SCRIPT_DIR/install_trellis_extensions.sh"
 
 stage "Running GPU/import smoke test"
 action "Importing TRELLIS/O-Voxel and checking CUDA visibility"
 python - <<'PY'
 import shutil
-import torch, o_voxel
+import torch, flash_attn, o_voxel
 from trellis2.pipelines import Trellis2ImageTo3DPipeline
 if not torch.cuda.is_available():
     raise RuntimeError("PyTorch cannot see the NVIDIA GPU")
 print("TRELLIS.2 import smoke test: OK", flush=True)
 print("GPU:", torch.cuda.get_device_name(0), flush=True)
 print("PyTorch:", torch.__version__, "CUDA:", torch.version.cuda, flush=True)
+print("FlashAttention:", flash_attn.__version__, flush=True)
 print("Free disk (GiB):", round(shutil.disk_usage('/content').free/1024**3, 1), flush=True)
 PY
 
