@@ -108,6 +108,17 @@ stage "Installing TRELLIS Python dependencies"
 cd /content/TRELLIS.2
 action "Running upstream setup.sh --basic"
 . ./setup.sh --basic
+action "Upgrading Hugging Face Hub/Xet downloader for authenticated high-speed model downloads"
+python -m pip install --progress-bar on --upgrade huggingface_hub hf_xet
+python - <<'PY'
+import huggingface_hub
+try:
+    import hf_xet
+    xet = "available"
+except Exception:
+    xet = "unavailable"
+print("huggingface_hub:", huggingface_hub.__version__, "| hf_xet:", xet, flush=True)
+PY
 
 stage "Restoring/installing TRELLIS CUDA/native extensions"
 action "Running resumable native-extension installer"
@@ -132,4 +143,4 @@ printf '\n[TRELLIS INSTALL][%d/%d][%s] ✅ Installation complete.\n' "$TOTAL" "$
 if [ "$CACHE_ENABLED" -eq 1 ]; then
   printf '[CACHE] Persistent sources/wheels are in: %s\n' "$ENGINE_CACHE_ROOT"
 fi
-printf 'You can now run the 3D generation cell.\n'
+printf 'You can now run the Hugging Face sign-in/download cell, then 3D generation.\n'
