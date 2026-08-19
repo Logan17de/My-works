@@ -35,6 +35,21 @@ def _patch_gradio_for_headless(progress):
     gr_helpers.log_message=headless_log_message
     progress.info("Patched MIA Gradio notifications for headless Colab execution")
 
+def _hard_exit_after_success(progress):
+    """Exit without running bpy/C-extension interpreter teardown.
+
+    Some Colab/Linux combinations can segfault after all Blender/MIA work is
+    finished, during Python process shutdown. At this point the FBX has already
+    been copied and validated, so bypassing interpreter finalizers is safer and
+    makes the subprocess return success to the parent pipeline.
+    """
+    progress.info("Rig artifact is fully validated; exiting without Blender/Python teardown")
+    try:
+        sys.stdout.flush()
+        sys.stderr.flush()
+    finally:
+        os._exit(0)
+
 def main():
     p=Progress("AUTO-RIG",7); a=parse_args(); ip=Path(a.input).expanduser().resolve()
     p.step("Validating selected humanoid mesh")
@@ -46,9 +61,6 @@ def main():
     mia_root=Path(os.environ.get("MIA_ROOT","/content/Make-It-Animatable")).resolve()
     if not (mia_root/"app.py").is_file(): raise FileNotFoundError(f"Make-It-Animatable not found at {mia_root}")
 
-    # When this helper is launched by absolute path, Python puts the helper's
-    # directory (My-works/animation-engine) in sys.path, not the later cwd.
-    # chdir() alone therefore does not make MIA's top-level `app.py` importable.
     mia_root_str=str(mia_root)
     if mia_root_str not in sys.path:
         sys.path.insert(0,mia_root_str)
@@ -100,4 +112,5 @@ def main():
     p.ok(f"Rig validated: {len(bone_names)} bones, {verts:,} vertices")
     p.ok(f"Rigged FBX: {out} ({out.stat().st_size/1024**2:.1f} MiB)")
     p.done("Auto-rigging complete")
+    _hard_exit_after_success(p)
 if __name__=="__main__": main()
