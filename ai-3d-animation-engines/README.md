@@ -2,11 +2,7 @@
 
 Two independent Colab-first engines for AI-assisted Unreal asset production.
 
-## Why two engines?
-
-The 3D engine creates **all kinds of assets**: props, furniture, buildings, environment pieces, and characters. Most generated assets never need a skeleton or motion.
-
-The animation engine is therefore deliberately separate. You manually choose only a humanoid character that should move, then send that file into the animation engine.
+## Architecture
 
 ```text
 REFERENCE IMAGE
@@ -28,8 +24,8 @@ REFERENCE IMAGE
           +----------------------+
           | ANIMATION ENGINE     |
           | Make-It-Animatable   |
-          | + ARDY               |
-          | + retarget bridge    |
+          | + ARDY Core          |
+          | + validated bridge   |
           +----------------------+
                     |
                     v
@@ -39,79 +35,105 @@ REFERENCE IMAGE
                   Unreal
 ```
 
+The engines are deliberately separate. The 3D Engine can generate any asset; only a humanoid you explicitly choose enters the Animation Engine.
+
 ## Engine 1 — 3D Engine
 
-Open [`3d-engine/TRELLIS2_Colab.ipynb`](3d-engine/TRELLIS2_Colab.ipynb) in Google Colab.
+Open [`3d-engine/TRELLIS2_Colab.ipynb`](3d-engine/TRELLIS2_Colab.ipynb).
 
-Input:
+**Input**
 - one reference image
 
-Output:
-- `asset.glb` — PBR-ready 3D asset
-- `asset_preview.mp4` — turntable preview
+**Outputs**
+- `asset.glb` — PBR 3D asset
+- `asset_preview.mp4` — optional turntable preview
 
-The notebook uses Microsoft's official TRELLIS.2 repository directly. No ComfyUI is required.
+The notebook calls TRELLIS.2 directly; ComfyUI is not required.
 
-> TRELLIS.2's official implementation currently targets Linux and an NVIDIA GPU with at least 24 GB VRAM. An A100/H100-class Colab runtime is therefore the clean path. Lower-VRAM community hacks are intentionally not part of this engine.
+### Reliability changes
+
+- refuses to run the official path below 24 GB VRAM;
+- recreates the `trellis2` environment cleanly when the install cell is rerun;
+- pins the upstream TRELLIS.2 commit;
+- uses PyTorch/CUDA 12.4 as expected by upstream;
+- installs a matching CUDA 12.4 toolkit inside Conda when Colab does not expose `/usr/local/cuda-12.4`;
+- smoke-tests imports before model download/generation;
+- exports the GLB **before** optional preview rendering, so an HDRI/render failure cannot discard a successful asset.
 
 ## Engine 2 — Animation Engine
 
 Open [`animation-engine/ARDY_Animation_Colab.ipynb`](animation-engine/ARDY_Animation_Colab.ipynb).
 
-Input:
-- a humanoid `.glb` / `.fbx` that **you manually select**
-- a text motion prompt, for example `A person walks forward and waves with the right hand.`
+**Input**
+- a humanoid `.glb`, `.fbx`, `.obj`, or polygon `.ply` that you manually select;
+- a text motion prompt.
 
-Pipeline:
+**Pipeline**
 
-1. Make-It-Animatable rigs the selected character to a Mixamo-style humanoid skeleton.
-2. ARDY generates Core-skeleton motion from the prompt.
-3. `enrich_ardy_motion.py` adds Core skeleton metadata to ARDY's `.npz`.
-4. `ardy_motion_to_fbx.py` builds an animated ARDY source skeleton in FBX.
-5. Make-It-Animatable's bundled Auto-Rig-Pro retargeter transfers the source motion to the generated character rig.
-6. The engine exports an animated FBX for Unreal.
+1. ARDY Core generates motion as `.npz`.
+2. `enrich_ardy_motion.py` validates the ARDY shapes/keys and attaches Core skeleton metadata.
+3. `preview_ardy_motion.py` renders a quick skeleton MP4.
+4. `ardy_motion_to_fbx.py` creates a clean source animation:
+   - root translation only;
+   - rotation-only child bones;
+   - exact `mixamorig:*` names for the 22 shared base humanoid bones;
+   - ARDY-only helper bones kept separate;
+   - runtime FK validation against ARDY `posed_joints` before FBX export.
+5. `rig_character_mia.py` auto-rigs the selected mesh with Make-It-Animatable and validates that the result is a bound Mixamo-style humanoid.
+6. `retarget_with_mia.py` uses Make-It-Animatable's bundled Auto-Rig-Pro fork, forcing exact shared Mixamo bone mappings before baking.
+7. Final animated FBX is exported for Unreal.
 
-Outputs:
-- `motion.npz` — original ARDY motion
-- `motion_bridge.npz` — motion + skeleton metadata
-- `motion_preview.mp4` — quick skeleton preview
-- `ardy_source.fbx` — ARDY motion as an animation skeleton
-- `character_rigged.fbx` — selected character after auto-rigging
-- `character_animated.fbx` — final retargeted character for Unreal
-- `character_animated.glb` — quick browser/GLB preview when export succeeds
+**Outputs**
+- `motion.npz`
+- `motion_bridge.npz`
+- `motion_preview.mp4`
+- `ardy_source.fbx`
+- `character_rigged.fbx`
+- `character_animated.fbx`
+- `character_animated.glb` when the optional preview export succeeds
 
-## Important boundary
+## Important scope
 
-TRELLIS.2 and ARDY are official model stages. The **ARDY → arbitrary generated character** bridge is integration code in this repository, not an official NVIDIA feature. ARDY officially emits motion `.npz` data; the FBX creation and retargeting steps here are glue code.
+TRELLIS.2 and ARDY are upstream model stages. The **ARDY → arbitrary generated character** path is integration code in this repository, not an official NVIDIA workflow.
 
-That means:
-- motion generation itself is the stable stage;
-- auto-rigging quality depends on the generated character geometry;
-- retargeting may need adjustment for unusual body proportions, clothing, accessories, tails, wings, etc.
+The bridge now validates its own kinematics, but final visual quality still depends on:
+- the generated character having clear humanoid geometry;
+- auto-rig blend weights;
+- unusual proportions, clothing, hair, accessories, tails, wings, etc.;
+- retarget quality.
+
+The default Animation Engine intentionally removes finger bones from the target rig because ARDY Core is a body-motion model, not a full finger-animation system.
 
 ## Colab strategy
 
-The notebooks intentionally install their large dependencies into disposable Colab runtimes.
+The notebooks use disposable runtimes and separate environments to avoid dependency conflicts.
 
 Keep permanently:
 - these notebooks/scripts in GitHub;
-- your input images/models;
-- final `.glb`, `.fbx`, `.npz`, and preview files in Drive.
+- source images/models;
+- final GLB/FBX/NPZ/preview outputs in Drive.
 
-Re-download on a fresh runtime:
-- TRELLIS.2 code + weights;
-- ARDY code + weights;
-- Make-It-Animatable code + weights.
+Redownload in a fresh runtime:
+- model repositories;
+- model weights;
+- Conda environments.
 
-This avoids maintaining conflicting CUDA/PyTorch stacks on the local PC.
+## Pinned upstream revisions
 
-## External projects
+The notebooks currently target:
 
-This integration relies on:
+- Microsoft TRELLIS.2: `75fbf0183001ed9876c8dbb35de6b68552ee08bd`
+- NVIDIA ARDY: `693f74d13b3d04a0a22ce127ee79c929dd89756b`
+- Make-It-Animatable: `d60cc7e01ff8da46448e458dbf450e8967b34e77`
+
+Pinning matters because these notebooks call upstream Python APIs directly.
+
+## External projects / licenses
+
 - Microsoft TRELLIS.2 — MIT
-- NVIDIA ARDY — Apache-2.0 code; model license is listed by NVIDIA
+- NVIDIA ARDY code — Apache-2.0; released model weights use NVIDIA's model license
 - Make-It-Animatable — MIT
 - Auto-Rig-Pro fork bundled by Make-It-Animatable
-- Meta Llama 3 8B Instruct for ARDY text encoding; access must be granted on Hugging Face
+- Meta Llama 3 8B Instruct — used by ARDY's text encoder and gated on Hugging Face
 
-Review each upstream license before redistributing generated assets, checkpoints, or bundled dependencies.
+Review upstream licenses before redistributing checkpoints, bundled code, or generated assets.
