@@ -2,9 +2,17 @@
 """Render a validated ARDY skeleton motion NPZ to MP4 with live progress."""
 from __future__ import annotations
 import argparse
+import os
 from pathlib import Path
+
+# Colab exports an inline Jupyter matplotlib backend into child processes.
+# The isolated `ardy` conda env does not provide that backend, and matplotlib
+# validates MPLBACKEND during import. Force a true headless backend *before*
+# importing matplotlib so preview rendering is deterministic in conda run.
+os.environ["MPLBACKEND"] = "Agg"
+
 import matplotlib
-matplotlib.use("Agg")
+matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.animation import FFMpegWriter
