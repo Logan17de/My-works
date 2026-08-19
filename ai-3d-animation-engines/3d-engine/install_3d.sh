@@ -120,6 +120,30 @@ except Exception:
 print("huggingface_hub:", huggingface_hub.__version__, "| hf_xet:", xet, flush=True)
 PY
 
+action "Applying upstream DINOv3 compatibility fix for current Transformers"
+python - <<'PY'
+from pathlib import Path
+import transformers
+
+path = Path('/content/TRELLIS.2/trellis2/modules/image_feature_extractor.py')
+text = path.read_text(encoding='utf-8')
+old = '        for i, layer_module in enumerate(self.model.layer):\n'
+new = (
+    '        # Transformers >=5 wraps DINOv3ViTEncoder under self.model.model.\n'
+    '        # Keep compatibility with both the old and new Transformers layouts.\n'
+    '        encoder = getattr(self.model, "model", self.model)\n'
+    '        for i, layer_module in enumerate(encoder.layer):\n'
+)
+if old in text:
+    path.write_text(text.replace(old, new, 1), encoding='utf-8')
+    print('Applied DINOv3 layer-path compatibility patch.', flush=True)
+elif 'encoder = getattr(self.model, "model", self.model)' in text:
+    print('DINOv3 compatibility patch already present.', flush=True)
+else:
+    raise RuntimeError('TRELLIS DINOv3 extractor changed unexpectedly; refusing an unsafe patch.')
+print('Transformers:', transformers.__version__, flush=True)
+PY
+
 stage "Restoring/installing TRELLIS CUDA/native extensions"
 action "Running resumable native-extension installer"
 bash "$SCRIPT_DIR/install_trellis_extensions.sh"
