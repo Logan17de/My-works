@@ -31,8 +31,17 @@ trap 'code=$?; printf "\n[ANIMATION INSTALL][%d/%d][%s] ❌ FAILED\n  Stage: %s\
 echo "============================================================"
 echo " ARDY + Make-It-Animatable Colab installer"
 echo " Fresh runtime + optional Google Drive source/build cache"
-echo " ARDY/Llama runtime model weights are NOT stored in Drive."
+echo " ARDY/Llama/MIA runtime model weights are NOT stored in Drive."
 echo "============================================================"
+
+# MIA requires the gated jasongzy/Mixamo Hugging Face dataset. Fail before
+# spending GPU time if the notebook did not provide a token. The token remains
+# in the process environment only; it is never printed or added to a Git URL.
+if [ -z "${HF_TOKEN:-}" ]; then
+  echo "ERROR: HF_TOKEN is required before Animation Engine installation." >&2
+  echo "Run the Animation Hugging Face sign-in cell (or add HF_TOKEN to Colab Secrets) first." >&2
+  exit 2
+fi
 
 stage "Installing Linux build tools"
 action "Refreshing apt package index"
@@ -114,22 +123,15 @@ printf "gradio>=5.25,<6\n" >/tmp/mia-constraints.txt
 PIP_CONSTRAINT=/tmp/mia-constraints.txt conda run --no-capture-output -n mia python -m pip install -r requirements.txt
 
 stage "Downloading MIA templates and model weights"
-info "These neural-network weights are intentionally downloaded fresh to local /content."
-action "Initializing Git-LFS"
-git lfs install --skip-repo >/dev/null
-rm -rf data/Mixamo
-mkdir -p data
-action "Cloning Mixamo template dataset metadata"
-GIT_LFS_SKIP_SMUDGE=1 git -C data clone --progress https://huggingface.co/datasets/jasongzy/Mixamo
-action "Cloning MIA model repository metadata"
-GIT_LFS_SKIP_SMUDGE=1 git clone --progress https://huggingface.co/jasongzy/Make-It-Animatable /tmp/mia-hf-data
-action "Downloading Mixamo skeleton templates through Git-LFS"
-git -C data/Mixamo lfs pull -I 'bones*.fbx'
-action "Downloading Make-It-Animatable neural-network weights through Git-LFS"
-git -C /tmp/mia-hf-data lfs pull -I 'output/best/new'
-mkdir -p output/best
-rm -rf output/best/new
-cp -r /tmp/mia-hf-data/output/best/new output/best/
+info "The gated Mixamo templates and MIA weights are downloaded fresh to local /content."
+info "HF_TOKEN is read from the environment and is never printed or embedded in Git URLs."
+action "Installing Hugging Face Hub/Xet downloader in the MIA environment"
+conda run --no-capture-output -n mia python -m pip install --progress-bar on --upgrade huggingface_hub hf_xet
+action "Authenticating and downloading only required MIA assets with visible HF progress"
+HF_HOME=/content/huggingface HF_XET_HIGH_PERFORMANCE=1 \
+  conda run --no-capture-output -n mia python "$SCRIPT_DIR/download_mia_assets.py" \
+    --mia-root /content/Make-It-Animatable \
+    --temp-root /tmp/mia-hf-data
 action "Restoring/downloading FBX2glTF helper binary"
 cache_download_file \
   "FBX2glTF-linux-x64-v0.9.7" \
@@ -141,9 +143,8 @@ stage "Validating downloaded MIA assets"
 action "Checking Mixamo template and weight files"
 BONE_FILE="$(find data/Mixamo -type f -name 'bones*.fbx' | head -n 1 || true)"
 [ -n "$BONE_FILE" ] || { echo "ERROR: Mixamo template FBX missing" >&2; exit 1; }
-! head -c 200 "$BONE_FILE" | grep -q 'git-lfs.github.com/spec' || { echo "ERROR: Mixamo FBX is still an LFS pointer" >&2; exit 1; }
+[ -s "$BONE_FILE" ] || { echo "ERROR: Mixamo template FBX is empty" >&2; exit 1; }
 find output/best/new -type f -name '*.pth' | grep -q . || { echo "ERROR: MIA weights missing" >&2; exit 1; }
-! grep -RIl '^version https://git-lfs.github.com/spec/v1' output/best/new | grep -q . || { echo "ERROR: MIA weights still LFS pointers" >&2; exit 1; }
 info "Template: $BONE_FILE"
 info "Weight files: $(find output/best/new -type f -name '*.pth' | wc -l)"
 
