@@ -4,6 +4,7 @@
 set -Eeuo pipefail
 
 CACHE_ENABLED=0
+CACHE_PYTHON="${CACHE_PYTHON:-python}"
 
 cache_init() {
   if [ -n "${ENGINE_CACHE_ROOT:-}" ]; then
@@ -69,11 +70,20 @@ cache_git_repo() {
   fi
 }
 
+cache_has_wheel() {
+  # usage: cache_has_wheel label cache_key
+  local label="$1" cache_key="$2" drive_dir
+  drive_dir="${ENGINE_CACHE_ROOT:-/tmp}/wheels/$cache_key/$label"
+  [ "$CACHE_ENABLED" -eq 1 ] && [ -d "$drive_dir" ] && \
+    [ -n "$(find "$drive_dir" -maxdepth 1 -type f -name '*.whl' -print -quit 2>/dev/null || true)" ]
+}
+
 cache_install_or_build_wheel() {
   # usage: cache_install_or_build_wheel label cache_key target [with-deps|no-deps]
   # target can be a package spec (flash-attn==...) or a local source directory.
   local label="$1" cache_key="$2" target="$3" dep_mode="${4:-no-deps}"
-  local drive_dir local_dir build_dir cached wheel install_args
+  local drive_dir local_dir build_dir cached wheel
+  local -a install_args
   drive_dir="${ENGINE_CACHE_ROOT:-/tmp}/wheels/$cache_key/$label"
   local_dir="/content/.ai3d_cached_wheels/$cache_key/$label"
   build_dir="/content/.ai3d_wheel_build/$cache_key/$label"
@@ -94,7 +104,7 @@ cache_install_or_build_wheel() {
     printf '[CACHE HIT] Wheel %s -> %s\n' "$label" "$(basename "$cached")"
     cp "$cached" "$local_dir/"
     wheel="$local_dir/$(basename "$cached")"
-    if python -m pip install "${install_args[@]}" "$wheel"; then
+    if "$CACHE_PYTHON" -m pip install "${install_args[@]}" "$wheel"; then
       printf '[CACHE HIT] Wheel %s installed without rebuilding.\n' "$label"
       return 0
     fi
@@ -103,13 +113,13 @@ cache_install_or_build_wheel() {
   fi
 
   printf '[CACHE MISS] Wheel %s -> building now. First compatible run pays this cost.\n' "$label"
-  python -m pip wheel --no-deps --no-build-isolation --wheel-dir "$build_dir" "$target"
+  "$CACHE_PYTHON" -m pip wheel --no-deps --no-build-isolation --wheel-dir "$build_dir" "$target"
   wheel="$(find "$build_dir" -maxdepth 1 -type f -name '*.whl' -print -quit || true)"
   if [ -z "$wheel" ]; then
     echo "ERROR: wheel build for $label completed without producing a .whl" >&2
     return 1
   fi
-  python -m pip install "${install_args[@]}" "$wheel"
+  "$CACHE_PYTHON" -m pip install "${install_args[@]}" "$wheel"
 
   if [ "$CACHE_ENABLED" -eq 1 ]; then
     mkdir -p "$drive_dir"
