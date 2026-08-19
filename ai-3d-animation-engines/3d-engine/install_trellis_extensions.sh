@@ -50,12 +50,15 @@ else
 fi
 export PATH="$CUDA_HOME/bin:$PATH"
 
+TRELLIS_REF="$(git -C /content/TRELLIS.2 rev-parse HEAD)"
 GPU_CC="$(python -c 'import torch; a,b=torch.cuda.get_device_capability(0); print(f"{a}{b}")')"
 PY_TAG="$(python -c 'import sys; print(f"cp{sys.version_info.major}{sys.version_info.minor}")')"
 TORCH_TAG="$(python -c 'import torch; print(torch.__version__.split("+")[0].replace(".", ""))')"
-WHEEL_KEY="trellis-${PY_TAG}-torch${TORCH_TAG}-cu124-sm${GPU_CC}"
+BASE_KEY="${PY_TAG}-torch${TORCH_TAG}-cu124-sm${GPU_CC}"
 export TORCH_CUDA_ARCH_LIST="${GPU_CC:0:1}.${GPU_CC:1:1}"
 mkdir -p /tmp/extensions /content/.ai3d_prebuilt
+info "Binary compatibility: $BASE_KEY"
+info "TRELLIS revision: ${TRELLIS_REF:0:12}"
 
 step "Installing official FlashAttention 2.7.3 wheel"
 ABI_FLAG="$(python -c 'import torch; print("TRUE" if torch._C._GLIBCXX_USE_CXX11_ABI else "FALSE")')"
@@ -71,22 +74,22 @@ python -c 'import flash_attn; print("FlashAttention import: OK", flash_attn.__ve
 
 step "Installing/restoring nvdiffrast"
 cache_git_repo "nvdiffrast" "https://github.com/NVlabs/nvdiffrast.git" "$NVDIFFRAST_REF" "/tmp/extensions/nvdiffrast" "plain"
-cache_install_or_build_wheel "nvdiffrast" "$WHEEL_KEY" "/tmp/extensions/nvdiffrast" "no-deps"
+cache_install_or_build_wheel "nvdiffrast" "${BASE_KEY}-nvdiffrast-${NVDIFFRAST_REF:0:8}" "/tmp/extensions/nvdiffrast" "no-deps"
 
 step "Installing/restoring nvdiffrec renderutils"
 cache_git_repo "nvdiffrec" "https://github.com/JeffreyXiang/nvdiffrec.git" "$NVDIFFREC_REF" "/tmp/extensions/nvdiffrec" "plain"
-cache_install_or_build_wheel "nvdiffrec" "$WHEEL_KEY" "/tmp/extensions/nvdiffrec" "no-deps"
+cache_install_or_build_wheel "nvdiffrec" "${BASE_KEY}-nvdiffrec-${NVDIFFREC_REF:0:8}" "/tmp/extensions/nvdiffrec" "no-deps"
 
 step "Installing/restoring CuMesh"
 cache_git_repo "CuMesh" "https://github.com/JeffreyXiang/CuMesh.git" "$CUMESH_REF" "/tmp/extensions/CuMesh" "recursive"
-cache_install_or_build_wheel "cumesh" "$WHEEL_KEY" "/tmp/extensions/CuMesh" "no-deps"
+cache_install_or_build_wheel "cumesh" "${BASE_KEY}-cumesh-${CUMESH_REF:0:8}" "/tmp/extensions/CuMesh" "no-deps"
 
 step "Installing/restoring O-Voxel"
-cache_install_or_build_wheel "o-voxel" "$WHEEL_KEY" "/content/TRELLIS.2/o-voxel" "no-deps"
+cache_install_or_build_wheel "o-voxel" "${BASE_KEY}-ovoxel-${TRELLIS_REF:0:8}" "/content/TRELLIS.2/o-voxel" "no-deps"
 
 step "Installing/restoring FlexGEMM"
 cache_git_repo "FlexGEMM" "https://github.com/JeffreyXiang/FlexGEMM.git" "$FLEXGEMM_REF" "/tmp/extensions/FlexGEMM" "recursive"
-cache_install_or_build_wheel "flexgemm" "$WHEEL_KEY" "/tmp/extensions/FlexGEMM" "no-deps"
+cache_install_or_build_wheel "flexgemm" "${BASE_KEY}-flexgemm-${FLEXGEMM_REF:0:8}" "/tmp/extensions/FlexGEMM" "no-deps"
 
 step "Validating native extension imports"
 python - <<'PY'
