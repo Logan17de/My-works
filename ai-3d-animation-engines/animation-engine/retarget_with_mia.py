@@ -5,11 +5,15 @@ This wrapper uses Make-It-Animatable's bundled Auto-Rig-Pro fork, but removes
 one fragile part of the upstream helper: when source and target share exact
 ``mixamorig:*`` bone names, those mappings are forced explicitly instead of
 leaving them to fuzzy auto-detection.
+
+It also makes frame rate explicit so ARDY's timing cannot silently become
+Blender's default FPS during the final FBX export.
 """
 
 from __future__ import annotations
 
 import argparse
+import math
 import os
 from pathlib import Path
 
@@ -44,6 +48,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--target", required=True, help="Rigged character FBX")
     p.add_argument("--animation", required=True, help="ARDY source animation FBX")
     p.add_argument("--output", required=True, help="Animated output FBX")
+    p.add_argument("--fps", type=float, required=True, help="Expected ARDY motion FPS")
     p.add_argument("--preview-glb", default=None)
     p.add_argument("--inplace", action="store_true")
     return p.parse_args()
@@ -54,6 +59,17 @@ def require_file(path: str, label: str) -> Path:
     if not p.is_file() or p.stat().st_size == 0:
         raise FileNotFoundError(f"{label} not found/empty: {p}")
     return p
+
+
+def set_scene_fps(scene, fps: float) -> None:
+    if not math.isfinite(fps) or fps <= 0:
+        raise ValueError(f"Invalid FPS: {fps}")
+    rounded = max(1, int(round(fps)))
+    scene.render.fps = rounded
+    scene.render.fps_base = rounded / fps
+    actual = float(scene.render.fps) / float(scene.render.fps_base)
+    if abs(actual - fps) > 1e-6:
+        raise RuntimeError(f"Could not set Blender scene FPS to {fps}; got {actual}")
 
 
 def main() -> None:
@@ -70,6 +86,7 @@ def main() -> None:
 
     bpy = blender_utils.bpy
     blender_utils.reset()
+    set_scene_fps(bpy.context.scene, args.fps)
 
     character = blender_utils.load_file(str(target_path))
     target_armature = blender_utils.get_armature_obj(character)
@@ -99,15 +116,11 @@ def main() -> None:
             "ARDY source bridge missing Mixamo bones: " + ", ".join(missing_source)
         )
 
-    # Mirror upstream load_mixamo_anim(): set the source action on the target
-    # before invoking its retarget helper/addon.
     blender_utils.set_action(target_armature, source_action)
 
-    # Configure Auto-Rig-Pro as upstream does, then force exact mappings for the
-    # common Mixamo bones. This prevents fuzzy matching from confusing ARDY's
-    # extra Spine3/helper joints with the target hierarchy.
     blender_utils.enable_arp(target_armature)
     scn = bpy.context.scene
+    set_scene_fps(scn, args.fps)
     scn.source_rig = source_armature.name
     scn.target_rig = target_armature.name
     if args.inplace:
@@ -133,7 +146,6 @@ def main() -> None:
     scn.bones_map_index = list(scn.bones_map_v2).index(hips)
     hips.set_as_root = True
 
-    # Verify forced source names exist before asking ARP to bake.
     bad = [
         item.name
         for item in scn.bones_map_v2
@@ -144,6 +156,7 @@ def main() -> None:
 
     bpy.ops.arp.retarget()
     blender_utils.update()
+    set_scene_fps(scn, args.fps)
 
     final_action = (
         target_armature.animation_data.action
@@ -157,7 +170,6 @@ def main() -> None:
     if len(keyframes) < 2:
         raise RuntimeError("Retargeted target contains fewer than two animation keyframes")
 
-    # The source armature is no longer needed after the bake.
     for obj in source_objects:
         if obj.name in bpy.data.objects:
             bpy.data.objects.remove(obj, do_unlink=True)
@@ -165,6 +177,7 @@ def main() -> None:
     scene = bpy.context.scene
     scene.frame_start = min(keyframes)
     scene.frame_end = max(keyframes)
+    set_scene_fps(scene, args.fps)
 
     output = Path(args.output).expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -184,13 +197,19 @@ def main() -> None:
         bake_anim_use_all_bones=True,
         bake_anim_use_nla_strips=False,
         bake_anim_use_all_actions=False,
+        bake_anim_force_startend_keying=True,
+        bake_anim_step=1.0,
         bake_anim_simplify_factor=0.0,
         path_mode="COPY",
         embed_textures=True,
     )
     if not output.is_file() or output.stat().st_size == 0:
         raise RuntimeError(f"Final FBX export failed: {output}")
-    print(f"Retargeted FBX: {output} | frames {scene.frame_start}-{scene.frame_end}")
+    actual_fps = float(scene.render.fps) / float(scene.render.fps_base)
+    print(
+        f"Retargeted FBX: {output} | frames {scene.frame_start}-{scene.frame_end} "
+        f"| fps {actual_fps:g}"
+    )
 
     if args.preview_glb:
         preview = Path(args.preview_glb).expanduser().resolve()
