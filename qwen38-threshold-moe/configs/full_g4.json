@@ -44,10 +44,11 @@
   "training": {
     "run_name": "full-g4-500e-80l",
     "output_dir": "runs",
-    "work_dir": "work",
+    "work_dir": "/content/qtm-work",
     "microbatch_size": 1,
     "layer_superbatch": 8,
-    "expert_cache_layers": 5,
+    "expert_cache_layers": "auto",
+    "gpu_cache_reserve_gib": 20.0,
     "expert_store": "mmap",
     "expert_compute_dtype": "bf16",
     "gradient_transfer_dtype": "int8",
