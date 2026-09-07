@@ -32,14 +32,14 @@
     "check_every_steps": 1
   },
   "data": {
-    "source": "k2-horizon",
+    "source": "k2-txt360-v2",
     "config_name": null,
     "split": "train",
     "text_field": null,
     "sequence_length": 8192,
     "streaming": true,
     "shuffle_buffer": 10000,
-    "mixture_file": null
+    "mixture_file": "configs/k2_public_mix.json"
   },
   "training": {
     "run_name": "full-g4-500e-80l",
