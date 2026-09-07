@@ -41,12 +41,11 @@ class TrainingLogger:
             blocked_total = int(stats.get("blocked_experts_total", 0))
             reroute = float(stats.get("reroute_pct", 0.0))
             return (
-                f" | E active {active:.0f} avg/{active_min} min"
+                f" | E {active:.0f}avg/{active_min}min"
                 f" | gap {gap_mean:.1f}/{gap_max:.1f}%"
                 f" | block {blocked_layers}L/{blocked_total}E"
                 f" | reroute {reroute:.1f}%"
             )
-
         active = int(stats.get("active", 0))
         total = int(stats.get("total_experts", 0))
         hot_id = int(stats.get("hot_id", -1))
@@ -67,19 +66,33 @@ class TrainingLogger:
         step = metrics.get("step", 0)
         layer = metrics.get("layer", "-")
         loss = metrics.get("loss")
-        ppl = math.exp(min(20.0, float(loss))) if loss is not None else float("nan")
-        toks = metrics.get("tokens_per_sec", 0.0)
+        loss_ok = loss is not None and math.isfinite(float(loss))
+        loss_text = f"{float(loss):.4f}" if loss_ok else "--"
+        ppl_text = f"{math.exp(min(20.0, float(loss))):.2f}" if loss_ok else "--"
+        toks = metrics.get("tokens_per_sec")
+        toks_text = f"{float(toks):.0f} tok/s" if toks is not None and float(toks) > 0 else "tok/s --"
         lr = metrics.get("lr", 0.0)
         phase = metrics.get("phase", "train")
         expert_stats = metrics.get("expert_stats")
         expert_text = self._expert_text(expert_stats, summary=phase == "train")
+
+        backend = metrics.get("backend")
+        backend_text = f" | {backend}" if backend else ""
+        cache_capacity = metrics.get("cache_capacity")
+        cache_text = f" | cache {int(cache_capacity)}L" if cache_capacity else ""
+        loaded_layers = int(metrics.get("loaded_layers", 0) or 0)
+        load_gib = float(metrics.get("load_gib", 0.0) or 0.0)
+        load_s = float(metrics.get("load_seconds", 0.0) or 0.0)
+        load_text = f" | load {loaded_layers}L/{load_gib:.1f}G {load_s:.1f}s" if loaded_layers or load_s > 0 else ""
+        compute_s = metrics.get("compute_seconds")
+        compute_text = f" | compute {float(compute_s):.1f}s" if compute_s is not None else ""
+
         msg = (
-            f"\r[{phase:8}] step {step:6} | layer {str(layer):>3} | "
-            f"loss {float(loss) if loss is not None else float('nan'):.4f} | ppl {ppl:.2f} | "
-            f"lr {float(lr):.2e} | {float(toks):8.0f} tok/s | GPU {alloc:.1f}/{reserved:.1f} GiB"
-            f"{expert_text}"
+            f"\r[{phase:8}] step {step:6} | L {str(layer):>5} | "
+            f"loss {loss_text} | ppl {ppl_text} | lr {float(lr):.2e} | {toks_text} | "
+            f"GPU {alloc:.1f}/{reserved:.1f} GiB"
+            f"{cache_text}{load_text}{compute_text}{backend_text}{expert_text}"
         )
-        # Clear leftovers when the new line is shorter than the previous terminal line.
         sys.stdout.write(msg + "\033[K")
         sys.stdout.flush()
 
@@ -141,19 +154,16 @@ class TrainingLogger:
             return
         import matplotlib.pyplot as plt
 
-        rows: list[dict[str, str]] = []
         with self.csv_path.open("r", encoding="utf-8", newline="") as f:
             rows = list(csv.DictReader(f))
 
         steps, losses = [], []
         for row in rows:
             try:
-                step = int(float(row["step"]))
-                loss = float(row["loss"])
+                steps.append(int(float(row["step"])))
+                losses.append(float(row["loss"]))
             except (KeyError, ValueError, TypeError):
                 continue
-            steps.append(step)
-            losses.append(loss)
         if steps:
             fig = plt.figure(figsize=(10, 5))
             ax = fig.add_subplot(111)
@@ -166,7 +176,6 @@ class TrainingLogger:
             fig.savefig(self.plot_path, dpi=150)
             plt.close(fig)
 
-        # Separate routing plot: only the signals needed to judge this experiment.
         r_steps, gap_mean, gap_max, reroute, active = [], [], [], [], []
         for row in rows:
             try:
