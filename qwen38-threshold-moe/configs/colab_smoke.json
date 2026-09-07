@@ -2,26 +2,35 @@
   "model": {
     "hidden_size": 256,
     "num_layers": 4,
-    "num_experts": 32,
+    "num_experts": 16,
     "num_shared_experts": 4,
     "top_k": 4,
     "expert_intermediate_size": 2048,
-    "router_activation": "sigmoid",
+    "router_normalize_topk": true,
     "hc_count": 4,
     "hc_lowrank": 32,
-    "full_attention_interval": 4
+    "full_attention_interval": 4,
+    "attention_heads": 8,
+    "kv_heads": 1,
+    "attention_head_dim": 64,
+    "partial_rotary_factor": 0.25,
+    "rope_theta": 10000000.0,
+    "linear_key_heads": 4,
+    "linear_value_heads": 12,
+    "linear_key_head_dim": 64,
+    "linear_value_head_dim": 64
   },
   "threshold": {
     "enabled": true,
-    "warmup_tokens": 2048,
+    "warmup_tokens": 100000,
     "imbalance_threshold": 0.30,
     "block_fraction": 0.30
   },
   "data": {
     "source": "k2-txt360-v2",
-    "config_name": "web-high-nltk-qa",
+    "config_name": "web-high-medium",
     "sequence_length": 512,
-    "shuffle_buffer": 256
+    "shuffle_buffer": 1000
   },
   "training": {
     "run_name": "colab-smoke",
@@ -29,14 +38,15 @@
     "expert_cache_layers": 2,
     "expert_store": "mmap",
     "expert_compute_dtype": "bf16",
-    "gradient_transfer_dtype": "bf16",
+    "gradient_transfer_dtype": "int8",
     "boundary_dtype": "bf16",
     "learning_rate": 0.0002,
+    "expert_learning_rate": 0.0002,
     "warmup_steps": 2,
     "max_steps": 5,
     "save_every_steps": 2,
     "plot_every_steps": 1,
-    "resume": "none",
-    "pin_memory": false
+    "lm_chunk_tokens": 64,
+    "resume": "none"
   }
 }
