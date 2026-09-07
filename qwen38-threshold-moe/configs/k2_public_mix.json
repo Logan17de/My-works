@@ -1,11 +1,11 @@
 {
-  "note": "Public K2 Horizon fallback mixture. IFM has not published the exact K2 Horizon pretraining mixture weights, so these released subsets use equal sampling weights. This is not the original K2 recipe.",
+  "note": "Public pretraining fallback for K2 Horizon. IFM has not published the exact K2 Horizon pretraining mixture weights, so these released pretraining-oriented subsets use equal sampling weights. SFT-Reasoning is intentionally excluded.",
   "components": [
     {"source": "IFM/TxT360-v2", "config_name": "web-high-medium", "split": "train", "weight": 1.0},
     {"source": "IFM/TxT360-v2", "config_name": "web-high-nltk-qa", "split": "train", "weight": 1.0},
+    {"source": "IFM/TxT360-v2", "config_name": "txt360-qa", "split": "train", "weight": 1.0},
     {"source": "IFM/Code-Reasoning", "config_name": "code-thinking-v1", "split": "train", "weight": 1.0},
     {"source": "IFM/Math-Reasoning", "config_name": "math-thinking-qwen", "split": "train", "weight": 1.0},
-    {"source": "IFM/Pretrain-Behaviors", "config_name": "reasoning", "split": "train", "weight": 1.0},
-    {"source": "IFM/SFT-Reasoning", "config_name": "3efforts-pretrain", "split": "train", "weight": 1.0}
+    {"source": "IFM/Pretrain-Behaviors", "config_name": "reasoning", "split": "train", "weight": 1.0}
   ]
 }
