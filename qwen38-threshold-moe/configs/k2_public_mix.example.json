@@ -1,0 +1,10 @@
+{
+  "note": "Template only. These are NOT the exact K2 Horizon mixture weights. Replace weights after verifying IFM's released recipe.",
+  "components": [
+    {"source": "IFM/TxT360-v2", "config_name": "web-high-medium", "split": "train", "weight": 1.0},
+    {"source": "IFM/TxT360-v2", "config_name": "web-high-nltk-qa", "split": "train", "weight": 1.0},
+    {"source": "IFM/Code-Reasoning", "config_name": "code-thinking-v1", "split": "train", "weight": 1.0},
+    {"source": "IFM/Math-Reasoning", "config_name": "math-thinking-qwen", "split": "train", "weight": 1.0},
+    {"source": "IFM/Pretrain-Behaviors", "config_name": "reasoning", "split": "train", "weight": 1.0}
+  ]
+}
