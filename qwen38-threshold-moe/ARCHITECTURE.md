@@ -1,6 +1,6 @@
 # Architecture v1 — Qwen3.8-inspired Threshold MoE
 
-This project freezes the architecture discussed in the research thread and separates **architectural identity** from **training-memory placement**. Changing `expert_cache_layers` does not change the model; it only changes how many routed expert banks are resident on the GPU at once.
+This is the locked initial-pretraining architecture. Runtime memory placement (for example `expert_cache_layers`) does not change model identity.
 
 ## Locked model
 
@@ -10,109 +10,134 @@ This project freezes the architecture discussed in the research thread and separ
 | Hidden width | 256 |
 | Routed experts / layer | 500 |
 | Always-active shared experts / layer | 4 |
-| Routed experts active / token | 4 |
-| Expert FFN | SwiGLU, `256 -> 2048 -> 256` |
-| Expert params | 1,572,864 each |
+| Routed experts active / token | Top-4 |
+| Expert FFN | SwiGLU `256 -> 2048 -> 256` |
 | Routed expert params | 62,914,560,000 |
 | Shared expert params | 503,316,480 |
 | Vocabulary | 248,320, Qwen3.8-Flash-Next tokenizer |
 | Embedding / LM head | untied |
-| Base context | 8,192 |
-| N-gram embedding | excluded from initial pretraining |
-| MTP | excluded from initial pretraining |
+| Initial context | 8,192 |
+| N-gram embedding | excluded initially |
+| MTP | excluded initially |
 
-The routed expert bank alone is ~117.19 GiB as BF16 masters. One 500-expert layer is ~1.465 GiB BF16 (750 MiB at one byte/parameter).
+The routed bank is about 117.2 GiB as BF16 masters. One 500-expert layer is about 1.465 GiB BF16.
 
-## Qwen3.8 attention/residual skeleton
+## Qwen attention / position design
 
-The official Qwen3.8-Flash-Next model uses a 3:1 hybrid: three Gated DeltaNet (GDN) layers followed by one attention layer, plus a four-branch Gated Residual (GR) stream. This implementation keeps that layout and directly uses Transformers' Qwen4-Exp GDN implementation.
+The initial 8K stage keeps Qwen3.8's 3:1 hybrid structure:
 
-For the **initial 8K base-pretraining stage**, every fourth layer uses gated full causal attention. This is deliberate: Qwen's technical report says QSA is introduced during continued pretraining at long context. QSA can therefore be a later CPT stage rather than changing the initial experiment.
+- three Qwen Gated DeltaNet layers
+- one gated full causal-attention layer
+- four-branch Gated Residual stream around attention and MoE sublayers
 
-Dimensions are shrunk for hidden=256 and exposed through CLI. Defaults:
+Qwen Sparse Attention is a later continued-pretraining option; it is not required for the first 8K experiment.
 
-- full attention: 8 Q heads, 1 KV head, head dim 64, partial RoPE dim 16
-- GDN: 4 key heads, 12 value heads, 64-d key/value heads, conv kernel 4
-- GR: 4 residual branches, low-rank mixer rank 32
-- RoPE theta: 10,000,000
+Position handling follows Qwen:
 
-## Router and threshold curriculum
+- **partial RoPE**, not learned absolute positional embeddings
+- RoPE is applied to Q/K in the full-attention layers
+- `rope_theta = 10,000,000`
+- attention head dim = 64 in this scaled model
+- partial rotary factor = 0.25, therefore 16 rotary dimensions/head
+- Gated DeltaNet uses its recurrent state rather than an absolute positional table
 
-The experimental default is **sigmoid scores + Top-4**. This is intentionally configurable:
+Scaled head defaults:
 
-```bash
---set model.router_activation=sigmoid
-# control comparison with the current HF reference implementation
---set model.router_activation=softmax
-```
+- full attention: 8 Q heads, 1 KV head, head dim 64
+- GDN: 4 key heads, 12 value heads, key/value head dim 64
+- GDN conv kernel: 4
+- Gated Residual: 4 branches, low-rank mixer rank 32
 
-Important correction: the current Hugging Face `Qwen4ExpTextTopKRouter` implementation uses **softmax**, not sigmoid. Sigmoid is retained here because it is part of this experiment's locked hypothesis, not because it is claimed to be identical to Qwen's released router.
+## Router
 
-Each layer records both natural Top-4 and executed Top-4 choices. Thresholding acts only on execution:
+The routed-expert router is **softmax only**, matching the current Qwen4-Exp / Qwen3.8 reference behavior:
 
-1. Train freely for `threshold.warmup_tokens=N`.
-2. Measure cumulative **executed** expert assignment counts per layer.
-3. Gap is `(most_used - least_used) / most_used`.
-4. If gap > 30%, block the most-used 30% of experts (150/500 by default).
-5. Re-run Top-K over the remaining experts. Thus a blocked natural Top-4 candidate is replaced by the next-ranked available candidate.
-6. Masks change only between optimizer steps, never between forward and backward recomputation.
-7. Set `threshold.enabled=false` for unrestricted routing later.
+1. linear projection `hidden -> 500 logits`
+2. FP32 softmax across experts
+3. Top-4 selection
+4. selected probabilities are normalized to sum to 1
 
-`warmup_tokens=-1` means "not supplied yet" and disables threshold activation, matching the decision to provide N at training time.
+There is no sigmoid-router option in this project. Sigmoid gates still exist inside Qwen's attention/GDN/Gated-Residual mechanisms; those are not MoE routers.
 
-## Four shared + four routed experts
+## Threshold curriculum
 
-All four shared experts are always executed. Their outputs are averaged by default and added to the Top-4 routed output. This makes eight expert FFNs active per layer per token while only four are routed.
+Thresholding changes executed expert choices only during pretraining:
 
-## Layer-wise training
+1. train freely for `threshold.warmup_tokens`
+2. accumulate executed expert counts per layer
+3. imbalance gap = `(most_used - least_used) / most_used`
+4. when the gap exceeds 30%, block the hottest 30% of experts (150 of 500)
+5. Top-K continues down the same softmax ranking to choose the next available experts
+6. both natural Top-4 and executed Top-4 counts are recorded
+7. masks only change between optimizer steps, so forward and backward recomputation use the same mask
+8. set `threshold.enabled=false` to remove the curriculum later
 
-The runtime does not retain an 80-layer autograd graph.
+## Shared experts
 
-**Forward**
+All four shared experts execute for every token. Their outputs are averaged and added to the weighted Top-4 routed expert output. Eight FFNs therefore execute per token/layer: four shared + four routed.
 
-1. Run a layer under `no_grad`.
-2. Store the layer boundary activation in host memory.
-3. Continue to the next layer.
+## Layer-wise exact-backprop schedule
 
-**Backward**
+The trainer deliberately avoids an 80-layer autograd graph.
 
-1. Start at layer 80.
-2. Reload its BF16 expert master into the GPU cache if needed.
-3. Recompute the layer with autograd.
-4. Compute `dX` **before changing any parameters**.
-5. Apply the resident-parameter optimizer and routed-expert Adafactor update.
-6. Free the layer gradient and expert GPU copy.
-7. Continue to layer 79.
+Forward:
 
-This ordering is the critical validation boundary: a small reference experiment should verify gradients against ordinary end-to-end autograd before interpreting throughput or scaling results.
+1. embed tokens and create the four residual streams
+2. load/cache routed expert banks for the current window
+3. execute one layer under `no_grad`
+4. save the layer-boundary activation to CPU
+5. move to the next layer
 
-## Sliding expert-layer cache
+Backward:
 
-`training.expert_cache_layers` controls a sliding window only:
+1. recompute LM-head/final-mixer work and obtain the gradient of the final boundary
+2. traverse layer 80 -> layer 1
+3. reload or reuse that layer's routed expert bank
+4. recompute the layer with autograd
+5. compute `dX` before any parameter update
+6. transfer routed-expert gradients to CPU (`int8`, `bf16`, or `fp32`)
+7. update BF16 CPU expert masters with factored Adafactor
+8. update attention/GDN/router/shared/GR parameters with AdamW
+9. release the layer graph and continue backward
+10. finally recompute/update the token embedding
+
+`validate-layerwise` compares direct autograd gradients with recomputed layer-wise gradients on a tiny model before a large run.
+
+## Sliding expert cache
+
+`training.expert_cache_layers=N` controls how many routed-expert layers occupy VRAM at once.
+
+For `N=5`:
 
 ```text
-capacity = 5
-
 [L1 L2 L3 L4 L5]
- execute L1
- evict L1 + load L6
+execute L1 -> evict L1 -> load L6
 [L2 L3 L4 L5 L6]
- execute L2
- evict L2 + load L7
+execute L2 -> evict L2 -> load L7
 ...
 ```
 
-The reverse traversal uses the same cache in the other direction. If a 96 GiB card has spare space, increase the number from CLI without changing weights, routing, optimizer semantics, or checkpoints.
+Backward uses the same window in reverse. Increasing this value uses spare VRAM to reduce reload stalls without changing the model.
 
-## Optimizer split
+## Expert storage and optimizer
 
-- routed experts: momentum-free factored **Adafactor**, CPU state
-- router / attention / GR / shared experts / embedding / LM head: **AdamW** baseline
-- routed gradients: current layer only; configurable `int8`, `bf16`, or `fp32` CPU transfer
-- authoritative routed expert masters: BF16 CPU RAM or memory-mapped files
+Routed experts:
 
-The Adafactor state for these matrix shapes is roughly ~1 GiB for the full routed bank instead of two full Adam moments.
+- authoritative master: BF16 CPU mmap/RAM
+- GPU copy: current sliding cache
+- gradient transfer: INT8 by default, configurable to BF16/FP32
+- optimizer: momentum-free factored Adafactor on CPU
+
+Resident parameters:
+
+- token embedding / LM head
+- GDN and full-attention weights
+- Gated Residual parameters
+- routers
+- four shared experts/layer
+
+These remain on GPU and use AdamW.
 
 ## FP8
 
-The first implementation deliberately validates BF16 expert compute first. Direct FP8 autograd is guarded rather than silently emulated. Once layer-wise gradients are verified, a Transformer Engine FP8 shadow/cache can replace the BF16 staging function without changing the CPU masters or training schedule.
+The Colab/A100 correctness path uses BF16. A100 does not provide native FP8 Tensor Core training. The architecture keeps the routed-expert cache boundary isolated so a Transformer Engine FP8 cache backend can later replace BF16 staging on Blackwell without changing CPU masters, routing, data, checkpoints, or layer-wise scheduling.
