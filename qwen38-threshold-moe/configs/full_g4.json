@@ -1,12 +1,13 @@
 {
   "model": {
+    "tokenizer": "Qwen/Qwen3.8-Flash-Next",
+    "vocab_size": 248320,
     "hidden_size": 256,
     "num_layers": 80,
     "num_experts": 500,
     "num_shared_experts": 4,
     "top_k": 4,
     "expert_intermediate_size": 2048,
-    "router_activation": "sigmoid",
     "router_normalize_topk": true,
     "hc_count": 4,
     "hc_lowrank": 32,
@@ -14,11 +15,14 @@
     "attention_heads": 8,
     "kv_heads": 1,
     "attention_head_dim": 64,
-    "rotary_dim": 16,
+    "partial_rotary_factor": 0.25,
+    "rope_theta": 10000000.0,
+    "max_position_embeddings": 262144,
     "linear_key_heads": 4,
     "linear_value_heads": 12,
     "linear_key_head_dim": 64,
-    "linear_value_head_dim": 64
+    "linear_value_head_dim": 64,
+    "linear_conv_kernel_dim": 4
   },
   "threshold": {
     "enabled": true,
@@ -30,12 +34,18 @@
   "data": {
     "source": "k2-horizon",
     "config_name": null,
+    "split": "train",
+    "text_field": null,
     "sequence_length": 8192,
     "streaming": true,
-    "shuffle_buffer": 10000
+    "shuffle_buffer": 10000,
+    "mixture_file": null
   },
   "training": {
     "run_name": "full-g4-500e-80l",
+    "output_dir": "runs",
+    "work_dir": "work",
+    "microbatch_size": 1,
     "layer_superbatch": 8,
     "expert_cache_layers": 5,
     "expert_store": "mmap",
@@ -45,11 +55,15 @@
     "routed_optimizer": "adafactor",
     "resident_optimizer": "adamw",
     "learning_rate": 0.0002,
+    "expert_learning_rate": 0.0002,
     "min_learning_rate": 0.00002,
     "warmup_steps": 100,
     "max_steps": 1000,
     "save_every_steps": 100,
+    "keep_last_checkpoints": 2,
+    "snapshot_experts": false,
     "plot_every_steps": 10,
+    "lm_chunk_tokens": 256,
     "resume": "none"
   }
 }
