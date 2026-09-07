@@ -3,9 +3,11 @@ from __future__ import annotations
 import gc
 import json
 import math
+import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Callable, Literal
 
 import torch
 from torch import nn
@@ -38,6 +40,21 @@ def _mmap_tensor(path: Path, shape: tuple[int, ...], dtype: torch.dtype) -> torc
     if not path.exists():
         _create_sized_file(path, count * element_size)
     return torch.from_file(str(path), shared=True, size=count, dtype=dtype).view(shape)
+
+
+def native_grouped_mm_available(device: torch.device) -> bool:
+    if device.type != "cuda" or not torch.cuda.is_available():
+        return False
+    capability = torch.cuda.get_device_capability(device)
+    if hasattr(torch.nn.functional, "grouped_mm"):
+        return capability >= (8, 0)
+    if not hasattr(torch, "_grouped_mm"):
+        return False
+    match = re.match(r"(\d+)\.(\d+)", torch.__version__)
+    version = (int(match.group(1)), int(match.group(2))) if match else (0, 0)
+    if version >= (2, 9):
+        return capability >= (8, 0)
+    return capability[0] == 9
 
 
 @dataclass
@@ -171,7 +188,7 @@ class ExpertStore:
 
 
 class ExpertLayerCache:
-    """Sliding GPU cache over CPU expert masters."""
+    """Sliding GPU cache over local CPU/NVMe expert masters."""
 
     def __init__(
         self,
@@ -180,36 +197,66 @@ class ExpertLayerCache:
         device: torch.device,
         capacity: int,
         compute_dtype: torch.dtype,
+        progress_callback: Callable[[dict], None] | None = None,
     ) -> None:
         self.store = store
         self.device = device
-        self.capacity = max(1, int(capacity))
+        self.capacity = min(store.num_layers, max(1, int(capacity)))
         self.compute_dtype = compute_dtype
         self.layers: dict[int, GPUExpertLayer] = {}
+        self.progress_callback = progress_callback
+        self.last_load_seconds = 0.0
+        self.last_loaded_layers = 0
+        self.last_loaded_gib = 0.0
 
     def _load(self, layer_idx: int) -> GPUExpertLayer:
+        started = time.time()
+        initialized_now = not self.store.layer_initialized(layer_idx)
         cpu = self.store.get_layer(layer_idx)
         gate_up = cpu.gate_up.to(device=self.device, dtype=self.compute_dtype, non_blocking=False).detach().requires_grad_(True)
         down = cpu.down.to(device=self.device, dtype=self.compute_dtype, non_blocking=False).detach().requires_grad_(True)
         layer = GPUExpertLayer(gate_up=gate_up, down=down, layer_idx=layer_idx)
         self.layers[layer_idx] = layer
+        elapsed = time.time() - started
+        if self.progress_callback:
+            self.progress_callback({
+                "layer_idx": layer_idx,
+                "seconds": elapsed,
+                "initialized_now": initialized_now,
+                "cached_layers": len(self.layers),
+                "capacity": self.capacity,
+                "layer_gib": self.store.bytes_per_layer() * (torch.empty((), dtype=self.compute_dtype).element_size() / 2.0) / 1024**3,
+            })
         return layer
 
+    def _wanted_window(self, current: int, direction: int) -> list[int]:
+        n = self.store.num_layers
+        cap = min(self.capacity, n)
+        if direction >= 0:
+            # Keep a full window near the end instead of shrinking to one layer.
+            start = min(max(0, current), max(0, n - cap))
+            return list(range(start, min(n, start + cap)))
+        # Reverse traversal: keep a full window near the beginning as well.
+        end = min(n - 1, max(current, cap - 1))
+        start = max(0, end - cap + 1)
+        return list(range(start, end + 1))
+
     def ensure_window(self, current: int, direction: int) -> GPUExpertLayer:
-        direction = 1 if direction >= 0 else -1
-        wanted: list[int] = []
-        x = current
-        for _ in range(self.capacity):
-            if 0 <= x < self.store.num_layers:
-                wanted.append(x)
-            x += direction
+        wanted = self._wanted_window(current, direction)
         wanted_set = set(wanted)
         for idx in list(self.layers):
             if idx not in wanted_set:
                 del self.layers[idx]
+        started = time.time()
+        loaded = 0
         for idx in wanted:
             if idx not in self.layers:
                 self._load(idx)
+                loaded += 1
+        self.last_load_seconds = time.time() - started
+        self.last_loaded_layers = loaded
+        compute_bytes = self.store.bytes_per_layer() * (torch.empty((), dtype=self.compute_dtype).element_size() / 2.0)
+        self.last_loaded_gib = loaded * compute_bytes / 1024**3
         return self.layers[current]
 
     def get(self, layer_idx: int) -> GPUExpertLayer:
@@ -376,6 +423,8 @@ class StreamedMoEBlock(nn.Module):
         self.shared = SharedExpertBank(num_shared_experts, hidden_size, intermediate_size, init_std)
         self.cache: ExpertLayerCache | None = None
         self.fast_grouped_mm = True
+        self.last_backend = "not-run"
+        self.last_backend_error: str | None = None
 
     def attach_cache(self, cache: ExpertLayerCache) -> None:
         self.cache = cache
@@ -390,13 +439,19 @@ class StreamedMoEBlock(nn.Module):
         expert_out = None
         if self.fast_grouped_mm and grouped_mm_experts_forward is not None and flat.is_cuda:
             try:
+                self.last_backend = "native-grouped" if native_grouped_mm_available(flat.device) else "hf-grouped-fallback"
                 expert_out = grouped_mm_experts_forward(
                     _ExpertView(weights, self.num_experts), flat, route.indices, route.weights
                 )
-            except Exception:
+                self.last_backend_error = None
+            except Exception as exc:
                 expert_out = None
                 self.fast_grouped_mm = False
+                self.last_backend = f"eager-after-{type(exc).__name__}"
+                self.last_backend_error = str(exc)
         if expert_out is None:
+            if grouped_mm_experts_forward is None:
+                self.last_backend = "eager-no-grouped-mm"
             expert_out = eager_experts_forward(flat, route.indices, route.weights, weights, self.num_experts)
         shared_out = self.shared(flat)
         return (expert_out + shared_out).view(shape)
