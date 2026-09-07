@@ -1,7 +1,5 @@
 # Colab run note
 
-This note contains runner commands only. The model/trainer implementation stays in the repository.
-
 ## 1. Clone + install
 
 ```bash
@@ -11,91 +9,53 @@ This note contains runner commands only. The model/trainer implementation stays 
 !pip install -r requirements.txt
 ```
 
-## 2. Mount Drive
+## 2. Mount Google Drive
 
-Use the notebook's **Mount Google Drive** cell. All commands below use:
+```python
+from google.colab import drive
+drive.mount('/content/drive')
+```
+
+The full config keeps the live expert masters and Adafactor state on fast Colab local storage at `/content/qtm-work`.
+
+`--drive-root` is the persistent destination only. At every configured checkpoint (`save_every_steps`), clean interruption, and completion, the local work tree is synchronized to:
 
 ```text
-/content/drive/MyDrive/qwen38-threshold-moe
+/content/drive/MyDrive/qwen38-threshold-moe/work-backup
 ```
 
-`--drive-root` stores both runs/checkpoints and mmap expert masters there, so resume survives a Colab disconnect.
+CSV logs, graphs, and resident checkpoints are also written automatically under the Drive root.
 
-## 3. Inspect + validate + probe data
+## 3. Validate once
 
 ```bash
-!python train.py inspect --config configs/colab_smoke.json --drive-root /content/drive/MyDrive/qwen38-threshold-moe --save-every 1 --plot-every 1
-!python train.py validate-layerwise --config configs/colab_smoke.json --device cuda
-!python train.py probe-data --config configs/colab_smoke.json --samples 2
+!python train.py validate-layerwise --config configs/full_g4.json
 ```
 
-## 4. Smoke train
+## 4. Full 80-layer / 500-expert training
 
 ```bash
-!python train.py train --config configs/colab_smoke.json --drive-root /content/drive/MyDrive/qwen38-threshold-moe --run-name colab-smoke --save-every 1 --plot-every 1 --max-steps 5 --cache-layers 2
+!python train.py train --config configs/full_g4.json --drive-root /content/drive/MyDrive/qwen38-threshold-moe
 ```
 
-## 5. Resume
+`full_g4.json` automatically uses as many routed-expert layers in VRAM as safely fit while reserving 20 GiB for the resident model and training transients. The selected cache size is printed at startup.
 
-```bash
-!python train.py train --config configs/colab_smoke.json --drive-root /content/drive/MyDrive/qwen38-threshold-moe --run-name colab-smoke --resume latest --save-every 1 --max-steps 10 --cache-layers 2
-```
-
-## 6. Main direct CLI controls
+Training automatically produces:
 
 ```text
---save-every N
---plot-every N
---max-steps N
---resume latest|none|PATH
---drive-root PATH
---output-dir PATH
---work-dir PATH
---run-name NAME
---cache-layers N
---superbatch N
---microbatch N
---seq-len N
---dataset NAME
---dataset-config NAME
---shuffle-buffer N
---lr VALUE
---expert-lr VALUE
---expert-grad-dtype int8|bf16|fp32
---expert-compute-dtype bf16|fp16|fp32
---warmup-tokens N
---imbalance-threshold VALUE
---block-fraction VALUE
---threshold / --no-threshold
---snapshot-experts / --no-snapshot-experts
+metrics.csv
+training.png
+routing.png
+checkpoints/
+work-backup/
 ```
 
-Every other config key is still available through repeatable `--set dotted.key=value`.
+No separate plotting or save command is required.
 
-## 7. Full 80-layer / 500-expert run
-
-Inspect first:
+## 5. Resume from the latest synchronized checkpoint
 
 ```bash
-!python train.py inspect --config configs/full_g4.json --drive-root /content/drive/MyDrive/qwen38-threshold-moe --run-name full-g4 --save-every 10 --cache-layers 5 --max-steps 1000
+!python train.py train --config configs/full_g4.json --drive-root /content/drive/MyDrive/qwen38-threshold-moe --resume latest
 ```
 
-Train:
-
-```bash
-!python train.py train --config configs/full_g4.json --drive-root /content/drive/MyDrive/qwen38-threshold-moe --run-name full-g4 --save-every 10 --plot-every 5 --cache-layers 5 --max-steps 1000 --warmup-tokens YOUR_N
-```
-
-Resume:
-
-```bash
-!python train.py train --config configs/full_g4.json --drive-root /content/drive/MyDrive/qwen38-threshold-moe --run-name full-g4 --resume latest --save-every 10 --plot-every 5 --cache-layers 5 --max-steps 1000 --warmup-tokens YOUR_N
-```
-
-The BF16 routed-expert masters for the full model are about 117 GiB, so confirm Drive capacity before using a Drive-backed full run.
-
-## 8. Rebuild graphs
-
-```bash
-!python train.py plot --config configs/full_g4.json --drive-root /content/drive/MyDrive/qwen38-threshold-moe --run-name full-g4
-```
+On a fresh Colab runtime, resume first restores the synchronized expert/optimizer work from Drive to local storage and then loads the matching checkpoint.
