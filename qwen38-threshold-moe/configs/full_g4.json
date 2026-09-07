@@ -1,0 +1,55 @@
+{
+  "model": {
+    "hidden_size": 256,
+    "num_layers": 80,
+    "num_experts": 500,
+    "num_shared_experts": 4,
+    "top_k": 4,
+    "expert_intermediate_size": 2048,
+    "router_activation": "sigmoid",
+    "router_normalize_topk": true,
+    "hc_count": 4,
+    "hc_lowrank": 32,
+    "full_attention_interval": 4,
+    "attention_heads": 8,
+    "kv_heads": 1,
+    "attention_head_dim": 64,
+    "rotary_dim": 16,
+    "linear_key_heads": 4,
+    "linear_value_heads": 12,
+    "linear_key_head_dim": 64,
+    "linear_value_head_dim": 64
+  },
+  "threshold": {
+    "enabled": true,
+    "warmup_tokens": -1,
+    "imbalance_threshold": 0.30,
+    "block_fraction": 0.30,
+    "check_every_steps": 1
+  },
+  "data": {
+    "source": "k2-horizon",
+    "config_name": null,
+    "sequence_length": 8192,
+    "streaming": true,
+    "shuffle_buffer": 10000
+  },
+  "training": {
+    "run_name": "full-g4-500e-80l",
+    "layer_superbatch": 8,
+    "expert_cache_layers": 5,
+    "expert_store": "mmap",
+    "expert_compute_dtype": "bf16",
+    "gradient_transfer_dtype": "int8",
+    "boundary_dtype": "bf16",
+    "routed_optimizer": "adafactor",
+    "resident_optimizer": "adamw",
+    "learning_rate": 0.0002,
+    "min_learning_rate": 0.00002,
+    "warmup_steps": 100,
+    "max_steps": 1000,
+    "save_every_steps": 100,
+    "plot_every_steps": 10,
+    "resume": "none"
+  }
+}
