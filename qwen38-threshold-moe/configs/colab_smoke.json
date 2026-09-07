@@ -1,0 +1,42 @@
+{
+  "model": {
+    "hidden_size": 256,
+    "num_layers": 4,
+    "num_experts": 32,
+    "num_shared_experts": 4,
+    "top_k": 4,
+    "expert_intermediate_size": 2048,
+    "router_activation": "sigmoid",
+    "hc_count": 4,
+    "hc_lowrank": 32,
+    "full_attention_interval": 4
+  },
+  "threshold": {
+    "enabled": true,
+    "warmup_tokens": 2048,
+    "imbalance_threshold": 0.30,
+    "block_fraction": 0.30
+  },
+  "data": {
+    "source": "k2-txt360-v2",
+    "config_name": "web-high-nltk-qa",
+    "sequence_length": 512,
+    "shuffle_buffer": 256
+  },
+  "training": {
+    "run_name": "colab-smoke",
+    "layer_superbatch": 1,
+    "expert_cache_layers": 2,
+    "expert_store": "mmap",
+    "expert_compute_dtype": "bf16",
+    "gradient_transfer_dtype": "bf16",
+    "boundary_dtype": "bf16",
+    "learning_rate": 0.0002,
+    "warmup_steps": 2,
+    "max_steps": 5,
+    "save_every_steps": 2,
+    "plot_every_steps": 1,
+    "resume": "none",
+    "pin_memory": false
+  }
+}
