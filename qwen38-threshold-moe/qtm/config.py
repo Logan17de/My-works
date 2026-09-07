@@ -59,10 +59,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "run_name": "qtm-run",
         "output_dir": "runs",
         "work_dir": "work",
+        "backup_dir": None,
         "device": "cuda",
         "microbatch_size": 1,
         "layer_superbatch": 1,
         "expert_cache_layers": 1,
+        "gpu_cache_reserve_gib": 20.0,
         "expert_store": "mmap",
         "expert_compute_dtype": "bf16",
         "gradient_transfer_dtype": "int8",
@@ -162,8 +164,12 @@ def validate_config(cfg: dict[str, Any]) -> None:
         raise ValueError("partial RoPE dimension must be even")
     if not 0.0 <= th["block_fraction"] < 1.0:
         raise ValueError("threshold.block_fraction must be in [0,1)")
-    if t["expert_cache_layers"] < 1:
-        raise ValueError("training.expert_cache_layers must be >= 1")
+    cache_layers = t["expert_cache_layers"]
+    if not (isinstance(cache_layers, str) and cache_layers.lower() == "auto"):
+        if int(cache_layers) < 1:
+            raise ValueError("training.expert_cache_layers must be >= 1 or 'auto'")
+    if float(t.get("gpu_cache_reserve_gib", 20.0)) < 0:
+        raise ValueError("training.gpu_cache_reserve_gib must be >= 0")
     if t["layer_superbatch"] < 1 or t["microbatch_size"] < 1:
         raise ValueError("layer_superbatch and microbatch_size must be >= 1")
     if t["gradient_transfer_dtype"] not in {"int8", "bf16", "fp32"}:
