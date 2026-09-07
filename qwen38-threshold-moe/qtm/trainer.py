@@ -181,7 +181,14 @@ class LayerwiseTrainer:
                 out = self.model.forward_layer(layer_idx, h, record_routing=True)
                 boundaries[mb_idx].append(out.to("cpu", dtype=self.boundary_dtype))
                 del h, out
-            self.logger.live(step=step, layer=layer_idx + 1, loss=self.last_loss, lr=lr, phase="forward")
+            self.logger.live(
+                step=step,
+                layer=layer_idx + 1,
+                loss=self.last_loss,
+                lr=lr,
+                phase="forward",
+                expert_stats=self.controller.live_layer_stats(layer_idx),
+            )
         self.cache.clear()
         return boundaries
 
@@ -241,7 +248,14 @@ class LayerwiseTrainer:
             self.adafactor.step_layer(layer_idx, gate_packet, down_packet, lr=expert_lr)
             optimizer.step()
             del gate_packet, down_packet
-            self.logger.live(step=step, layer=layer_idx + 1, loss=self.last_loss, lr=lr, phase="backward")
+            self.logger.live(
+                step=step,
+                layer=layer_idx + 1,
+                loss=self.last_loss,
+                lr=lr,
+                phase="backward",
+                expert_stats=self.controller.live_layer_stats(layer_idx),
+            )
         self.cache.clear()
         return grad_h
 
@@ -267,6 +281,7 @@ class LayerwiseTrainer:
         grad_h = self._layers_backward(batches, boundaries, grad_h, step, lr, expert_lr)
         self._embedding_backward(batches, grad_h)
         self.controller.finish_step(step + 1, total_tokens)
+        routing_summary = self.controller.completed_step_summary()
         elapsed = max(1e-9, time.time() - started)
         del batches, boundaries, grad_h
         gc.collect()
@@ -280,6 +295,8 @@ class LayerwiseTrainer:
             "tokens_per_sec": total_tokens / elapsed,
             "step_seconds": elapsed,
             "threshold_tokens_seen": self.controller.tokens_seen,
+            **routing_summary,
+            # Keep these cumulative layer-0 fields for backwards-compatible analysis.
             "blocked_experts_layer0": int(self.controller.blocked[0].sum().item()),
             "routing_gap_layer0": self.controller.layer_gap(0),
         }
@@ -316,8 +333,13 @@ class LayerwiseTrainer:
                 self.last_completed_step = step + 1
                 self.logger.record(metrics)
                 self.logger.live(
-                    step=step + 1, layer="-", loss=metrics["loss"], lr=metrics["lr"],
-                    tokens_per_sec=metrics["tokens_per_sec"], phase="train",
+                    step=step + 1,
+                    layer="-",
+                    loss=metrics["loss"],
+                    lr=metrics["lr"],
+                    tokens_per_sec=metrics["tokens_per_sec"],
+                    phase="train",
+                    expert_stats=metrics,
                 )
                 if plot_every > 0 and (step + 1) % plot_every == 0:
                     self.logger.plot()
