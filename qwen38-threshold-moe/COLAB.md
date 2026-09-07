@@ -1,123 +1,108 @@
-# Colab test note
+# Colab run note
 
-The full 80-layer / 500-expert model is not a normal Colab-sized run. Colab is for validating **the exact training logic** on a scaled model first: router thresholding, layer boundary recompute, expert sliding cache, CPU Adafactor, dataset streaming, logs, checkpoint/resume.
+This note contains commands only. The model/trainer implementation stays in the repository.
 
-## 1. Clone the research branch
+## 1. Clone the experiment branch
 
-```python
+```bash
 !git clone -b moe-threshold-pretrain https://github.com/Logan17de/My-works.git
 %cd My-works/qwen38-threshold-moe
 ```
 
-## 2. Install only the Python dependencies
+## 2. Install dependencies
 
-Colab already provides PyTorch/CUDA, so do not reinstall torch unless you have a specific reason.
-
-```python
-!pip install -q -r requirements.txt
+```bash
+!pip install -r requirements.txt
 ```
 
-Restart the runtime if Transformers was already imported before the upgrade.
+Restart the Colab runtime once if pip asks for it, then return to the same directory.
 
-## 3. Optional Hugging Face token
+## 3. Check GPU
 
-If the K2 aggregate dataset is gated/authenticated:
-
-```python
-import os
-from google.colab import userdata
-os.environ["HF_TOKEN"] = userdata.get("HF_TOKEN") or ""
+```bash
+!nvidia-smi
 ```
 
-The public smoke config uses `IFM/TxT360-v2` and does not intentionally depend on the gated aggregate.
+## 4. Show the resolved smoke configuration
 
-## 4. Inspect without allocating all routed experts
-
-```python
-!python inspect_model.py --config configs/colab_smoke.json
+```bash
+!python train.py show-config --config configs/colab_smoke.json
 ```
 
-## 5. Probe streaming data
+## 5. Check model/memory numbers
 
-```python
-!python data_probe.py --config configs/colab_smoke.json --count 2
+```bash
+!python train.py info --config configs/full_g4.json
 ```
 
-To test the exact K2 aggregate dataset ID:
+## 6. Probe the public K2/TxT360 stream
 
-```python
-!python data_probe.py --config configs/full_g4.json --count 1
+```bash
+!python train.py probe-data --config configs/colab_smoke.json --samples 3
 ```
 
-## 6. Run the smoke training
+## 7. Validate layer-wise recomputation before training
 
-```python
-!python train.py --config configs/colab_smoke.json
+```bash
+!python train.py validate-layerwise --config configs/colab_smoke.json --device cuda
 ```
 
-You will get a single live line similar to:
+## 8. Run the small Colab smoke training
 
-```text
-step  3 | loss 8.1234 | ppl ... | tok/s ... | lr ... | route-gap ... | blocked ... | VRAM ... | cache ...
+```bash
+!python train.py train --config configs/colab_smoke.json
 ```
 
-Persistent run outputs:
+## 9. Resume after interruption
 
-```text
-runs/colab-smoke/
-  metrics.csv
-  loss.png
-  throughput.png
-  router_balance.png
-  resolved_config.json
-  expert_store/
-  checkpoints/
+```bash
+!python train.py train --config configs/colab_smoke.json --set training.resume=latest
 ```
 
-## 7. Resume after interrupt
+## 10. Run the 8-layer / 64-expert experiment
 
-```python
-!python train.py --config configs/colab_smoke.json --resume auto \
-  --set training.max_steps=10
+```bash
+!python train.py train --config configs/research_8x64.json
 ```
 
-SIGINT/SIGTERM is handled by finishing the current layer-wise optimizer step and then checkpointing.
+## 11. Change anything from CLI only
 
-## 8. Change anything from CLI
-
-No source edits are required for normal experiments:
-
-```python
-!python train.py --config configs/colab_smoke.json \
-  --set model.num_layers=8 \
-  --set model.num_experts=64 \
-  --set data.sequence_length=8192 \
-  --set training.expert_cache_layers=4 \
-  --set training.layer_superbatch=1 \
-  --set threshold.warmup_tokens=1000000 \
-  --set training.max_steps=20 \
-  --set training.run_name=8l-64e-test
+```bash
+!python train.py train --config configs/research_8x64.json --set model.num_experts=96 --set training.expert_cache_layers=4 --set training.layer_superbatch=4 --set data.sequence_length=4096 --set training.max_steps=200
 ```
 
-Switch router control experiment:
+## 12. Use the exact K2 aggregate if your Hugging Face account has access
 
-```python
-!python train.py --config configs/colab_smoke.json \
-  --set model.router_activation=softmax
+```bash
+!huggingface-cli login
+!python train.py probe-data --config configs/full_g4.json --samples 3
 ```
 
-Change how many complete expert layers stay in VRAM:
+## 13. Use another public K2 subset from CLI
 
-```python
-!python train.py --config configs/research_8x64.json \
-  --set training.expert_cache_layers=1
-
-!python train.py --config configs/research_8x64.json \
-  --set training.expert_cache_layers=5
+```bash
+!python train.py train --config configs/colab_smoke.json --set data.source=k2-code --set data.config_name=code-thinking-v1
 ```
 
-The model architecture is identical in those two runs; only transfer/cache behavior changes.
+## 14. Use a custom mixture file
 
-## 9. Before the 63B run
+```bash
+!python train.py train --config configs/research_8x64.json --set data.mixture_file=configs/k2_public_mix.example.json
+```
 
-Run the `research_8x64.json` case and compare against a conventional small-model autograd reference. The acceptance criterion is gradient/loss agreement first, throughput second. Only then move to `configs/full_g4.json`.
+## 15. Generate/update the training graph
+
+```bash
+!python train.py plot --config configs/colab_smoke.json
+```
+
+## 16. Full 80-layer / 500-expert configuration
+
+Do not start this on a normal Colab A100 until the smoke and 8x64 validation runs are clean. On the intended large-memory host, initialize/run it with:
+
+```bash
+!python train.py init-experts --config configs/full_g4.json
+!python train.py train --config configs/full_g4.json --set threshold.warmup_tokens=YOUR_N
+```
+
+Training writes a one-line live status, `metrics.csv`, `training.png`, periodic checkpoints, and a clean interruption checkpoint.
