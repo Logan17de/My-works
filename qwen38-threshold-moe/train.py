@@ -12,34 +12,36 @@ def add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--config", default="configs/colab_smoke.json", help="JSON config file")
     parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", help="Override any dotted config key; repeatable")
 
-    # First-class CLI aliases for the knobs we change most during experiments.
     parser.add_argument("--run-name")
-    parser.add_argument("--save-every", type=int, metavar="N", help="Save checkpoint every N optimizer steps; 0 disables periodic saves")
+    parser.add_argument("--save-every", type=int, metavar="N", help="Checkpoint + persistent expert sync every N optimizer steps")
     parser.add_argument("--plot-every", type=int, metavar="N", help="Refresh plots every N steps; 0 disables during training")
     parser.add_argument("--max-steps", type=int)
     parser.add_argument("--resume", metavar="PATH|latest|none")
     parser.add_argument("--output-dir", help="Logs/checkpoints directory")
-    parser.add_argument("--work-dir", help="Expert masters and optimizer-state directory")
-    parser.add_argument("--drive-root", help="Convenience root: sets output-dir=<root>/runs and work-dir=<root>/work")
-    parser.add_argument("--snapshot-experts", action=argparse.BooleanOptionalAction, default=None, help="Include an exact expert-store snapshot in checkpoints")
+    parser.add_argument("--work-dir", help="Fast local expert masters and optimizer-state directory")
+    parser.add_argument(
+        "--drive-root",
+        help="Persistent root: logs/checkpoints go to <root>/runs and local expert work is mirrored to <root>/work-backup only at checkpoints",
+    )
+    parser.add_argument("--snapshot-experts", action=argparse.BooleanOptionalAction, default=None)
 
-    parser.add_argument("--cache-layers", type=int, help="Number of routed-expert layers kept resident on GPU")
-    parser.add_argument("--superbatch", type=int, help="Sequences processed while a layer is resident")
+    parser.add_argument("--cache-layers", help="Number of routed-expert layers on GPU, or 'auto'")
+    parser.add_argument("--superbatch", type=int)
     parser.add_argument("--microbatch", type=int)
     parser.add_argument("--seq-len", type=int)
-    parser.add_argument("--dataset", help="Dataset alias/name, e.g. k2-txt360-v2 or hf:ORG/NAME")
-    parser.add_argument("--dataset-config", help="HF dataset subset/config name")
+    parser.add_argument("--dataset")
+    parser.add_argument("--dataset-config")
     parser.add_argument("--shuffle-buffer", type=int)
 
-    parser.add_argument("--lr", type=float, help="Resident-parameter learning rate")
-    parser.add_argument("--expert-lr", type=float, help="Routed-expert Adafactor learning rate")
+    parser.add_argument("--lr", type=float)
+    parser.add_argument("--expert-lr", type=float)
     parser.add_argument("--expert-grad-dtype", choices=["int8", "bf16", "fp32"])
     parser.add_argument("--expert-compute-dtype", choices=["bf16", "fp16", "fp32"])
 
-    parser.add_argument("--warmup-tokens", type=int, help="Threshold curriculum warmup tokens; -1 keeps masking disabled")
-    parser.add_argument("--imbalance-threshold", type=float, help="Trigger gap, e.g. 0.30")
-    parser.add_argument("--block-fraction", type=float, help="Fraction of hottest experts blocked when threshold fires")
-    parser.add_argument("--threshold", action=argparse.BooleanOptionalAction, default=None, help="Enable/disable threshold masking")
+    parser.add_argument("--warmup-tokens", type=int)
+    parser.add_argument("--imbalance-threshold", type=float)
+    parser.add_argument("--block-fraction", type=float)
+    parser.add_argument("--threshold", action=argparse.BooleanOptionalAction, default=None)
 
 
 def _append_override(overrides: list[str], key: str, value) -> None:
@@ -83,9 +85,9 @@ def apply_cli_aliases(args: argparse.Namespace) -> list[str]:
         _append_override(overrides, key, getattr(args, attr, None))
 
     if getattr(args, "drive_root", None):
-        root = str(Path(args.drive_root))
-        _append_override(overrides, "training.output_dir", str(Path(root) / "runs"))
-        _append_override(overrides, "training.work_dir", str(Path(root) / "work"))
+        root = Path(args.drive_root)
+        _append_override(overrides, "training.output_dir", str(root / "runs"))
+        _append_override(overrides, "training.backup_dir", str(root / "work-backup"))
     return overrides
 
 
@@ -115,10 +117,9 @@ def model_info(cfg: dict) -> dict:
         },
         "memory": {
             "routed_bf16_gib": routed * 2 / 1024**3,
-            "routed_one_byte_gib": routed / 1024**3,
             "one_layer_routed_bf16_gib": e * per_expert * 2 / 1024**3,
-            "one_layer_routed_one_byte_gib": e * per_expert / 1024**3,
-            "expert_cache_layers": int(t["expert_cache_layers"]),
+            "expert_cache_layers": t["expert_cache_layers"],
+            "gpu_cache_reserve_gib": float(t.get("gpu_cache_reserve_gib", 20.0)),
             "expert_compute_dtype": t["expert_compute_dtype"],
             "expert_gradient_transfer": t["gradient_transfer_dtype"],
         },
@@ -130,6 +131,7 @@ def model_info(cfg: dict) -> dict:
             "resume": t.get("resume", "none"),
             "output_dir": t["output_dir"],
             "work_dir": t["work_dir"],
+            "backup_dir": t.get("backup_dir"),
             "layer_superbatch": int(t["layer_superbatch"]),
             "microbatch_size": int(t["microbatch_size"]),
         },
@@ -138,6 +140,7 @@ def model_info(cfg: dict) -> dict:
             "config_name": d.get("config_name"),
             "sequence_length": int(d["sequence_length"]),
             "streaming": bool(d.get("streaming", True)),
+            "mixture_file": d.get("mixture_file"),
         },
         "threshold": {
             "enabled": bool(th["enabled"]),
@@ -178,9 +181,14 @@ def main() -> None:
         m, t = cfg["model"], cfg["training"]
         root = Path(t["work_dir"]) / t["run_name"] / "expert_store"
         store = ExpertStore(
-            root, num_layers=int(m["num_layers"]), num_experts=int(m["num_experts"]),
-            hidden_size=int(m["hidden_size"]), intermediate_size=int(m["expert_intermediate_size"]),
-            storage=t["expert_store"], init_std=float(m["initializer_range"]), seed=int(t["seed"]),
+            root,
+            num_layers=int(m["num_layers"]),
+            num_experts=int(m["num_experts"]),
+            hidden_size=int(m["hidden_size"]),
+            intermediate_size=int(m["expert_intermediate_size"]),
+            storage=t["expert_store"],
+            init_std=float(m["initializer_range"]),
+            seed=int(t["seed"]),
         )
         def progress(idx, total):
             print(f"\rInitializing expert layer {idx + 1}/{total}", end="", flush=True)
@@ -204,8 +212,7 @@ def main() -> None:
         return
     if args.command == "train":
         from qtm.trainer import LayerwiseTrainer
-        trainer = LayerwiseTrainer(cfg)
-        trainer.train()
+        LayerwiseTrainer(cfg).train()
         return
 
 
