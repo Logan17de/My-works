@@ -1,73 +1,42 @@
-# K2 Horizon research notes used by this trainer
+# K2 Horizon pretraining-data notes
 
-Checked against IFM's K2 Horizon release on 2026-09-07.
+## Exact aggregate link
 
-## What is useful for this project
+The K2 Horizon model cards reference this aggregate pretraining dataset:
 
-IFM reports that K2 Horizon 3.7B, 7B, 32B and MoVA-36B-A4B were trained on **the same 22 trillion-token sequence**. The pretraining mixture includes web, code, mathematics, science, multilingual/domain data and synthetic data. IFM says nearly **17% of pretraining is explicit problem-solving/reasoning trajectories** and roughly **10T synthetic tokens** were used.
+https://huggingface.co/datasets/IFM/K2-Horizon-Pretrain-Data
 
-That makes K2 unusually useful for our architecture experiment: the data recipe is designed for large-scale pretraining and the dense/sparse family gives a controlled reference for later comparisons.
+At the time this project was prepared, anonymous access returned HTTP 401. The trainer supports this dataset directly through `data.source=k2-horizon` and forwards `HF_TOKEN` when set, so no code change is required if access is available to the user.
 
-Sources:
-- https://ifm.ai/blog/k2/
-- https://huggingface.co/IFM/K2-Horizon-MoVA-36B-A4B
+## Public K2 Horizon training-data repositories
 
-## Public data lineage
+- TxT360-v2: https://huggingface.co/datasets/IFM/TxT360-v2
+- Code-Reasoning: https://huggingface.co/datasets/IFM/Code-Reasoning
+- Math-Reasoning: https://huggingface.co/datasets/IFM/Math-Reasoning
+- Pretrain-Behaviors: https://huggingface.co/datasets/IFM/Pretrain-Behaviors
+- SFT-Reasoning: https://huggingface.co/datasets/IFM/SFT-Reasoning
+- Original TxT360: https://huggingface.co/datasets/LLM360/TxT360
 
-The model cards point to:
+The public repositories are Parquet-backed and can be streamed with Hugging Face Datasets. `IFM/TxT360-v2` exposes web/high-quality and QA subsets; the code, math, and behavior repositories expose multiple reasoning and rewrite subsets.
 
-- `IFM/K2-Horizon-Pretrain-Data`
-- `IFM/K2-Horizon-Midtrain-Data`
+## What IFM reports
 
-and identify the pretraining lineage as TxT360. TxT360 globally deduplicates 99 CommonCrawl snapshots together with curated sources and exposes metadata suitable for deliberate upsampling.
+IFM states that K2 Horizon 3.7B, 7B, 32B, and 36B-A4B were trained on the same 22T-token sequence. Their announcement describes a mixture spanning web, code, mathematics, scientific, multilingual, domain-specific, and synthetic sources. Nearly 17% of the pretraining corpus is described as explicit problem-solving/reasoning trajectories, and approximately 10T synthetic tokens were used.
 
-Public lineage:
-- https://github.com/LLM360/TxT360
-- https://huggingface.co/datasets/LLM360/TxT360
+Source announcement:
 
-The newer K2 Horizon dataset series is also appearing as separately streamable repositories. At research time these included:
+https://ifm.ai/blog/k2/
 
-- `IFM/TxT360-v2` — web and QA text; public configs include `web-high-nltk-qa`, `web-high-medium`, `txt360-qa`
-- `IFM/Code-Reasoning`
-- `IFM/Math-Reasoning`
-- `IFM/SFT-Reasoning`
-- `IFM/Pretrain-Behaviors`
+## Data aliases built into this trainer
 
-The trainer therefore does **not** hard-code an invented K2 mixture. It supports the exact aggregate dataset ID when accessible and exposes arbitrary Hugging Face sources/configs through CLI.
+- `k2-horizon` -> `IFM/K2-Horizon-Pretrain-Data`
+- `k2-txt360-v2` -> `IFM/TxT360-v2`
+- `txt360` -> `LLM360/TxT360`
+- `k2-code` -> `IFM/Code-Reasoning`
+- `k2-math` -> `IFM/Math-Reasoning`
+- `k2-behaviors` -> `IFM/Pretrain-Behaviors`
+- `k2-sft` -> `IFM/SFT-Reasoning`
+- `hf:ORG/DATASET` -> arbitrary Hugging Face dataset
+- `local:/path/file.jsonl` -> local JSONL
 
-## Access status / important limitation
-
-During this research pass, anonymous fetching of `IFM/K2-Horizon-Pretrain-Data` returned HTTP 401 through the research crawler even though the model cards reference it. The larger K2 model card also describes data/training-code publication as a rolling release. Therefore this repo does **not** claim that it has reconstructed the exact 22T-token mixture weights.
-
-Behavior is explicit:
-
-```bash
-# Exact K2 aggregate ID. Set HF_TOKEN if the dataset requires authentication.
-python data_probe.py --config configs/full_g4.json
-
-# Public K2/TxT360 component for pipeline testing now.
-python data_probe.py --config configs/colab_smoke.json \
-  --set data.source=k2-txt360-v2 \
-  --set data.config_name=web-high-nltk-qa
-
-# Any HF dataset/config without code changes.
-python data_probe.py --config configs/colab_smoke.json \
-  --set data.source=hf:ORG/DATASET \
-  --set data.config_name=CONFIG
-```
-
-## Training ideas taken from K2 / TxT360 lineage
-
-Useful ideas, without pretending they are the exact Horizon-36B recipe:
-
-- 8K is a real base-pretraining context in K2's released stage lineage.
-- Keep natural text as the grounding distribution, then deliberately introduce reasoning/synthetic domains.
-- Deduplicate first; make repetition/upsampling an explicit quality decision rather than an accident.
-- Keep data source metadata so later expert-specialization analysis can correlate routes with domains.
-- Stream rather than materialize the corpus locally.
-
-The previous K2-V2 report is especially useful for public methodology: it documents TxT360 data curation, code/math sources, and quality/duplicate-based upsampling. We use those as research references, not as a claim about exact K2 Horizon mixture weights.
-
-## xLLM provenance
-
-K2 model cards reference `LLM360/xllm` and stage-specific commits for training provenance. The referenced 36B commit could not be independently fetched through the connected GitHub API during this pass, so no unverified implementation detail from that commit was copied into this repository. The project instead uses publicly inspectable Qwen/Transformers code for the model skeleton and the K2/TxT360 releases for the data path.
+`configs/k2_public_mix.example.json` is intentionally only a template. Its weights are **not** claimed to reproduce K2 Horizon's exact mixture. Replace them after verifying IFM's official mixture recipe.
