@@ -92,6 +92,18 @@ def _load_one(spec: dict[str, Any], default_cfg: dict[str, Any]):
     return load_dataset(source, **kwargs)
 
 
+def _text_only_stream(ds, preferred: str | None = None):
+    """Normalize heterogeneous public K2 subsets to one interleavable text schema."""
+    columns = list(getattr(ds, "column_names", None) or [])
+
+    def normalize(example: dict[str, Any]) -> dict[str, str]:
+        return {"text": extract_text(example, preferred) or ""}
+
+    if columns:
+        return ds.map(normalize, remove_columns=columns)
+    return ds.map(normalize)
+
+
 def build_streaming_dataset(cfg: dict[str, Any], *, resume_raw_examples: int = 0):
     mixture_file = cfg.get("mixture_file")
     if mixture_file:
@@ -100,11 +112,20 @@ def build_streaming_dataset(cfg: dict[str, Any], *, resume_raw_examples: int = 0
         streams = []
         probs = []
         for item in components:
-            streams.append(_load_one(item, cfg))
+            stream = _load_one(item, cfg)
+            stream = _text_only_stream(stream, item.get("text_field", cfg.get("text_field")))
+            streams.append(stream)
             probs.append(float(item.get("weight", 1.0)))
         total = sum(probs)
+        if total <= 0:
+            raise ValueError("Dataset mixture weights must sum to a positive value")
         probs = [p / total for p in probs]
-        ds = interleave_datasets(streams, probabilities=probs, seed=int(cfg.get("seed", 17)), stopping_strategy="all_exhausted")
+        ds = interleave_datasets(
+            streams,
+            probabilities=probs,
+            seed=int(cfg.get("seed", 17)),
+            stopping_strategy="all_exhausted",
+        )
     else:
         ds = _load_one(cfg, cfg)
     buffer = int(cfg.get("shuffle_buffer", 0) or 0)
