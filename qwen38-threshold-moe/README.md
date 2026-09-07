@@ -38,9 +38,20 @@ Use repeatable `--set dotted.key=value` arguments for CLI-only changes.
 
 ## Logging / recovery
 
-- single continuously refreshed terminal status line
-- `metrics.csv`
-- `training.png`
+The live terminal line now shows only the expert signals needed for this experiment rather than dumping every expert:
+
+- current layer expert coverage: `E active/total`
+- hottest expert and its assignment share
+- per-layer routing load gap
+- number of experts currently blocked by the threshold curriculum
+- percentage of natural Top-K assignments actually rerouted because of blocking
+- at the end of each optimizer step: mean/min expert coverage across layers, mean/max routing gap, number of blocked layers/experts, and overall reroute percentage
+
+Persistent outputs:
+
+- `metrics.csv` with the same experiment-level routing summaries
+- `training.png` for loss
+- `routing.png` for mean/max routing gap, reroute rate, and mean active experts
 - periodic checkpoints every `training.save_every_steps`
 - SIGINT/SIGTERM requests finish the current optimizer step and then save an interruption checkpoint
 - `training.resume=latest` resumes the latest checkpoint
