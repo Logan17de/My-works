@@ -18,99 +18,60 @@ Single-GPU research implementation for the 80-layer, hidden-256, 500-routed-expe
 
 ## Memory strategy
 
-Routed expert masters live in BF16 CPU mmap/RAM. A configurable sliding window of expert layers is copied to GPU. Forward stores only layer-boundary activations on CPU. Backward recomputes one layer at a time, computes `dX`, transfers the routed expert gradient to CPU (INT8 by default), updates routed masters with factored Adafactor, updates resident parameters with AdamW, and frees the graph.
+Routed expert masters live in BF16 CPU mmap/RAM on the fast local work disk. A sliding window of complete routed-expert layers is copied to GPU. Forward stores only layer-boundary activations on CPU. Backward recomputes one layer at a time, computes `dX`, transfers routed expert gradients to CPU (INT8 by default), updates expert masters with factored Adafactor, and updates resident parameters with AdamW.
 
-`--cache-layers 5` implements the sliding `L1-L5 -> evict L1 -> load L6` behavior.
+The full config uses `expert_cache_layers: "auto"`. At startup it measures free VRAM and fills it with as many complete expert layers as fit while retaining the configured safety reserve (`gpu_cache_reserve_gib`, 20 GiB in `full_g4.json`). A manual `--cache-layers N` still overrides this.
+
+The last forward cache window is retained into reverse backward, so those layers are not reloaded before backward starts.
 
 ## CLI
 
-Available commands:
-
-- `show-config`
-- `info`
-- `inspect` (human-friendly experiment summary)
-- `probe-data`
-- `init-experts`
-- `validate-layerwise`
-- `train`
-- `plot`
-
-Important experiment knobs are first-class flags, so normal runs do not require editing JSON or using dotted overrides:
-
-```text
---save-every N
---plot-every N
---max-steps N
---resume latest|none|PATH
---run-name NAME
---drive-root PATH
---output-dir PATH
---work-dir PATH
---cache-layers N
---superbatch N
---microbatch N
---seq-len N
---dataset NAME
---dataset-config NAME
---lr VALUE
---expert-lr VALUE
---expert-grad-dtype int8|bf16|fp32
---expert-compute-dtype bf16|fp16|fp32
---warmup-tokens N
---imbalance-threshold VALUE
---block-fraction VALUE
---threshold / --no-threshold
---snapshot-experts / --no-snapshot-experts
-```
-
-Every remaining config field is still reachable with repeatable `--set dotted.key=value`.
+Available commands include `show-config`, `info`, `inspect`, `probe-data`, `init-experts`, `validate-layerwise`, `train`, and `plot`. Important experiment settings have direct flags such as `--save-every`, `--resume`, `--drive-root`, `--work-dir`, `--cache-layers`, `--superbatch`, `--seq-len`, learning-rate controls, and threshold controls. Remaining fields can use repeatable `--set dotted.key=value` overrides.
 
 ## Colab / Drive persistence
 
-The Colab notebook mounts Google Drive. Using:
+For the full Colab/G4 configuration:
 
 ```text
---drive-root /content/drive/MyDrive/qwen38-threshold-moe
+local hot work: /content/qtm-work/<run-name>/
+persistent logs/checkpoints: <drive-root>/runs/<run-name>/
+persistent expert/optimizer mirror: <drive-root>/work-backup/<run-name>/
 ```
 
-sets both:
+`--drive-root` no longer makes Google Drive the live mmap disk. Training reads and writes expert masters plus Adafactor state locally. At every configured checkpoint, clean interruption, and completion, the local work tree is synchronized to the persistent `work-backup` directory. A fresh-runtime `--resume latest` restores that synchronized work back to local storage and verifies its saved step matches the resident checkpoint before resuming.
 
-```text
-output_dir = <drive-root>/runs
-work_dir   = <drive-root>/work
-```
+The full routed expert masters are about 117 GiB, so the Colab local disk and persistent destination both need enough capacity.
 
-This matters because the routed expert masters are mmap-backed and updated in place. Saving only the small checkpoint while leaving `work_dir` on ephemeral Colab storage is not enough for a true resume after the runtime disappears. Drive-backed `work_dir` keeps the expert masters and Adafactor state persistent too.
+## Live logging / recovery
 
-For the full 500-expert/80-layer model the BF16 routed expert masters are about 117 GiB, so Drive capacity and FUSE performance must be considered before a full persistent Colab run.
+The live terminal line reports the signals needed to diagnose this experiment:
 
-## Logging / recovery
+- current layer / total layers
+- GPU expert-cache capacity
+- expert layers/GiB loaded during the transition and load time
+- layer compute time
+- MoE execution backend (`native-grouped`, Hugging Face grouped fallback, or eager fallback)
+- current-layer expert coverage, hottest expert, routing gap, blocked experts, and reroute percentage
+- end-of-step loss, throughput, mean/min expert coverage, mean/max routing gap, blocked layers/experts, and reroute percentage
 
-The live terminal line shows only the expert signals needed for this experiment:
+Before a complete optimizer step exists, throughput is shown as unavailable rather than a misleading `0 tok/s`.
 
-- current-layer expert coverage: `E active/total`
-- hottest expert and its assignment share
-- per-layer routing load gap
-- number of experts currently blocked by the threshold curriculum
-- percentage of natural Top-K assignments rerouted because of blocking
-- end-of-step mean/min expert coverage, mean/max routing gap, blocked layers/experts, and overall reroute percentage
-
-Persistent outputs:
+Training automatically writes:
 
 - `metrics.csv`
-- `training.png` for loss
-- `routing.png` for expert imbalance/reroute/coverage
-- periodic checkpoints controlled directly by `--save-every N`
-- SIGINT/SIGTERM finishes the current optimizer step and saves an interruption checkpoint
-- `--resume latest` resumes the newest checkpoint
-- optional `--snapshot-experts` stores an exact expert snapshot with a checkpoint; this is extremely large for the full routed bank
+- `training.png`
+- `routing.png`
+- periodic resident checkpoints
+- synchronized expert/optimizer work at checkpoint time
+
+SIGINT/SIGTERM requests finish the current optimizer step and then checkpoint + synchronize. A hard runtime loss cannot execute cleanup, so recovery is from the most recent completed synchronization.
 
 ## Dataset streaming
 
-Built-in aliases support the K2 Horizon aggregate, public K2 repositories, TxT360, arbitrary Hugging Face datasets, local JSONL, and weighted mixture files. Tokenized documents are packed continuously into fixed next-token sequences; the whole corpus is never downloaded first.
+The full configuration uses the released public K2-oriented repositories through `configs/k2_public_mix.json`. The exact original K2 Horizon mixture weights are not public, so this fallback mixture is explicitly not claimed to reproduce IFM's original data schedule. Tokenized documents are streamed and packed continuously into fixed next-token sequences.
 
-See `K2_RESEARCH.md` for K2 links and `COLAB.md` for the Colab runner commands.
+See `K2_RESEARCH.md` and `COLAB.md` for details.
 
 ## Important validation boundary
 
-Run `validate-layerwise` before scaling. The entire memory-saving schedule assumes recomputation produces the same `dX` and parameter gradients as ordinary autograd before a layer's parameters are updated.
+Run `validate-layerwise` before scaling. The memory-saving schedule assumes recomputation produces the same `dX` and parameter gradients as ordinary autograd before a layer's parameters are updated.
