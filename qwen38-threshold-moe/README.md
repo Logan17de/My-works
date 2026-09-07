@@ -1,77 +1,60 @@
 # Qwen3.8-inspired Threshold MoE pretraining experiment
 
-Single-GPU research implementation for the 80-layer, hidden-256, 500-routed-expert architecture discussed in the design thread.
+Single-GPU research implementation for the 80-layer, hidden-256, 500-routed-expert architecture.
 
-## Current architecture
+## Architecture
 
 - 80 layers, hidden 256
-- 500 routed experts/layer
-- four shared experts/layer
-- softmax + Top-4 router only
+- 500 routed experts/layer + 4 shared experts/layer
+- softmax Top-4 routed experts
 - threshold-routing curriculum after configurable warmup
 - Qwen-style 3 Gated DeltaNet : 1 gated full-attention layout
 - four-branch Gated Residual
-- Qwen partial RoPE (`theta=1e7`) in full-attention layers
+- partial RoPE (`theta=1e7`)
 - expert SwiGLU `256 -> 2048 -> 256`
-- Qwen3.8 tokenizer, 248,320 vocabulary, untied embedding/head
-- initial 8K pretraining; no n-gram embedding or MTP
+- Qwen3.8 tokenizer, vocab 248,320, untied embedding/head
+- 8K initial pretraining; no n-gram/MTP initially
 
-## Memory strategy
+## FP8 full-resident training
 
-Routed expert masters live in BF16 CPU mmap/RAM on the fast local work disk. A sliding window of complete routed-expert layers is copied to GPU. Forward stores only layer-boundary activations on CPU. Backward recomputes one layer at a time, computes `dX`, transfers routed expert gradients to CPU (INT8 by default), updates expert masters with factored Adafactor, and updates resident parameters with AdamW.
+The main G4/Colab path is now `train_fp8.py` + `configs/full_g4_fp8.json`.
 
-The full config uses `expert_cache_layers: "auto"`. At startup it measures free VRAM and fills it with as many complete expert layers as fit while retaining the configured safety reserve (`gpu_cache_reserve_gib`, 20 GiB in `full_g4.json`). A manual `--cache-layers N` still overrides this.
+All 80×500 routed expert shadows stay resident in GPU VRAM as E4M3 FP8. Only the current layer is materialized as a BF16 autograd work tensor. Expert GEMMs use TorchAO MXFP8 grouped matrix multiplication for differentiable FP8 forward/backward. The 8×8192-token layer superbatch is concatenated into one layer call so the grouped kernel sees 65,536 tokens instead of eight separate 8K calls.
 
-The last forward cache window is retained into reverse backward, so those layers are not reloaded before backward starts.
+The authoritative routed-expert optimizer masters remain BF16 mmap files on fast Colab local disk. Routed gradients are packed to INT8, CPU factored Adafactor updates the BF16 master, then that layer's FP8 GPU shadow is refreshed. This keeps sub-FP8 optimizer updates while eliminating expert-layer streaming during forward/backward.
 
-## CLI
+The memory-critical routed bank is 62.91456B parameters = 58.59 GiB at one byte/parameter. The full model is about 63.62B parameters; the smaller non-routed model components stay BF16 for stability.
 
-Available commands include `show-config`, `info`, `inspect`, `probe-data`, `init-experts`, `validate-layerwise`, `train`, and `plot`. Important experiment settings have direct flags such as `--save-every`, `--resume`, `--drive-root`, `--work-dir`, `--cache-layers`, `--superbatch`, `--seq-len`, learning-rate controls, and threshold controls. Remaining fields can use repeatable `--set dotted.key=value` overrides.
-
-## Colab / Drive persistence
-
-For the full Colab/G4 configuration:
+## Persistence
 
 ```text
 local hot work: /content/qtm-work/<run-name>/
-persistent logs/checkpoints: <drive-root>/runs/<run-name>/
-persistent expert/optimizer mirror: <drive-root>/work-backup/<run-name>/
+Drive logs/checkpoints: <drive-root>/runs/<run-name>/
+Drive expert/optimizer mirror: <drive-root>/work-backup/<run-name>/
 ```
 
-`--drive-root` no longer makes Google Drive the live mmap disk. Training reads and writes expert masters plus Adafactor state locally. At every configured checkpoint, clean interruption, and completion, the local work tree is synchronized to the persistent `work-backup` directory. A fresh-runtime `--resume latest` restores that synchronized work back to local storage and verifies its saved step matches the resident checkpoint before resuming.
+Drive is not used in the training hot path. At each configured checkpoint, clean interruption, and completion, the local BF16 expert masters + Adafactor state are synchronized to Drive. `--resume latest` restores that synchronized state on a fresh runtime.
 
-The full routed expert masters are about 117 GiB, so the Colab local disk and persistent destination both need enough capacity.
+The local routed BF16 masters are about 117.19 GiB and the factored Adafactor state is about 0.99 GiB, so allow roughly 119 GiB for the hot work tree and similar persistent backup capacity.
 
-## Live logging / recovery
+## Run
 
-The live terminal line reports the signals needed to diagnose this experiment:
+```bash
+python train_fp8.py --config configs/full_g4_fp8.json --drive-root /content/drive/MyDrive/qwen38-threshold-moe
+```
 
-- current layer / total layers
-- GPU expert-cache capacity
-- expert layers/GiB loaded during the transition and load time
-- layer compute time
-- MoE execution backend (`native-grouped`, Hugging Face grouped fallback, or eager fallback)
-- current-layer expert coverage, hottest expert, routing gap, blocked experts, and reroute percentage
-- end-of-step loss, throughput, mean/min expert coverage, mean/max routing gap, blocked layers/experts, and reroute percentage
+Resume:
 
-Before a complete optimizer step exists, throughput is shown as unavailable rather than a misleading `0 tok/s`.
+```bash
+python train_fp8.py --config configs/full_g4_fp8.json --drive-root /content/drive/MyDrive/qwen38-threshold-moe --resume latest
+```
 
-Training automatically writes:
+Training automatically writes `metrics.csv`, `training.png`, `routing.png`, live expert-routing metrics, and periodic checkpoints.
 
-- `metrics.csv`
-- `training.png`
-- `routing.png`
-- periodic resident checkpoints
-- synchronized expert/optimizer work at checkpoint time
+## Dataset
 
-SIGINT/SIGTERM requests finish the current optimizer step and then checkpoint + synchronize. A hard runtime loss cannot execute cleanup, so recovery is from the most recent completed synchronization.
+The full config streams the public K2-oriented mixture in `configs/k2_public_mix.json`. Exact original K2 Horizon mixture weights are not public, so this is not claimed to reproduce IFM's original data schedule.
 
-## Dataset streaming
+## Validation / current status
 
-The full configuration uses the released public K2-oriented repositories through `configs/k2_public_mix.json`. The exact original K2 Horizon mixture weights are not public, so this fallback mixture is explicitly not claimed to reproduce IFM's original data schedule. Tokenized documents are streamed and packed continuously into fixed next-token sequences.
-
-See `K2_RESEARCH.md` and `COLAB.md` for details.
-
-## Important validation boundary
-
-Run `validate-layerwise` before scaling. The memory-saving schedule assumes recomputation produces the same `dX` and parameter gradients as ordinary autograd before a layer's parameters are updated.
+The earlier layer-wise recomputation validator matched direct autograd on the tested layer. The new TorchAO MXFP8 path is a prototype backend and must be runtime-validated on the actual Blackwell G4 environment; it intentionally fails loudly rather than silently falling back to BF16 expert execution.
