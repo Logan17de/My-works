@@ -21,11 +21,11 @@ from PIL import Image
 import o_voxel
 from trellis2.pipelines import Trellis2ImageTo3DPipeline
 
-ROOT = Path("/content/drive/MyDrive/AI_Projects/TRELLIS.2")
-INPUT_DIR = ROOT / "TRELLIS_INPUT"
-OUTPUT_DIR = ROOT / "TRELLIS_OUTPUT"
-DONE_DIR = ROOT / "TRELLIS_DONE"
-FAILED_DIR = ROOT / "TRELLIS_FAILED"
+ROOT = Path("/content/drive/MyDrive/Shared/Trellis")
+INPUT_DIR = ROOT / "input"
+OUTPUT_DIR = ROOT / "output"
+DONE_DIR = ROOT / "done"
+FAILED_DIR = ROOT / "failed"
 EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
 
@@ -47,7 +47,7 @@ def main() -> None:
     )
 
     if not images:
-        print("✅ TRELLIS_INPUT is empty. Nothing to process.")
+        print(f"✅ No images waiting in {INPUT_DIR}")
         return
 
     print(f"Found {len(images)} image(s). Loading TRELLIS.2 once...")
@@ -65,7 +65,7 @@ def main() -> None:
 
         try:
             if output_path.is_file() and output_path.stat().st_size > 0:
-                print("  ↳ Existing GLB found; moving input to DONE.")
+                print("  ↳ Existing GLB found; moving input to done.")
                 move_replace(image_path, DONE_DIR)
                 success += 1
                 continue
@@ -98,14 +98,14 @@ def main() -> None:
 
             move_replace(image_path, DONE_DIR)
             success += 1
-            print(f"  ✅ {output_path.name}")
+            print(f"  ✅ Saved: {output_path}")
 
             del image, mesh, glb
             torch.cuda.empty_cache()
 
         except Exception as exc:
             failed += 1
-            print(f"  ❌ {exc}")
+            print(f"  ❌ Failed: {exc}")
             traceback.print_exc()
             if output_path.exists() and output_path.stat().st_size == 0:
                 output_path.unlink()
