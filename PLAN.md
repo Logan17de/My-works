@@ -384,3 +384,363 @@ When uncertain, answer:
 > **“The project establishes X, but it does not yet establish Y. The next control I would run is Z.”**
 
 This keeps the interview technically honest and demonstrates research maturity.
+
+
+---
+
+# 26. AI Architecture Mastery Expansion — Beyond Resume
+
+**Purpose:** This section is deliberately broader than the resume. It is interview-breadth preparation so that architecture questions about modern LLMs do not surprise you.
+
+**Mastery target:** For every checked item, be able to give:
+1. a 20–30 second definition,
+2. why it exists,
+3. one trade-off,
+4. one concrete example or use case.
+
+## 26.1 Transformer End-to-End
+
+- [ ] **Walk through a decoder-only Transformer from token IDs to next-token logits.**
+- [ ] **Encoder-only vs decoder-only vs encoder-decoder — when is each used?**
+- [ ] **What happens inside one Transformer block?**
+- [ ] **Why do residual connections matter?**
+- [ ] **Why do we normalize activations?**
+- [ ] **Pre-norm vs post-norm — what changes for training stability?**
+- [ ] **What is the FFN/MLP doing that attention does not do?**
+- [ ] **Why are modern FFNs often much wider than the hidden size?**
+- [ ] **What is SwiGLU and why is it popular?**
+- [ ] **What is weight tying? Why might the LM head be tied or untied?**
+- [ ] **What exactly happens during autoregressive generation?**
+- [ ] **Why can training be parallel across sequence positions while decoding is sequential?**
+
+## 26.2 Attention Fundamentals
+
+- [ ] **Explain Q, K, and V mathematically and intuitively.**
+- [ ] **Derive scaled dot-product attention at a high level.**
+- [ ] **Why divide by sqrt(d_k)?**
+- [ ] **What does softmax do inside attention?**
+- [ ] **What is a causal mask?**
+- [ ] **Padding mask vs causal mask — what is the difference?**
+- [ ] **Why does future-token leakage make language-model results invalid?**
+- [ ] **What is multi-head attention and why multiple heads?**
+- [ ] **What happens if all attention heads learn the same thing?**
+- [ ] **Attention complexity with sequence length — where does O(n²) come from?**
+- [ ] **What is the KV cache and why does decoding need it?**
+
+## 26.3 Modern Attention Variants
+
+- [ ] **MHA vs MQA vs GQA — what changes and why?**
+- [ ] **Why does GQA reduce KV-cache memory compared with full MHA?**
+- [ ] **What is Multi-Head Latent Attention (MLA)?**
+- [ ] **How does MLA compress the KV cache conceptually?**
+- [ ] **GQA vs MLA — what trade-off is each making?**
+- [ ] **What is sliding-window attention?**
+- [ ] **Local vs global attention — when would you mix them?**
+- [ ] **What is sparse attention?**
+- [ ] **What is block-sparse attention?**
+- [ ] **What are attention sinks and why can they help long-context models?**
+- [ ] **What is FlashAttention? Why is it faster if the mathematical attention result is the same?**
+- [ ] **FlashAttention vs a new attention architecture — why are they not the same thing?**
+- [ ] **What is QK normalization / QKNorm and why might it stabilize training?**
+
+## 26.4 Positional Information and Long Context
+
+- [ ] **Why does a Transformer need positional information?**
+- [ ] **Absolute positional embeddings vs relative position methods.**
+- [ ] **Explain RoPE intuitively.**
+- [ ] **Why does RoPE act on Q/K rather than directly changing V?**
+- [ ] **What is ALiBi at a high level?**
+- [ ] **What is position interpolation / RoPE scaling?**
+- [ ] **What is YaRN-style context extension conceptually?**
+- [ ] **Why does extending context length sometimes hurt short-context quality?**
+- [ ] **What is the “lost in the middle” problem?**
+- [ ] **Long-context prompting vs RAG — when would you prefer each?**
+- [ ] **How would you evaluate whether a model really uses a 100K+ context effectively?**
+
+## 26.5 Mixture of Experts (MoE)
+
+- [ ] **What is MoE?**
+- [ ] **Dense model vs MoE model — total parameters vs active parameters.**
+- [ ] **What does the router do?**
+- [ ] **Top-1 vs top-2 routing.**
+- [ ] **Why can MoE increase model capacity without activating every parameter per token?**
+- [ ] **What is expert specialization?**
+- [ ] **What is expert collapse?**
+- [ ] **Why is load balancing needed?**
+- [ ] **What is an auxiliary routing/load-balancing loss?**
+- [ ] **What is capacity factor / expert capacity?**
+- [ ] **What happens when too many tokens route to one expert?**
+- [ ] **Shared experts vs routed experts.**
+- [ ] **Fine-grained experts vs a few large experts.**
+- [ ] **Expert parallelism — why does MoE create communication overhead?**
+- [ ] **Why can an MoE model be memory-heavy even when active compute is low?**
+- [ ] **Why does active-parameter count not tell the whole inference-speed story?**
+- [ ] **When would you choose dense instead of MoE?**
+- [ ] **Can MoE be used only in FFN layers, or elsewhere too?**
+- [ ] **How would you test whether experts are actually specializing?**
+
+## 26.6 State-Space Models, Linear Attention, and Hybrid Architectures
+
+- [ ] **What problem are State Space Models (SSMs) trying to solve?**
+- [ ] **Transformer attention vs SSM recurrence at a high level.**
+- [ ] **What is Mamba conceptually?**
+- [ ] **What changed with Mamba-2 / state-space duality at a high level?**
+- [ ] **What is Mamba-3 trying to improve?**
+- [ ] **Why can fixed-state recurrent/linear models struggle with exact retrieval?**
+- [ ] **What is linear attention?**
+- [ ] **Why is “linear complexity” not automatically faster on real GPUs?**
+- [ ] **What is Gated DeltaNet / gated linear recurrence at a high level?**
+- [ ] **Why are hybrid Attention + SSM architectures becoming attractive?**
+- [ ] **Inter-layer hybrid vs intra-layer hybrid — what is the difference?**
+- [ ] **When would you retain occasional full-attention layers inside an SSM-heavy model?**
+- [ ] **How can MoE and hybrid Attention/SSM designs coexist?**
+
+## 26.7 Tokenization and Embeddings
+
+- [ ] **What is tokenization and why is it trained before model pretraining?**
+- [ ] **BPE vs WordPiece vs Unigram tokenization.**
+- [ ] **Byte-level vs subword tokenization.**
+- [ ] **Vocabulary size trade-offs.**
+- [ ] **Why can tokenizer choice affect multilingual performance and compute?**
+- [ ] **What are special tokens?**
+- [ ] **What is an embedding layer?**
+- [ ] **Token embeddings vs sentence/document embeddings.**
+- [ ] **What is an embedding dimension?**
+- [ ] **Cosine similarity vs dot product vs L2 distance.**
+- [ ] **Why does normalization make cosine and dot-product ranking closely related?**
+- [ ] **Bi-encoder vs cross-encoder.**
+- [ ] **Why is a cross-encoder usually better for reranking but slower?**
+- [ ] **What is late interaction / ColBERT-style retrieval?**
+
+## 26.8 Training Objectives and Adaptation
+
+- [ ] **Next-token prediction / causal language modeling objective.**
+- [ ] **Masked language modeling vs causal language modeling.**
+- [ ] **Pretraining vs continued pretraining vs SFT.**
+- [ ] **Instruction tuning vs domain adaptation.**
+- [ ] **Full fine-tuning vs LoRA.**
+- [ ] **What exactly does LoRA modify?**
+- [ ] **Why does low rank reduce trainable parameters?**
+- [ ] **LoRA vs QLoRA.**
+- [ ] **Adapters / prefix tuning / prompt tuning — conceptually how do they differ?**
+- [ ] **What is catastrophic forgetting?**
+- [ ] **Replay / mixed old+new data as a forgetting mitigation strategy.**
+- [ ] **Freezing, adapters, and selective plasticity as mitigation strategies.**
+- [ ] **What is knowledge distillation?**
+- [ ] **Teacher-student distillation vs self-distillation.**
+- [ ] **What is DPO?**
+- [ ] **RLHF at a high level — reward model + policy optimization.**
+- [ ] **What is GRPO at a high level and why is it associated with modern reasoning training?**
+- [ ] **Why does post-training quality depend heavily on data quality and evaluation?**
+
+## 26.9 Reasoning and Test-Time Compute
+
+- [ ] **What is chain-of-thought prompting?**
+- [ ] **Why should internal reasoning and final answer quality be treated separately?**
+- [ ] **What is self-consistency?**
+- [ ] **What is best-of-N sampling?**
+- [ ] **What is a verifier / reward model?**
+- [ ] **What is test-time compute scaling?**
+- [ ] **Why can spending more inference compute improve answer quality?**
+- [ ] **When does test-time scaling become too expensive?**
+- [ ] **Tool use vs reasoning in the model weights.**
+- [ ] **Workflow vs agent.**
+- [ ] **Function/tool calling — what actually happens outside the model?**
+- [ ] **Why should authorization never be delegated to the LLM itself?**
+- [ ] **Structured output / JSON schema — why useful in production AI?**
+
+## 26.10 Advanced RAG — Retrieval
+
+- [x] **Basic RAG pipeline**
+- [x] **Dense embeddings + FAISS**
+- [x] **Precision@K / Recall@K basics**
+- [x] **Hybrid retrieval concept**
+- [x] **Reranking concept**
+- [ ] **Sparse retrieval / BM25 — how does it differ from dense retrieval?**
+- [ ] **Dense vs sparse vs hybrid — when does each win?**
+- [ ] **Reciprocal Rank Fusion (RRF) — why combine rankings?**
+- [ ] **Query rewriting**
+- [ ] **Multi-query retrieval**
+- [ ] **HyDE — generate a hypothetical document before retrieval.**
+- [ ] **Semantic chunking vs fixed-size chunking.**
+- [ ] **Parent-child / hierarchical retrieval.**
+- [ ] **Metadata filtering and ACL-aware retrieval.**
+- [ ] **Late-interaction retrieval / ColBERT.**
+- [ ] **Cross-encoder reranking.**
+- [ ] **Contextual retrieval / adding surrounding context before indexing.**
+- [ ] **GraphRAG — when relationships matter more than nearest-neighbor similarity.**
+- [ ] **Multi-hop retrieval.**
+- [ ] **Agentic RAG — when the system chooses retrieval steps dynamically.**
+- [ ] **Multimodal RAG — text + image/audio/video/document structure.**
+- [ ] **Freshness / incremental indexing / deleting stale knowledge.**
+- [ ] **Deduplication and conflicting-source handling.**
+
+## 26.11 Advanced RAG — Generation and Evaluation
+
+- [ ] **Retrieval failure vs generation failure — how do you isolate them?**
+- [ ] **Faithfulness vs answer correctness vs relevance.**
+- [ ] **Precision@K vs Recall@K vs MRR vs nDCG at a high level.**
+- [ ] **How do you build a labeled retrieval evaluation set?**
+- [ ] **How do you evaluate groundedness?**
+- [ ] **Human evaluation vs LLM-as-judge.**
+- [ ] **What are the risks of using an LLM as the evaluator?**
+- [ ] **When should a RAG system refuse to answer?**
+- [ ] **How do citations help and what do citations NOT guarantee?**
+- [ ] **How can irrelevant retrieved chunks hurt generation?**
+- [ ] **How can too many chunks hurt quality?**
+- [ ] **How would you choose top-K?**
+- [ ] **How would you choose chunk size and overlap experimentally?**
+- [ ] **How do you evaluate RAG latency and cost separately from quality?**
+- [ ] **RAG cache / semantic cache — when does it help?**
+
+## 26.12 RAG Security and Failure Modes
+
+- [ ] **Prompt injection through retrieved documents.**
+- [ ] **Data poisoning / malicious indexed content.**
+- [ ] **Tenant/ACL leakage in multi-user RAG.**
+- [ ] **Why filtering after retrieval can be unsafe or inefficient.**
+- [ ] **PII / sensitive-data redaction.**
+- [ ] **Source trust / provenance scoring.**
+- [ ] **Conflicting documents — how should the system respond?**
+- [ ] **Stale documents / versioning.**
+- [ ] **Why the model should not treat retrieved text as trusted instructions.**
+- [ ] **How to make a RAG system auditable.**
+
+## 26.13 Modern LLM Inference and Serving
+
+- [ ] **Prefill vs decode — what is different computationally?**
+- [ ] **Why decode is often memory-bandwidth-bound.**
+- [ ] **What is TTFT (time to first token)?**
+- [ ] **What is inter-token latency?**
+- [ ] **Latency vs throughput — why optimizing one may hurt the other.**
+- [ ] **What is continuous batching?**
+- [ ] **Why static batches waste GPU utilization during decoding.**
+- [ ] **What is PagedAttention / paged KV-cache management?**
+- [ ] **Why is prefix caching useful for chat/agent workloads?**
+- [ ] **What is chunked prefill?**
+- [ ] **Why can a huge prefill stall other users?**
+- [ ] **What is speculative decoding?**
+- [ ] **Draft model + target model verification — how does it speed decoding?**
+- [ ] **When does speculative decoding help and when does it not?**
+- [ ] **What is prefill/decode disaggregation?**
+- [ ] **Why might production systems scale prefill and decode separately?**
+- [ ] **Streaming output vs waiting for complete generation.**
+- [ ] **How do you estimate concurrent users from model memory + KV cache?**
+
+## 26.14 Quantization and Model Compression
+
+- [ ] **FP32 vs FP16 vs BF16 vs FP8.**
+- [ ] **INT8 vs INT4 quantization.**
+- [ ] **Weight quantization vs activation quantization vs KV-cache quantization.**
+- [ ] **Post-training quantization vs quantization-aware training.**
+- [ ] **What are GPTQ and AWQ conceptually?**
+- [ ] **What is GGUF / why common in local inference?**
+- [ ] **Why does quantization reduce memory bandwidth pressure?**
+- [ ] **Why can lower precision hurt quality?**
+- [ ] **Why hardware support matters for whether a datatype is actually faster.**
+- [ ] **Pruning vs quantization vs distillation.**
+- [ ] **What is sparsity and why is theoretical sparsity not always real speedup?**
+
+## 26.15 Distributed Training and Scaling
+
+- [ ] **Data parallelism**
+- [ ] **Tensor parallelism**
+- [ ] **Pipeline parallelism**
+- [ ] **Expert parallelism**
+- [ ] **Sequence/context parallelism**
+- [ ] **Why distributed training needs communication between GPUs**
+- [ ] **What is FSDP / ZeRO at a high level?**
+- [ ] **Why optimizer state can consume more memory than model weights during training**
+- [ ] **Gradient accumulation — why use it?**
+- [ ] **Gradient checkpointing — compute vs memory trade-off**
+- [ ] **Mixed-precision training**
+- [ ] **Gradient clipping**
+- [ ] **Learning-rate warmup**
+- [ ] **What causes training loss spikes / instability?**
+- [ ] **Checkpointing and resume correctness in distributed training**
+
+## 26.16 Modern Architectural Features to Recognize
+
+- [ ] **Multi-Token Prediction (MTP) — predicting multiple future tokens as an auxiliary objective.**
+- [ ] **Speculative heads / Medusa/EAGLE-style decoding at a high level.**
+- [ ] **Mixture of Depths / adaptive computation — not every token necessarily uses every block.**
+- [ ] **Token pruning / dynamic token selection.**
+- [ ] **Shared KV / compressed KV architectures.**
+- [ ] **Memory tokens / recurrent memory concepts.**
+- [ ] **Retrieval-augmented language models vs very-long-context models.**
+- [ ] **Diffusion language models vs autoregressive language models at a high level.**
+- [ ] **Multimodal Transformers — where image/audio tokens enter the architecture.**
+- [ ] **Vision encoder + projector + LLM vs native multimodal architectures.**
+- [ ] **Why modern models increasingly combine several ideas rather than using one pure architecture.**
+
+## 26.17 Architecture Comparison Drills
+
+- [ ] **Dense Transformer vs MoE Transformer**
+- [ ] **MHA vs GQA vs MLA**
+- [ ] **Full attention vs sliding-window attention**
+- [ ] **Transformer vs Mamba/SSM**
+- [ ] **Pure Transformer vs hybrid Attention+SSM**
+- [ ] **RAG vs long context**
+- [ ] **RAG vs fine-tuning**
+- [ ] **Full fine-tuning vs LoRA/QLoRA**
+- [ ] **Vector search vs BM25**
+- [ ] **Bi-encoder retrieval vs cross-encoder reranking**
+- [ ] **REST vs WebSocket vs streaming HTTP**
+- [ ] **Local inference vs API-hosted inference**
+- [ ] **Dense deployment vs quantized deployment**
+- [ ] **Single-GPU vs tensor-parallel serving**
+
+## 26.18 Whiteboard Drills
+
+- [ ] **Draw a decoder-only Transformer block.**
+- [ ] **Draw attention with Q/K/V and causal mask.**
+- [ ] **Draw GQA and explain which heads share K/V.**
+- [ ] **Draw a simple MoE FFN with router -> top-k experts -> combine.**
+- [ ] **Draw a classic RAG pipeline.**
+- [ ] **Draw hybrid retrieval + reranker + generation.**
+- [ ] **Draw an LLM serving stack with queue -> scheduler -> GPU -> KV cache -> streaming response.**
+- [ ] **Draw an agent/tool loop with application-side authorization.**
+- [ ] **Draw Attention + SSM hybrid model conceptually.**
+- [ ] **Draw your Token MOD vs ATE distinction.**
+
+---
+
+# 27. Current 2025–2026 Architecture Topics — Quick Recognition List
+
+These are **breadth topics**, not resume claims. The goal is recognition + a 30-second explanation, not pretending hands-on experience.
+
+- [ ] **MLA (Multi-Head Latent Attention)** — compressed latent KV representation for cache efficiency.
+- [ ] **MHA -> MQA -> GQA -> MLA evolution**
+- [ ] **Hybrid Transformer + Mamba / SSM architectures**
+- [ ] **Mamba-2 / Mamba-3 high-level evolution**
+- [ ] **Gated DeltaNet / modern gated linear recurrence**
+- [ ] **Shared+routed MoE experts and fine-grained expert routing**
+- [ ] **Multi-Token Prediction**
+- [ ] **Test-time compute / reasoning scaling**
+- [ ] **Agentic tool-use systems**
+- [ ] **GraphRAG / agentic RAG / contextual retrieval**
+- [ ] **Late-interaction retrieval (ColBERT-style)**
+- [ ] **PagedAttention / continuous batching / prefix caching**
+- [ ] **Speculative decoding**
+- [ ] **Chunked prefill and prefill/decode disaggregation**
+- [ ] **FP8 / INT4 serving and KV-cache quantization**
+- [ ] **FlashAttention-family kernels**
+- [ ] **Diffusion language models**
+- [ ] **Multimodal token architectures**
+- [ ] **Adaptive-depth / sparse-compute architectures**
+
+## Current-topic reading anchors
+
+- Hybrid Attention/SSM evaluation and modern hybrid design: https://arxiv.org/pdf/2510.04800
+- Mamba-3 / inference-first SSM evolution: https://arxiv.org/pdf/2603.15569
+- MLA migration / KV-cache compression concepts: https://proceedings.neurips.cc/paper_files/paper/2025/file/75d13a472f570755af2a4ae4ac3d6724-Paper-Conference.pdf
+
+---
+
+# 28. AI Architecture “Surprise Question” Rule
+
+If an interviewer names an architecture you have heard of but have not used:
+
+> **“I haven’t implemented that architecture directly, but my understanding is that it changes X to solve Y. The trade-off I would want to measure is Z.”**
+
+Do **not** fake hands-on experience. Architecture breadth is useful; evidence-backed depth on your own projects is still the priority.
