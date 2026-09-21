@@ -17,7 +17,7 @@
 
 - [ ] **Tell me about yourself** — 60-second version that connects TCS, independent research, and applied AI.
 - [x] **Current TCS role** — explain model evaluation/tuning work in one clean sentence.
-- [ ] **Why Prodapt?** — research mindset -> real production systems, larger teams, customer impact.
+- [x] **Why Prodapt?** — research mindset -> real production systems, larger teams, customer impact.
 - [ ] **Why move from Mechanical Engineering to AI?**
 - [ ] **Independent research vs production experience** — explain the distinction honestly.
 
@@ -90,7 +90,7 @@
 - [ ] **Hypothesis behind pre-activation** — influence the SwiGLU gate before activation.
 - [ ] **Hypothesis behind post-activation** — modify activated FFN features before down projection.
 - [x] **Tokenizer/data confound** — validation answer tokens must exist in training; commuted pairs stay in the same split.
-- [ ] **What is still not proven?** — no decisive multi-seed placement winner.
+- [x] **What is still not proven?** — no decisive multi-seed placement winner.
 
 ---
 
@@ -173,7 +173,7 @@
 **Memory hook:** Gradient flow is not mechanism validation.
 
 - [ ] **Core idea** — separate stable token identity from adaptable meaning.
-- [ ] **What dynamic Q/K/V gating was meant to do**
+- [x] **What dynamic Q/K/V gating was meant to do**
 - [ ] **What was actually implemented**
 - [ ] **What was missing** — write head not connected to training; shallow architecture.
 - [ ] **Main lesson** — differentiability does not prove usefulness.
