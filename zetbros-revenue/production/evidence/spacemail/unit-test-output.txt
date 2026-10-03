@@ -60,6 +60,9 @@ test_duplicate_out_of_order_and_malformed_codes_cannot_establish_acceptance (tes
 test_fixed_official_tls_endpoints_and_no_activation_surface (test_spacemail_contract.SpaceMailContractTests.test_fixed_official_tls_endpoints_and_no_activation_surface) ... ok
 test_known_negative_smtp_response_terminal_without_internal_retry (test_spacemail_contract.SpaceMailContractTests.test_known_negative_smtp_response_terminal_without_internal_retry) ... ok
 test_lost_ack_timeout_and_cancellation_after_body_uncertain (test_spacemail_contract.SpaceMailContractTests.test_lost_ack_timeout_and_cancellation_after_body_uncertain) ... ok
+test_malformed_encoded_words_are_never_silently_repaired (test_spacemail_contract.SpaceMailContractTests.test_malformed_encoded_words_are_never_silently_repaired) ... ok
+test_nested_encoded_word_subject_cannot_change_approved_wire_preview (test_spacemail_contract.SpaceMailContractTests.test_nested_encoded_word_subject_cannot_change_approved_wire_preview) ... ok
+test_parent_in_reply_to_fallback_is_bound_and_visible_in_references (test_spacemail_contract.SpaceMailContractTests.test_parent_in_reply_to_fallback_is_bound_and_visible_in_references) ... ok
 test_raw_header_or_thread_change_changes_source_fingerprint (test_spacemail_contract.SpaceMailContractTests.test_raw_header_or_thread_change_changes_source_fingerprint) ... ok
 test_read_plan_and_transcript_never_mark_seen_or_mutate (test_spacemail_contract.SpaceMailContractTests.test_read_plan_and_transcript_never_mark_seen_or_mutate) ... ok
 test_size_preflight_rejects_missing_wrong_uid_duplicates_and_oversize (test_spacemail_contract.SpaceMailContractTests.test_size_preflight_rejects_missing_wrong_uid_duplicates_and_oversize) ... ok
@@ -78,6 +81,6 @@ test_thread_drift_after_claim_refused_before_any_smtp_body (test_spacemail_contr
 test_uid_or_thread_drift_before_claim_blocks_without_consumption (test_spacemail_contract.SpaceMailDurableBridgeTests.test_uid_or_thread_drift_before_claim_blocks_without_consumption) ... ok
 
 ----------------------------------------------------------------------
-Ran 78 tests in 5.902s
+Ran 81 tests in 5.757s
 
 OK

@@ -162,6 +162,7 @@ class SpaceMailContractTests(unittest.TestCase):
             ([(b"7 (UID 42 BODY[]<1> {5}",raw),b")"],5),(valid,4),
             ([(b"7 (UID 42 BODY[]<0> {6}",raw),b")"],5),
             ([(b"7 (UID 42 BODY[]<0> {5}",raw),b" UID 42)"],5),
+            ([(b"7 (UID 41\t BODY[]<0> {5}",raw),b" UID 42)"],5),
             ([(b"7 (UID 42 BODY[]<0> {5}",raw),b")",(b"8 {5}",raw)],5),
             ([(b"7 (UID 42 BODY[]<0> {5}",raw),b" FLAGS (\\Seen))"],5),(valid,True)):
             with self.subTest(data=data,size=size), self.assertRaises(SourceUnavailable): parse_body_response(PLAN,"OK",data,size)
@@ -183,6 +184,35 @@ class SpaceMailContractTests(unittest.TestCase):
             changed=parse_source(BINDING,PLAN,raw)
             self.assertNotEqual(original.version,changed.version)
             self.assertNotEqual(digest(original),digest(changed))
+
+    def test_parent_in_reply_to_fallback_is_bound_and_visible_in_references(self):
+        raw=source_wire(extra="In-Reply-To: <parent@example.invalid>\r\n").replace(b"References: <earlier@example.invalid>\r\n",b"")
+        record=parse_source(BINDING,PLAN,raw)
+        self.assertEqual(record.rfc_in_reply_to,"<parent@example.invalid>")
+        prepared=prepare_reply(BINDING,action_for(record),record,now=1001)
+        self.assertEqual(prepared.preview.references,("<parent@example.invalid>","<source-42@example.invalid>"))
+        rendered=BytesParser(policy=policy.default).parsebytes(prepared.wire)
+        self.assertEqual(str(rendered["References"]),"<parent@example.invalid> <source-42@example.invalid>")
+        changed=parse_source(BINDING,PLAN,raw.replace(b"<parent@example.invalid>",b"<other-parent@example.invalid>"))
+        self.assertNotEqual(digest(record),digest(changed))
+        with self.assertRaises(ContractError): prepare_reply(BINDING,action_for(record),changed,now=1001)
+
+    def test_malformed_encoded_words_are_never_silently_repaired(self):
+        for subject in ("=?utf-8?b?Zg?=","=?x-invalid?b?Zm9v?=","=?utf-8?b?/w==?=",
+                        "=?utf-8?q?bad=XX?=","=?utf-8?b?Zg===?=","=?utf-8?q?line=0Abreak?=",
+                        "=?utf-8?b?Zh==?=","=?utf-8?b?unfinished"):
+            with self.subTest(subject=subject), self.assertRaises(SourceUnavailable):
+                parse_source(BINDING,PLAN,source_wire(subject=subject))
+        encoded_id=base64.b64encode(b"<source-42@example.invalid>").decode()
+        with self.assertRaises(SourceUnavailable):
+            parse_source(BINDING,PLAN,source_wire(message_id="=?utf-8?b?"+encoded_id+"?="))
+
+    def test_nested_encoded_word_subject_cannot_change_approved_wire_preview(self):
+        # The outer source header is valid; its decoded text looks like a second
+        # encoded word. Python's wire serializer would otherwise change it to hi.
+        record=parse_source(BINDING,PLAN,source_wire(subject="=?utf-8?b?PT91dGYtOD9iP2FHaz0/PQ==?="))
+        self.assertEqual(record.subject,"=?utf-8?b?aGk=?=")
+        with self.assertRaises(ContractError): prepare_reply(BINDING,action_for(record),record,now=1001)
 
     def test_duplicate_malformed_routing_and_thread_headers_refused(self):
         for raw in (source_wire(extra="From: another@example.invalid\r\n"),source_wire(extra="Subject: other\r\n"),

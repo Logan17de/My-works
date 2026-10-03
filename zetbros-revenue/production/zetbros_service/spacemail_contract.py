@@ -31,6 +31,7 @@ MAX_UID = 4294967295
 MAX_REFERENCES = 20
 _MSG_ID = re.compile(r"<[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?>")
 _SOURCE_ID = re.compile(r"imap-v1:([1-9][0-9]{0,9}):([1-9][0-9]{0,9})")
+_ENCODED_WORD = re.compile(r"=\?([^?\s]+)\?([bBqQ])\?([^?\s]+)\?=")
 
 
 class ContractError(ValueError):
@@ -129,20 +130,18 @@ def parse_body_response(plan: ImapReadPlan, status: str, data: object, expected_
     suffix = parts[1]
     if type(prefix) is not bytes or type(raw) is not bytes or len(prefix) + len(suffix) > 1024:
         raise SourceUnavailable() from None
-    # UID may occur before or after the literal. Sequence numbers never identify a message.
-    metadata = prefix + suffix
-    uid_matches = re.findall(rb"(?:^|[ (])UID ([1-9][0-9]*)(?=[ )])", metadata)
-    literal = re.search(rb"BODY\[\](?:<0>)? \{([0-9]+)\}$", prefix)
-    if (not re.match(rb"[1-9][0-9]* \(", prefix) or not suffix.endswith(b")")
-            or len(uid_matches) != 1 or int(uid_matches[0]) != plan.uid or not literal
-            or len(raw) != expected_size or int(literal[1]) != expected_size):
+    # Exact framing permits one UID either before or after one body literal.
+    # Counting then stripping tokens can disagree on tabs and hide a wrong UID.
+    before = re.fullmatch(rb"[1-9][0-9]* \(UID ([1-9][0-9]*) BODY\[\](?:<0>)? \{([0-9]+)\}", prefix)
+    after = re.fullmatch(rb"[1-9][0-9]* \(BODY\[\](?:<0>)? \{([0-9]+)\}", prefix)
+    tail = re.fullmatch(rb" UID ([1-9][0-9]*)\)", suffix)
+    if before is not None and suffix == b")":
+        uid, literal_size = int(before[1]), int(before[2])
+    elif after is not None and tail is not None:
+        uid, literal_size = int(tail[1]), int(after[1])
+    else:
         raise SourceUnavailable() from None
-    # Only the requested UID and body literal are permitted in this narrow FETCH response.
-    before = prefix[:literal.start()]
-    before = re.sub(rb"^[1-9][0-9]* \(", b"", before)
-    before = re.sub(rb"UID [1-9][0-9]* ?", b"", before)
-    after = re.sub(rb" ?UID [1-9][0-9]*", b"", suffix[:-1])
-    if before.strip() or after.strip():
+    if uid != plan.uid or len(raw) != expected_size or literal_size != expected_size:
         raise SourceUnavailable() from None
     return raw
 
@@ -172,9 +171,11 @@ class SpaceMailRecord(SourceMessage):
     uidvalidity: Annotated[int, Field(ge=1, le=MAX_UID)]
     uid: Annotated[int, Field(ge=1, le=MAX_UID)]
     rfc_message_id: Annotated[str, Field(max_length=254)]
+    rfc_in_reply_to: Annotated[str, Field(max_length=254)] | None = None
     rfc_references: Annotated[tuple[str, ...], Field(max_length=MAX_REFERENCES)] = ()
 
     _thread = field_validator("rfc_message_id")(_message_id)
+    _parent = field_validator("rfc_in_reply_to")(lambda value: _message_id(value) if value is not None else value)
 
     @field_validator("rfc_references")
     @classmethod
@@ -199,6 +200,36 @@ def _one_header(message: EmailMessage, name: str, *, required=False):
     return value
 
 
+def _validate_raw_encoded_words(message: EmailMessage) -> None:
+    # Python's UnstructuredHeader can silently repair encoded-word defects.
+    # Validate raw words independently; never depend on its private parse tree.
+    for name, value in message.raw_items():
+        lower = name.lower()
+        if lower in ("message-id", "references", "in-reply-to") and "=?" in value:
+            raise ContractError("encoded_thread_header_forbidden")
+        if lower not in ("subject", "from", "reply-to", "to", "cc"):
+            continue
+        position = 0
+        while (start := value.find("=?", position)) != -1:
+            word = _ENCODED_WORD.match(value, start)
+            if word is None or len(word[0]) > 75:
+                raise ContractError("malformed_source_encoded_word")
+            charset, encoding, encoded = word.groups()
+            supported = {"utf-8":"utf-8", "utf8":"utf-8", "us-ascii":"ascii", "ascii":"ascii"}
+            if charset.lower() not in supported:
+                raise ContractError("unsupported_source_header_charset")
+            if encoding.lower() == "b":
+                decoded = base64.b64decode(encoded.encode("ascii"), validate=True)
+                if base64.b64encode(decoded).decode("ascii") != encoded:
+                    raise ContractError("noncanonical_source_encoded_word")
+            else:
+                if re.search(r"=(?![0-9A-Fa-f]{2})", encoded):
+                    raise ContractError("malformed_source_encoded_word")
+                decoded = quopri.decodestring(encoded.replace("_", " ").encode("ascii"))
+            plain_header(decoded.decode(supported[charset.lower()], errors="strict"))
+            position = word.end()
+
+
 def _one_mailbox(header) -> str:
     addresses = getattr(header, "addresses", ())
     groups = getattr(header, "groups", ())
@@ -221,6 +252,7 @@ def parse_source(binding: ProviderBinding, plan: ImapReadPlan, raw: bytes) -> Sp
         if not separator or len(header_block) > MAX_HEADER_BYTES or not header_block.isascii():
             raise ContractError("source_header_bounds")
         message = BytesParser(policy=policy.default.clone(raise_on_defect=True)).parsebytes(raw)
+        _validate_raw_encoded_words(message)
         if message.defects or message.is_multipart() or message.get_content_type() != "text/plain":
             raise ContractError("unsupported_source_mime")
         for name in ("From", "Reply-To", "Subject", "Message-ID", "References", "In-Reply-To", "To", "Cc",
@@ -239,7 +271,7 @@ def parse_source(binding: ProviderBinding, plan: ImapReadPlan, raw: bytes) -> Sp
         msg_id = _message_id(str(_one_header(message, "Message-ID", required=True)))
         refs_header = _one_header(message, "References")
         refs = tuple(str(refs_header).split()) if refs_header is not None else ()
-        if len(refs) > MAX_REFERENCES - 1:
+        if len(refs) > MAX_REFERENCES - 1 or (refs_header is not None and not refs):
             raise ContractError("thread_bounds")
         for reference in refs:
             _message_id(reference)
@@ -248,6 +280,8 @@ def parse_source(binding: ProviderBinding, plan: ImapReadPlan, raw: bytes) -> Sp
         in_reply_to = _one_header(message, "In-Reply-To")
         if in_reply_to is not None:
             _message_id(str(in_reply_to))
+            if str(in_reply_to) == msg_id:
+                raise ContractError("ambiguous_thread_header")
         charset = (message.get_content_charset() or "us-ascii").lower()
         if charset not in ("utf-8", "us-ascii"):
             raise ContractError("unsupported_source_charset")
@@ -274,7 +308,8 @@ def parse_source(binding: ProviderBinding, plan: ImapReadPlan, raw: bytes) -> Sp
         return SpaceMailRecord(source_id=plan.source_id, version="rfc822:"+hashlib.sha256(raw).hexdigest(),
             tenant_id=binding.tenant_id, connector_id=binding.connector_id, account_id=binding.account_id,
             sender=sender, reply_to=reply_to, subject=subject, body=body, uidvalidity=plan.uidvalidity,
-            uid=plan.uid, rfc_message_id=msg_id, rfc_references=refs)
+            uid=plan.uid, rfc_message_id=msg_id, rfc_in_reply_to=str(in_reply_to) if in_reply_to is not None else None,
+            rfc_references=refs)
     except Exception:
         # Discard raw parser/provider exception text, which may include message content.
         raise SourceUnavailable() from None
@@ -342,7 +377,10 @@ def prepare_reply(binding: ProviderBinding, action: ReplyAction, fresh: SpaceMai
             raise ContractError("invalid_or_expired_action")
         action_digest = digest(action)
         message_id = f"<zetbros.{action_digest}@{binding.sender_address.split('@')[1]}>"
-        refs = (*fresh.rfc_references, fresh.rfc_message_id)
+        # RFC 5322 3.6.4: a single parent In-Reply-To is the fallback when the
+        # parent has no References. It is part of the immutable source binding.
+        parents = fresh.rfc_references or ((fresh.rfc_in_reply_to,) if fresh.rfc_in_reply_to is not None else ())
+        refs = (*parents, fresh.rfc_message_id)
         date = format_datetime(datetime.fromtimestamp(action.created_at, timezone.utc))
         message = EmailMessage(policy=policy.SMTP.clone(max_line_length=78))
         for header, value in (("From", action.sender), ("To", recipient), ("Subject", action.subject),
@@ -355,6 +393,15 @@ def prepare_reply(binding: ProviderBinding, action: ReplyAction, fresh: SpaceMai
         wire = message.as_bytes()
         if len(wire) > MAX_WIRE_BYTES or any(len(line) > 998 for line in wire.split(b"\r\n")):
             raise ContractError("wire_bounds")
+        # Header assignment/folding can interpret an encoded-word-looking
+        # literal again. Refuse any wire that changes the exact visible preview.
+        rendered = BytesParser(policy=policy.default.clone(raise_on_defect=True)).parsebytes(wire)
+        expected = {"From":action.sender, "To":recipient, "Subject":action.subject, "Message-ID":message_id,
+                    "In-Reply-To":fresh.rfc_message_id, "Date":date}
+        if (any(str(rendered[name]) != value for name, value in expected.items())
+                or " ".join(str(rendered["References"]).split()) != " ".join(refs)
+                or rendered.is_multipart() or rendered.get_payload(decode=True) != action.body.encode("utf-8")):
+            raise ContractError("wire_preview_round_trip_mismatch")
         preview = WirePreview(action_digest=action_digest, source_fingerprint=digest(fresh), source_id=fresh.source_id,
             source_version=fresh.version, sender=action.sender, to=action.to, subject=action.subject, body=action.body,
             message_id=message_id, in_reply_to=fresh.rfc_message_id, references=refs, date=date,

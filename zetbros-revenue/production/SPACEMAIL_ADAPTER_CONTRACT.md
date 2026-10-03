@@ -50,9 +50,12 @@ HTML, attachments, ambiguous routing/thread headers, groups/multiple From or
 Reply-To addresses, unsupported charsets, malformed encodings and unbounded
 references are refused. A missing original Message-ID is refused in this narrow
 workflow. Broader MIME handling requires a separate implementation and review.
+Raw routing/subject encoded words are independently validated with bounded,
+canonical base64 or valid quoted-printable escapes and strict UTF-8/ASCII decode;
+silent Python header repairs and unsupported header charsets are refused.
 
 `SpaceMailRecord` extends the existing source contract with the fixed provider,
-INBOX, UIDVALIDITY, UID, Message-ID and References. The version is a SHA-256 of
+INBOX, UIDVALIDITY, UID, Message-ID, original In-Reply-To and References. The version is a SHA-256 of
 the entire original RFC822 record. Its canonical source fingerprint additionally
 binds the deployment/account identity and visible threading metadata. Mail text
 never grants approval or changes policy.
@@ -67,6 +70,10 @@ References. Base64 preserves the approved body bytes, including Unicode and
 newline choices. Message-ID derives from the full action digest; Date derives
 from its creation time. It emits no attachment, CC or BCC. Wire size and line
 length are bounded.
+References include the source's single In-Reply-To as the RFC 5322 fallback when
+the source has no References. The generated wire must round-trip to the exact
+visible headers and body; encoded-word-looking literal subjects that Python
+would reinterpret are refused before any provider operation.
 
 The visible `WirePreview` includes sender, destination, subject, exact body,
 Message-ID, In-Reply-To, References, Date, source version/fingerprint,
