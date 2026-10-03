@@ -1,0 +1,15 @@
+{
+  "source_commit": null,
+  "source_commit_reason": "Source hashes identify the executed files; commit omitted to avoid circular evidence provenance",
+  "local_source_revision_sha256": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+  "file_sha256": {
+    "demo.py": "9866d281cacaa1a2b0f0b4caa14c7996579ebe60f061e41f582d2dff48f09776",
+    "evaluate_workflows.py": "4c6f70bdb0b1d432a06c3cdd1e041213c2b279bc0baf2bc74514a0c8f84028dd",
+    "proof.py": "9a20a625d587afbb61134ce7c7dc277cf0fce514de41700c10feed0982aebd9e",
+    "run_tests.py": "523889b6b4744be05a1a0ebd0981247abbfb6fb93f691cb9e676ff7968487921",
+    "safety.py": "5cdec9abce90c1d09a36092b289be3b83e8079c7d03382964b1d0dc7df0e7c1c",
+    "tests/test_proof.py": "b52ee1af250e68bb2fdf1f4d967b5b18223db1906206e93b00154810c37557e4",
+    "fixtures/mailbox-v1.json": "c2acab140bd6a3f981ee022518813ea62b9e0d38d77087f86d995cb43ec4da63",
+    "README.md": "0d540d4b0d817e5c26e96145ffbbd8d4a5563667d52ee05f9e03caf80dd51797"
+  }
+}

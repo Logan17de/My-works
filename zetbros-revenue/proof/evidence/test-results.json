@@ -1,0 +1,1754 @@
+{
+  "label": "OFFLINE SYNTHETIC HARNESS, NOT PRODUCTION MAIL MCP TESTS",
+  "executed_at_utc": "2026-10-03T05:19:51.783925+00:00",
+  "fixture_version": "zetbros-synthetic-v1",
+  "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+  "runtime": {
+    "python": "3.12.14",
+    "implementation": "CPython",
+    "platform": "linux",
+    "external_runtime_dependencies": []
+  },
+  "source": {
+    "source_commit": null,
+    "source_commit_reason": "Source hashes identify the executed files; commit omitted to avoid circular evidence provenance",
+    "local_source_revision_sha256": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+    "file_sha256": {
+      "demo.py": "9866d281cacaa1a2b0f0b4caa14c7996579ebe60f061e41f582d2dff48f09776",
+      "evaluate_workflows.py": "4c6f70bdb0b1d432a06c3cdd1e041213c2b279bc0baf2bc74514a0c8f84028dd",
+      "proof.py": "9a20a625d587afbb61134ce7c7dc277cf0fce514de41700c10feed0982aebd9e",
+      "run_tests.py": "523889b6b4744be05a1a0ebd0981247abbfb6fb93f691cb9e676ff7968487921",
+      "safety.py": "5cdec9abce90c1d09a36092b289be3b83e8079c7d03382964b1d0dc7df0e7c1c",
+      "tests/test_proof.py": "b52ee1af250e68bb2fdf1f4d967b5b18223db1906206e93b00154810c37557e4",
+      "fixtures/mailbox-v1.json": "c2acab140bd6a3f981ee022518813ea62b9e0d38d77087f86d995cb43ec4da63",
+      "README.md": "0d540d4b0d817e5c26e96145ffbbd8d4a5563667d52ee05f9e03caf80dd51797"
+    }
+  },
+  "unit_tests": {
+    "executed": 53,
+    "passed": 53,
+    "failed": 0,
+    "skipped": 0,
+    "cases": [
+      {
+        "case_id": "D02",
+        "test": "test_proof.ControlTests.test_accepted_and_copy",
+        "result": "passed",
+        "assertion": "Fake acceptance and Sent copy have separate statuses, neither proves delivery.",
+        "duration_ms": 0.915,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 1,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_accepted_and_copy_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "I03",
+        "test": "test_proof.ControlTests.test_addresses_fail_closed",
+        "result": "passed",
+        "assertion": "Nonfixture, non-.invalid recipient and sender are rejected without fallback.",
+        "duration_ms": 0.465,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_addresses_fail_closed_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P10.pre_submit",
+        "test": "test_proof.ControlTests.test_audit_fail_closed",
+        "result": "passed",
+        "assertion": "Required proposal/decision/start audit failure blocks before fake submission.",
+        "duration_ms": 1.11,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_audit_fail_closed_1",
+            "event_ids": [
+              "demo_event_0001"
+            ]
+          },
+          {
+            "run_id": "demo_run_test_audit_fail_closed_2",
+            "event_ids": [
+              "demo_event_0001"
+            ]
+          },
+          {
+            "run_id": "demo_run_test_audit_fail_closed_3",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "I05",
+        "test": "test_proof.ControlTests.test_bad_references",
+        "result": "passed",
+        "assertion": "Wrong folder, absent/stale IDs and fabricated references produce errors with no guessed target.",
+        "duration_ms": 0.496,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_bad_references_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005",
+              "demo_event_0006",
+              "demo_event_0007"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "I06",
+        "test": "test_proof.ControlTests.test_bounded_inputs",
+        "result": "passed",
+        "assertion": "Result limits, ASCII query encoding and required tool fields are enforced.",
+        "duration_ms": 0.353,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_bounded_inputs_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005",
+              "demo_event_0006",
+              "demo_event_0007",
+              "demo_event_0008",
+              "demo_event_0009",
+              "demo_event_0010",
+              "demo_event_0011"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "D06",
+        "test": "test_proof.ControlTests.test_bounded_read_retry",
+        "result": "passed",
+        "assertion": "Only safe reads retry, within fixed three-attempt upper bound and simulated delay.",
+        "duration_ms": 0.282,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_bounded_read_retry_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005",
+              "demo_event_0006",
+              "demo_event_0007",
+              "demo_event_0008"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P03.cancel",
+        "test": "test_proof.ControlTests.test_cancel_revokes",
+        "result": "passed",
+        "assertion": "Canceling an already approved proposal revokes its unused approval.",
+        "duration_ms": 0.591,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_cancel_revokes_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "D08",
+        "test": "test_proof.ControlTests.test_claim_scorer",
+        "result": "passed",
+        "assertion": "Deterministic scorer rejects an unsupported delivered claim and accepts only the observed synthetic status.",
+        "duration_ms": 0.461,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_claim_scorer_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "D03",
+        "test": "test_proof.ControlTests.test_copy_failure",
+        "result": "passed",
+        "assertion": "Failed Sent copy preserves acceptance and never repairs itself by resending.",
+        "duration_ms": 0.509,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 1,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_copy_failure_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P07.cross_proposal",
+        "test": "test_proof.ControlTests.test_cross_proposal",
+        "result": "passed",
+        "assertion": "Approval cannot be swapped between proposals; exact-action dedup correlates requested and original receipt IDs.",
+        "duration_ms": 0.661,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 1,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_cross_proposal_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005",
+              "demo_event_0006",
+              "demo_event_0007",
+              "demo_event_0008"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P03.deny",
+        "test": "test_proof.ControlTests.test_deny_terminal",
+        "result": "passed",
+        "assertion": "Denial is terminal; later approval or alternate send execution does not reopen it.",
+        "duration_ms": 0.398,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_deny_terminal_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "I07",
+        "test": "test_proof.ControlTests.test_draft",
+        "result": "passed",
+        "assertion": "Draft is stored separately and cannot authorize/send an action.",
+        "duration_ms": 0.339,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_draft_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P02",
+        "test": "test_proof.ControlTests.test_exact_approval",
+        "result": "passed",
+        "assertion": "Local test-owner capability approves exact digest once, with fixture/run/time/actor bindings.",
+        "duration_ms": 0.473,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 1,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_exact_approval_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P05.expiry",
+        "test": "test_proof.ControlTests.test_expiry_boundary",
+        "result": "passed",
+        "assertion": "Exactly-at-expiry is rejected and requires a new proposal/decision.",
+        "duration_ms": 0.386,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_expiry_boundary_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "I01.fixture_schema",
+        "test": "test_proof.ControlTests.test_fixture_schema_before_backend",
+        "result": "passed",
+        "assertion": "Missing workflow metadata and malformed context/fixture types reject before backend creation.",
+        "duration_ms": 2.462,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P04",
+        "test": "test_proof.ControlTests.test_forged_approval",
+        "result": "passed",
+        "assertion": "Absent/forged approver, model boolean/source and foreign capability cannot grant approval.",
+        "duration_ms": 0.431,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_forged_approval_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005",
+              "demo_event_0006",
+              "demo_event_0007"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P05.future",
+        "test": "test_proof.ControlTests.test_future_issued",
+        "result": "passed",
+        "assertion": "Approval cannot be used before its creation time.",
+        "duration_ms": 0.411,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_future_issued_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "I08",
+        "test": "test_proof.ControlTests.test_headers",
+        "result": "passed",
+        "assertion": "Unauthorized sender alias and CRLF in sender, target or subject are rejected.",
+        "duration_ms": 0.38,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_headers_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P07.idempotency_conflict",
+        "test": "test_proof.ControlTests.test_idempotency_conflict",
+        "result": "passed",
+        "assertion": "Reusing a key for a different action rejects; changed repeated payload rejects before cache lookup.",
+        "duration_ms": 0.873,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 1,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_idempotency_conflict_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005",
+              "demo_event_0006",
+              "demo_event_0007"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P07.in_flight",
+        "test": "test_proof.ControlTests.test_inflight_reservation",
+        "result": "passed",
+        "assertion": "Reentrant execution of a new exact-action proposal is blocked by the pre-transport reservation.",
+        "duration_ms": 0.823,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 1,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_inflight_reservation_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005",
+              "demo_event_0006",
+              "demo_event_0007"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.live_context",
+        "test": "test_proof.ControlTests.test_live_context_change",
+        "result": "passed",
+        "assertion": "Changed context, policy, fixture version or original message version invalidates approval.",
+        "duration_ms": 1.335,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_live_context_change_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          },
+          {
+            "run_id": "demo_run_test_live_context_change_2",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          },
+          {
+            "run_id": "demo_run_test_live_context_change_3",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.live_reply_to",
+        "test": "test_proof.ControlTests.test_live_reply_to_change",
+        "result": "passed",
+        "assertion": "Changed fixture Reply-To without version bump invalidates approval, even if reverted later.",
+        "duration_ms": 0.55,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_live_reply_to_change_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P08",
+        "test": "test_proof.ControlTests.test_mail_injection",
+        "result": "passed",
+        "assertion": "Mail-body claims of management approval produce no permission or write.",
+        "duration_ms": 0.246,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mail_injection_1",
+            "event_ids": [
+              "demo_event_0001"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "I06.malformed_types",
+        "test": "test_proof.ControlTests.test_malformed_types",
+        "result": "passed",
+        "assertion": "Malformed sender, recipient, CC, folder and tool types fail with typed errors and minimized rejection events.",
+        "duration_ms": 0.452,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_malformed_types_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005",
+              "demo_event_0006",
+              "demo_event_0007",
+              "demo_event_0008",
+              "demo_event_0009",
+              "demo_event_0010",
+              "demo_event_0011",
+              "demo_event_0012",
+              "demo_event_0013"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.body",
+        "test": "test_proof.ControlTests.test_mutation_body",
+        "result": "passed",
+        "assertion": "Changing exact approved body invalidates action and causes zero transport calls.",
+        "duration_ms": 0.474,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mutation_body_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.cc",
+        "test": "test_proof.ControlTests.test_mutation_cc",
+        "result": "passed",
+        "assertion": "Changing exact approved cc invalidates action and causes zero transport calls.",
+        "duration_ms": 0.411,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mutation_cc_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.context_digest",
+        "test": "test_proof.ControlTests.test_mutation_context_digest",
+        "result": "passed",
+        "assertion": "Changing exact approved context_digest invalidates action and causes zero transport calls.",
+        "duration_ms": 0.45,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mutation_context_digest_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.fixture_digest",
+        "test": "test_proof.ControlTests.test_mutation_fixture_digest",
+        "result": "passed",
+        "assertion": "Changing exact approved fixture_digest invalidates action and causes zero transport calls.",
+        "duration_ms": 0.393,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mutation_fixture_digest_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.fixture_version",
+        "test": "test_proof.ControlTests.test_mutation_fixture_version",
+        "result": "passed",
+        "assertion": "Changing exact approved fixture_version invalidates action and causes zero transport calls.",
+        "duration_ms": 0.363,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mutation_fixture_version_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.operation",
+        "test": "test_proof.ControlTests.test_mutation_operation",
+        "result": "passed",
+        "assertion": "Changing exact approved operation invalidates action and causes zero transport calls.",
+        "duration_ms": 0.407,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mutation_operation_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.original_folder",
+        "test": "test_proof.ControlTests.test_mutation_original_folder",
+        "result": "passed",
+        "assertion": "Changing exact approved original_folder invalidates action and causes zero transport calls.",
+        "duration_ms": 0.362,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mutation_original_folder_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.original_message_digest",
+        "test": "test_proof.ControlTests.test_mutation_original_message_digest",
+        "result": "passed",
+        "assertion": "Changing exact approved original_message_digest invalidates action and causes zero transport calls.",
+        "duration_ms": 0.389,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mutation_original_message_digest_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.original_message_id",
+        "test": "test_proof.ControlTests.test_mutation_original_message_id",
+        "result": "passed",
+        "assertion": "Changing exact approved original_message_id invalidates action and causes zero transport calls.",
+        "duration_ms": 0.369,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mutation_original_message_id_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.original_message_version",
+        "test": "test_proof.ControlTests.test_mutation_original_message_version",
+        "result": "passed",
+        "assertion": "Changing exact approved original_message_version invalidates action and causes zero transport calls.",
+        "duration_ms": 0.45,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mutation_original_message_version_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.sender",
+        "test": "test_proof.ControlTests.test_mutation_sender",
+        "result": "passed",
+        "assertion": "Changing exact approved sender invalidates action and causes zero transport calls.",
+        "duration_ms": 0.444,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mutation_sender_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.subject",
+        "test": "test_proof.ControlTests.test_mutation_subject",
+        "result": "passed",
+        "assertion": "Changing exact approved subject invalidates action and causes zero transport calls.",
+        "duration_ms": 0.376,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mutation_subject_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.to",
+        "test": "test_proof.ControlTests.test_mutation_to",
+        "result": "passed",
+        "assertion": "Changing exact approved to invalidates action and causes zero transport calls.",
+        "duration_ms": 0.453,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mutation_to_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.tool_name",
+        "test": "test_proof.ControlTests.test_mutation_tool_name",
+        "result": "passed",
+        "assertion": "Changing exact approved tool_name invalidates action and causes zero transport calls.",
+        "duration_ms": 0.376,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_mutation_tool_name_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "I02",
+        "test": "test_proof.ControlTests.test_network_guard",
+        "result": "passed",
+        "assertion": "Socket, SMTP, IMAP, DNS, HTTP and subprocess network routes are denied before transport.",
+        "duration_ms": 6.592,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 7,
+        "trace_refs": [],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "I02.provider_spies",
+        "test": "test_proof.ControlTests.test_no_provider_constructors",
+        "result": "passed",
+        "assertion": "Full synthetic flow never constructs SMTP, IMAP, socket or HTTP clients, even disconnected ones.",
+        "duration_ms": 2.209,
+        "fake_transport_call_count": 3,
+        "fake_outbox_count": 2,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_no_provider_constructors_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005",
+              "demo_event_0006",
+              "demo_event_0007",
+              "demo_event_0008",
+              "demo_event_0009",
+              "demo_event_0010",
+              "demo_event_0011",
+              "demo_event_0012",
+              "demo_event_0013",
+              "demo_event_0014",
+              "demo_event_0015",
+              "demo_event_0016",
+              "demo_event_0017",
+              "demo_event_0018",
+              "demo_event_0019",
+              "demo_event_0020",
+              "demo_event_0021",
+              "demo_event_0022",
+              "demo_event_0023",
+              "demo_event_0024",
+              "demo_event_0025"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "D05",
+        "test": "test_proof.ControlTests.test_partial",
+        "result": "passed",
+        "assertion": "Partial acceptance records accepted/rejected recipients separately and never automatically resends.",
+        "duration_ms": 0.599,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 1,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_partial_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P01",
+        "test": "test_proof.ControlTests.test_pending",
+        "result": "passed",
+        "assertion": "Pending proposal and direct backend invocation cannot submit.",
+        "duration_ms": 0.366,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_pending_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P09",
+        "test": "test_proof.ControlTests.test_permission_subset",
+        "result": "passed",
+        "assertion": "Unknown/out-of-profile tools and approval/execution calls through tools are denied.",
+        "duration_ms": 0.272,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_permission_subset_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005",
+              "demo_event_0006",
+              "demo_event_0007"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P10.post_submit",
+        "test": "test_proof.ControlTests.test_post_send_audit_failure",
+        "result": "passed",
+        "assertion": "Failed post-submission trace retains terminal acceptance; no automatic/new-key resend.",
+        "duration_ms": 0.538,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 1,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_post_send_audit_failure_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P06.preview_copy",
+        "test": "test_proof.ControlTests.test_preview_copy",
+        "result": "passed",
+        "assertion": "Mutating returned preview/CC cannot mutate stored action; forged preview digest is rejected.",
+        "duration_ms": 0.347,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_preview_copy_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "I04",
+        "test": "test_proof.ControlTests.test_reads",
+        "result": "passed",
+        "assertion": "List/search/read return exact fixtures and never mutate the read flag.",
+        "duration_ms": 0.401,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_reads_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "D01",
+        "test": "test_proof.ControlTests.test_rejected",
+        "result": "passed",
+        "assertion": "Explicit pre-submission fake rejection is failed, never delivered, attempted once.",
+        "duration_ms": 0.474,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_rejected_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "P07.replay",
+        "test": "test_proof.ControlTests.test_replay",
+        "result": "passed",
+        "assertion": "Repeated approve/execute returns one receipt; a fresh key cannot resend consumed permission.",
+        "duration_ms": 0.546,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 1,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_replay_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005",
+              "demo_event_0006"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "I09",
+        "test": "test_proof.ControlTests.test_reply_to",
+        "result": "passed",
+        "assertion": "Reply-To is the preview and transport destination; no reply-all or From fallback.",
+        "duration_ms": 1.241,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 1,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_reply_to_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "I01",
+        "test": "test_proof.ControlTests.test_start_fail_closed",
+        "result": "passed",
+        "assertion": "Unknown mode, missing/invalid fixtures fail before any fake backend creation.",
+        "duration_ms": 0.347,
+        "fake_transport_call_count": 0,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "D07",
+        "test": "test_proof.ControlTests.test_trace_redaction",
+        "result": "passed",
+        "assertion": "Trace schema is complete and omits body/subject, canary credentials and raw exception data.",
+        "duration_ms": 0.787,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 1,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_trace_redaction_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "D04.uncertain",
+        "test": "test_proof.ControlTests.test_uncertain_no_resend",
+        "result": "passed",
+        "assertion": "Unknown submission is terminal and remains uncertain on replay or a newly approved exact-action proposal.",
+        "duration_ms": 0.748,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_uncertain_no_resend_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005",
+              "demo_event_0006",
+              "demo_event_0007",
+              "demo_event_0008",
+              "demo_event_0009"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      },
+      {
+        "case_id": "D04.exception",
+        "test": "test_proof.ControlTests.test_unexpected_exception",
+        "result": "passed",
+        "assertion": "Unexpected adapter exception after invocation returns sanitized uncertainty, never a retryable success/failure.",
+        "duration_ms": 0.481,
+        "fake_transport_call_count": 1,
+        "fake_outbox_count": 0,
+        "external_transport_call_count": 0,
+        "unapproved_fake_submission_count": 0,
+        "duplicate_fake_submission_count": 0,
+        "blocked_network_attempts": 0,
+        "trace_refs": [
+          {
+            "run_id": "demo_run_test_unexpected_exception_1",
+            "event_ids": [
+              "demo_event_0001",
+              "demo_event_0002",
+              "demo_event_0003",
+              "demo_event_0004",
+              "demo_event_0005"
+            ]
+          }
+        ],
+        "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b",
+        "source_commit": null,
+        "fixture_version": "zetbros-synthetic-v1",
+        "runtime": "3.12.14"
+      }
+    ]
+  },
+  "control_matrix": [
+    {
+      "case_id": "D01",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "D02",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "D03",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "D04",
+      "status": "passed",
+      "executed_cases": 2
+    },
+    {
+      "case_id": "D05",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "D06",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "D07",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "D08",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "I01",
+      "status": "passed",
+      "executed_cases": 2
+    },
+    {
+      "case_id": "I02",
+      "status": "passed",
+      "executed_cases": 2
+    },
+    {
+      "case_id": "I03",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "I04",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "I05",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "I06",
+      "status": "passed",
+      "executed_cases": 2
+    },
+    {
+      "case_id": "I07",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "I08",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "I09",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "P01",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "P02",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "P03",
+      "status": "passed",
+      "executed_cases": 2
+    },
+    {
+      "case_id": "P04",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "P05",
+      "status": "passed",
+      "executed_cases": 2
+    },
+    {
+      "case_id": "P06",
+      "status": "passed",
+      "executed_cases": 17
+    },
+    {
+      "case_id": "P07",
+      "status": "passed",
+      "executed_cases": 4
+    },
+    {
+      "case_id": "P08",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "P09",
+      "status": "passed",
+      "executed_cases": 1
+    },
+    {
+      "case_id": "P10",
+      "status": "passed",
+      "executed_cases": 2
+    },
+    {
+      "case_id": "I10",
+      "status": "excluded",
+      "reason": "Attachment tools not exposed or changed"
+    },
+    {
+      "case_id": "I11",
+      "status": "excluded",
+      "reason": "Move/archive/delete tools not exposed or changed"
+    }
+  ],
+  "scripted_workflows": {
+    "passed": 10,
+    "failed": 0,
+    "evidence_file": "workflow-results.json"
+  },
+  "scope_status": {
+    "production_mail_mcp": {
+      "status": "not_run",
+      "reason": "Standalone harness only; no production Mail MCP implementation tested"
+    },
+    "real_provider_connectivity_delivery": {
+      "status": "not_run",
+      "reason": "Synthetic-only scope; no live transport"
+    },
+    "actual_model_client_evaluations": {
+      "status": "not_run",
+      "count": 10,
+      "reason": "No model/client invoked; no model spend or live integration scoped"
+    },
+    "durability_restart_crash_multiuser_concurrency": {
+      "status": "not_run",
+      "reason": "Single-process in-memory scope"
+    },
+    "website_W01_to_W10": {
+      "status": "excluded",
+      "reason": "Website source and website checks are outside this standalone proof"
+    }
+  },
+  "critical_gates": {
+    "external_transport_calls": 0,
+    "unapproved_fake_submissions": 0,
+    "duplicate_fake_submissions": 0,
+    "automatic_send_retries": 0,
+    "gate_basis": "Passing deterministic cases, constructor spies and Python audit-event denies; not packet capture or OS sandbox certification",
+    "network_guard_blocked_events": [
+      "socket.__new__",
+      "socket.getaddrinfo",
+      "socket.getaddrinfo",
+      "smtplib.connect",
+      "imaplib.open",
+      "urllib.Request",
+      "subprocess.Popen"
+    ],
+    "scripted_replay_fake_attempts": 2,
+    "scripted_replay_known_accepted_outbox": 1
+  },
+  "model_invoked": false,
+  "production_mail_mcp_tested": false
+}

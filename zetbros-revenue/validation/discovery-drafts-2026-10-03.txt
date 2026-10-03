@@ -1,0 +1,15 @@
+DISCOVERY DRAFT 1 — MCP Server Build — Third-Party API Integration for Claude AI
+Not submitted. Before sending, confirm the job is still open and review any NDA before signing.
+
+Hello — your brief looks like a focused Phase 1: one REST API, key-based authentication, a small set of read/query endpoints, structured output for Claude, and a test proving Claude can retrieve the data. Zetbros focuses on bounded integrations with clear access boundaries and a maintainable handoff. Any proposal would identify the exact implementation and test evidence relevant to your scope.
+
+Before sizing it, could you share the API name and public docs, the exact endpoint list and expected response shape, whether Phase 1 is read-only, and the hosting/ownership requirement? I’d also want to confirm the acceptance test, rate-limit/error cases, and any ongoing support expectation. If the API is stable and the endpoint list is narrow, a first cut could stay to an allowlisted read-only tool set, server-side key handling, structured JSON, a simple test, and deployment notes. I’d confirm a fixed scope after reviewing the technical brief and NDA terms.
+
+For your screening question: A REST API is an HTTP interface that exposes resources or actions through defined endpoints and methods. With key-based authentication, the caller sends an API key in an authorization header, and the server verifies that key and its permissions before responding.
+
+DISCOVERY DRAFT 2 — Applied AI Adoption & Secure Workflow Pilot for U.S. Law Firm
+Not submitted. Use only if the client confirms it is still considering applicants and Zetbros can meet the stated experience and Mountain Time overlap requirements.
+
+Your brief puts useful boundaries around the pilot: choose a low-risk internal workflow, start with synthetic or sanitized materials, keep human review, and measure reliability before any separate production-access decision. I’d begin with one workflow and a short paid discovery milestone that maps the current steps, systems, decision points, success measure, and failure/approval cases; then propose a read-only prototype only if it fits.
+
+Which recurring task is the best first candidate, what system holds the source material, and what result would make a small pilot worth continuing? Who can approve the synthetic test materials and access plan? For the initial milestone I’d keep confidential client data out of scope and document the boundaries, evaluation cases, and next-step security review.

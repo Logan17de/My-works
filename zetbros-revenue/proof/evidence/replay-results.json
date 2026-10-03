@@ -1,0 +1,126 @@
+{
+  "label": "OFFLINE SYNTHETIC ONLY: deterministic workflow; fake in-memory transport; no real Mail MCP or delivery.",
+  "fixture_version": "zetbros-synthetic-v1",
+  "decision_source": "scripted_test_fixture",
+  "model_invoked": false,
+  "production_mail_mcp_tested": false,
+  "transport_kind": "in_memory_fake",
+  "fake_transport_attempts": 2,
+  "accepted_fake_outbox_entries": 1,
+  "fake_drafts": 2,
+  "automatic_send_retries": 0,
+  "external_transport_calls": 0,
+  "observations": [
+    {
+      "scenario": "guide",
+      "outcome": {
+        "proposal_id": "demo_proposal_0001",
+        "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+        "status": "simulated_accepted",
+        "simulated_submission_status": "accepted",
+        "sent_copy_status": "copied",
+        "accepted_recipients": [
+          "sam@customer.invalid"
+        ],
+        "rejected_recipients": [],
+        "unknown_recipients": [],
+        "error_class": null,
+        "retry_count": 0,
+        "delivered": false,
+        "synthetic": true,
+        "duplicate": false,
+        "audit_status": "recorded",
+        "receipt_proposal_id": null
+      },
+      "replay": {
+        "proposal_id": "demo_proposal_0001",
+        "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+        "status": "simulated_accepted",
+        "simulated_submission_status": "accepted",
+        "sent_copy_status": "copied",
+        "accepted_recipients": [
+          "sam@customer.invalid"
+        ],
+        "rejected_recipients": [],
+        "unknown_recipients": [],
+        "error_class": null,
+        "retry_count": 0,
+        "delivered": false,
+        "synthetic": true,
+        "duplicate": true,
+        "audit_status": "recorded",
+        "receipt_proposal_id": "demo_proposal_0001"
+      }
+    },
+    {
+      "scenario": "denial",
+      "decision": {
+        "proposal_id": "demo_proposal_0002",
+        "state": "denied",
+        "decision_source": "scripted_test_fixture",
+        "previous_state": "awaiting_approval"
+      }
+    },
+    {
+      "scenario": "demo_msg_02",
+      "kind": "draft_only",
+      "summary": "Synthetic escalation draft only; no refund or send."
+    },
+    {
+      "scenario": "demo_msg_03",
+      "kind": "blocked_untrusted_request",
+      "summary": "Mail instructions cannot authorize sends, exfiltration or permission changes."
+    },
+    {
+      "scenario": "demo_msg_04",
+      "kind": "draft_only",
+      "summary": "Synthetic clarification draft only; account identifier is missing."
+    },
+    {
+      "scenario": "demo_msg_07",
+      "kind": "summary_only",
+      "summary": "Resolved fixture; no action needed."
+    },
+    {
+      "scenario": "uncertain",
+      "outcome": {
+        "proposal_id": "demo_proposal_0005",
+        "action_digest": "09706852d5b07bdac1d25aaa9d3e5b653f881a726a7da214ab186dd798f5a435",
+        "status": "uncertain",
+        "simulated_submission_status": "unknown",
+        "sent_copy_status": "not_attempted",
+        "accepted_recipients": [],
+        "rejected_recipients": [],
+        "unknown_recipients": [
+          "alex@customer.invalid"
+        ],
+        "error_class": "fake_interruption",
+        "retry_count": 0,
+        "delivered": false,
+        "synthetic": true,
+        "duplicate": false,
+        "audit_status": "recorded",
+        "receipt_proposal_id": null
+      },
+      "replay": {
+        "proposal_id": "demo_proposal_0005",
+        "action_digest": "09706852d5b07bdac1d25aaa9d3e5b653f881a726a7da214ab186dd798f5a435",
+        "status": "uncertain",
+        "simulated_submission_status": "unknown",
+        "sent_copy_status": "not_attempted",
+        "accepted_recipients": [],
+        "rejected_recipients": [],
+        "unknown_recipients": [
+          "alex@customer.invalid"
+        ],
+        "error_class": "fake_interruption",
+        "retry_count": 0,
+        "delivered": false,
+        "synthetic": true,
+        "duplicate": true,
+        "audit_status": "recorded",
+        "receipt_proposal_id": "demo_proposal_0005"
+      }
+    }
+  ]
+}
