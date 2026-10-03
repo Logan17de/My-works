@@ -13,6 +13,7 @@ buyer research. Prepared on 3 October 2026.
 - [Technical scope and limitations](technical/README.md)
 - [Executed control matrix](technical/test-matrix.md)
 - [Verification summary](proof/evidence/verification-summary.md)
+- [Implemented, unpublished service-page patch](website-preview/SERVICE_PAGE_HANDOFF.md)
 
 ## Run the proof
 
@@ -46,6 +47,7 @@ and durations, so those files can appear modified in Git.
 - Proposed USD 300 audit and qualified USD 1,500 read-only pilot, with discovery,
   scope, acceptance, handoff, and labor-inclusive economics
 - Dated public buyer research and two unsent discovery drafts
+- A narrow `/agents` website patch with recorded automated results; unpublished
 
 The prices are planning hypotheses. Buyer-posted budgets are not earned revenue,
 accepted customer terms, or proof that a buyer wants Zetbros' service. Check live
@@ -64,10 +66,13 @@ Python guard blocks the tested socket/network/subprocess paths, but it is not an
 OS sandbox. Developer code inside the process remains trusted. Read the proof's
 full limitations before drawing conclusions from a passing test.
 
-The website update is pending separately. No unfinished website source or build
-output is included in this package, and this GitHub publication does not deploy
-the website. No prospect demo, outreach, customer contract, or live-mail action
-was performed by this package.
+The website service page is implemented and unpublished. `website-preview/`
+contains only the narrow three-file patch and its review handoff. Final build and
+TypeScript checks passed, along with 6 Worker tests and 19 static tests. Browser
+UI verification is blocked and incomplete, so no visual or interaction pass is
+claimed. The full website checkout and build output are not included, and this
+GitHub publication does not deploy the website. No prospect demo, outreach,
+customer contract, or live-mail action was performed by this package.
 
 Existing repository content is preserved. This package is self-contained under
 `zetbros-revenue/` and does not change the repository's other projects.

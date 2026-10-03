@@ -81,6 +81,6 @@ is invoked, so these scores do not measure general reasoning or tool selection.
 ## Exclusions
 
 - I10 attachments and I11 move/archive/delete: not exposed
-- Website checks: outside this package; website work is pending separately
+- Website checks: outside this offline proof; the included unpublished patch has separate automated results and blocked browser UI verification
 - Existing live Mail MCP, provider transport/delivery, and actual model/client evaluations: not run
 - Durable state, crash/restart recovery, authenticated multi-user identity, and parallel/distributed concurrency: not run

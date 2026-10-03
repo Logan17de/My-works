@@ -75,5 +75,8 @@ commercial entry pilot is bounded to one documented API, one account/operator,
 one selected client, and at most three read-only tools. Live writes need their
 own qualification and scope.
 
-The website update is separate and pending. No website or production deployment
-is included or validated by this proof package.
+The website service-page patch is implemented and unpublished; see
+`../website-preview/SERVICE_PAGE_HANDOFF.md`. Its recorded final checks passed
+(build, TypeScript, 6 Worker tests and 19 static tests). Browser UI verification
+is blocked and incomplete. Those results are separate from the offline proof.
+No website or production deployment is performed by this package.
