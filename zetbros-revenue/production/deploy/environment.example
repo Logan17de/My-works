@@ -1,0 +1,4 @@
+# This release loads one explicit deployment config. No .env discovery or credentials.
+ZETBROS_CONFIG_FILE=/opt/zetbros-config/config.json
+# TLS termination, request/header timeouts, 32 KiB body limits and traffic limits
+# belong to the existing customer-approved reverse proxy. Do not expose 8081 publicly.

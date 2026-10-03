@@ -1,0 +1,25 @@
+# Review-only template. Installing it changes security/system settings and needs authorization.
+[Unit]
+Description=Zetbros single-deployment support reply control service
+After=network.target
+
+[Service]
+Type=simple
+User=zetbros-existing-service-user
+Group=zetbros-existing-service-group
+WorkingDirectory=/opt/zetbros/production
+Environment=ZETBROS_CONFIG_FILE=/opt/zetbros-config/config.json
+ExecStart=/opt/zetbros/production/.venv/bin/python -m uvicorn zetbros_service.api:configured_app --factory --host 127.0.0.1 --port 8081 --workers 1 --no-access-log --timeout-keep-alive 5 --limit-concurrency 32 --timeout-graceful-shutdown 30
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/zetbros
+ReadOnlyPaths=/opt/zetbros-config /opt/zetbros-sources
+
+[Install]
+WantedBy=multi-user.target
