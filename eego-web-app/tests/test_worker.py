@@ -90,12 +90,18 @@ class WorkerTests(unittest.TestCase):
             self.assertNotIn('answer',run.call_args.args[1]['properties'])
     def test_answer_check_receives_the_question_and_submitted_answer(self):
         codex=object.__new__(w.Codex)
-        f={'correct':False,'answer':self.q['answer'],'explanationJa':self.q['explanationJa'],'translationJa':self.q['translationJa']}
+        f={'correct':False,'answer':self.q['answer'],'explanationEn':'Use this verb to talk about reaching a goal.','explanationJa':self.q['explanationJa'],'suggestionEn':'Remember: achieve a goal.','suggestionJa':'achieve a goal の形で覚えましょう。','exampleEn':'She achieved her goal.','exampleJa':'彼女は目標を達成しました。','translationJa':self.q['translationJa']}
         with patch.object(codex,'run',return_value=f) as run:
             self.assertEqual(codex.check_answer({'question':{'sentence':self.q['sentence']},'target':{'id':self.q['itemId']},'choice':'banana'}),f)
             self.assertEqual(run.call_count,1)
             self.assertIn('banana',run.call_args.args[0])
             self.assertIn(self.q['sentence'],run.call_args.args[0])
+            self.assertEqual(set(run.call_args.args[1]['properties']),set(w.FEEDBACK_FIELDS))
+    def test_feedback_requires_both_languages_and_a_learning_suggestion(self):
+        f={'correct':True,'answer':'avoid','explanationEn':'Avoid takes a noun or an -ing form.','explanationJa':'avoid の後には名詞か動名詞を置きます。','suggestionEn':'Try avoid plus an -ing verb.','suggestionJa':'avoid と動名詞の組み合わせを練習しましょう。','exampleEn':'I avoid driving at night.','exampleJa':'夜に運転するのを避けます。','translationJa':'私は混雑した場所を避けます。'}
+        self.assertEqual(w.validate_feedback(f),f)
+        for field in ('explanationEn','explanationJa','suggestionEn','suggestionJa','exampleEn','exampleJa'):
+            with self.assertRaises(ValueError):w.validate_feedback({**f,field:''})
     def test_incomplete_answer_feedback_fails_format_check(self):
         with self.assertRaises(ValueError):w.validate_feedback({'correct':True,'answer':'x'})
         with self.assertRaises(ValueError):w.validate_feedback({'correct':'true','answer':'x','explanationJa':'説明です。','translationJa':'日本語です。'})

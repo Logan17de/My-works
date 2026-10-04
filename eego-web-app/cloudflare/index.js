@@ -22,6 +22,7 @@ const iso=n=>new Date(n).toISOString();
 const normalize=s=>s.normalize('NFKC').replace(/[’‘]/g,"'").trim().replace(/\s+/g,' ').toLowerCase();
 const text=(v,max=160)=>typeof v==='string'&&v.length<=max?v:'';
 const asInt=(v,min,max,def)=>Number.isInteger(v)&&v>=min&&v<=max?v:def;
+const FEEDBACK_FIELDS=['correct','answer','explanationEn','explanationJa','suggestionEn','suggestionJa','exampleEn','exampleJa','translationJa'];
 async function boundedJson(request){
  if(!request.headers.get('content-type')?.startsWith('application/json'))fail(415,'JSON required.');
  const reader=request.body?.getReader();if(!reader)fail(400,'A request is required.');
@@ -104,8 +105,9 @@ async function completeTask(db,data){
   statements.push(stmt(db,`UPDATE codex_tasks SET question_id=?,result=?,state='completed',error=NULL WHERE id=? AND ${guard}`,[id,JSON.stringify({questionId:id}),task.id,...valid]));
  }else{
   const f=data.feedback;
-  if(!f||Object.keys(f).sort().join(',')!=='answer,correct,explanationJa,translationJa'||typeof f.correct!=='boolean'||typeof f.answer!=='string'||!f.answer.trim()||f.answer.length>160)fail(400,'Invalid answer check format.');
-  for(const [key,max] of [['explanationJa',1500],['translationJa',1000]])if(typeof f[key]!=='string'||!f[key].trim()||f[key].length>max||!/[ぁ-んァ-ヶ一-龯]/.test(f[key]))fail(400,'Japanese feedback is required.');
+  if(!f||Object.keys(f).sort().join(',')!==[...FEEDBACK_FIELDS].sort().join(',')||typeof f.correct!=='boolean'||typeof f.answer!=='string'||!f.answer.trim()||f.answer.length>160)fail(400,'Invalid answer check format.');
+  for(const [key,max] of [['explanationJa',1500],['suggestionJa',1000],['exampleJa',1000],['translationJa',1000]])if(typeof f[key]!=='string'||!f[key].trim()||f[key].length>max||!/[ぁ-んァ-ヶ一-龯]/.test(f[key]))fail(400,'Japanese feedback is required.');
+  for(const key of ['explanationEn','suggestionEn','exampleEn'])if(typeof f[key]!=='string'||!f[key].trim()||f[key].length>1000||!/[A-Za-z]/.test(f[key]))fail(400,'English feedback is required.');
   const practice=await first(db,'SELECT * FROM practice WHERE id=?',[task.session_id]);
   const q=await first(db,'SELECT q.*,i.label,i.meaning_ja FROM questions q JOIN items i ON i.id=q.item_id WHERE q.id=?',[task.question_id]);
   const prev=await first(db,'SELECT * FROM mastery WHERE user_id=? AND item_id=?',[practice.user_id,q.item_id]);
@@ -114,7 +116,7 @@ async function completeTask(db,data){
   if(!correct||unsure){weak=true;recovery=0;due=now+10*60000;}
   else if(weak&&due<=now&&prev.last_question!==q.id){recovery=Math.min(3,recovery+1);weak=recovery<3;due=now+([1,3,7][recovery-1])*DAY;}
   else if(!weak)due=now+7*DAY;
-  const feedback={correct,unsure,choice:task.choice,answer:f.answer,sentence:q.sentence,itemId:q.item_id,label:q.label,meaningJa:q.meaning_ja,explanationJa:f.explanationJa,translationJa:f.translationJa,weak,recovery,nextDue:iso(due),checkedBy:'Codex'};
+  const feedback={...f,correct,unsure,choice:task.choice,sentence:q.sentence,itemId:q.item_id,label:q.label,meaningJa:q.meaning_ja,weak,recovery,nextDue:iso(due),checkedBy:'Codex'};
   const id=crypto.randomUUID();
   statements.push(stmt(db,`INSERT OR IGNORE INTO attempts(id,user_id,session_id,question_id,item_id,choice,correct,unsure,created_at,feedback) SELECT ?,?,?,?,?,?,?,?,?,? WHERE ${guard}`,[id,practice.user_id,practice.id,q.id,q.item_id,task.choice,Number(correct),Number(unsure),now,JSON.stringify(feedback),...valid]));
   statements.push(stmt(db,'INSERT INTO mastery(user_id,item_id,seen,correct,weak,recovery,next_due,last_question) SELECT ?,?,1,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM attempts WHERE id=?) ON CONFLICT(user_id,item_id) DO UPDATE SET seen=mastery.seen+1,correct=mastery.correct+excluded.correct,weak=excluded.weak,recovery=excluded.recovery,next_due=excluded.next_due,last_question=excluded.last_question',[practice.user_id,q.item_id,Number(correct),Number(weak),recovery,due,q.id,id]));

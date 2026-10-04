@@ -28,8 +28,9 @@ QUESTION_SCHEMA = {'type':'object','additionalProperties':False,'required':['que
   **{k:{'type':'string'} for k in FIELDS}}}}}}
 PROMPT_FIELDS=['itemId','sentence','hintJa']
 PROMPT_SCHEMA={'type':'object','additionalProperties':False,'required':PROMPT_FIELDS,'properties':{k:{'type':'string'} for k in PROMPT_FIELDS}}
-FEEDBACK_SCHEMA={'type':'object','additionalProperties':False,'required':['correct','answer','explanationJa','translationJa'],'properties':{
- 'correct':{'type':'boolean'},**{k:{'type':'string'} for k in ['answer','explanationJa','translationJa']}}}
+FEEDBACK_FIELDS=['correct','answer','explanationEn','explanationJa','suggestionEn','suggestionJa','exampleEn','exampleJa','translationJa']
+FEEDBACK_SCHEMA={'type':'object','additionalProperties':False,'required':FEEDBACK_FIELDS,'properties':{
+ 'correct':{'type':'boolean'},**{k:{'type':'string'} for k in FEEDBACK_FIELDS if k!='correct'}}}
 STOP = threading.Event()
 
 
@@ -92,11 +93,13 @@ def validate_question(result: object, job: dict) -> dict:
 
 
 def validate_feedback(result: object) -> dict:
-    if not isinstance(result,dict) or set(result)!={'correct','answer','explanationJa','translationJa'}: raise ValueError('Incorrect feedback fields.')
+    if not isinstance(result,dict) or set(result)!=set(FEEDBACK_FIELDS): raise ValueError('Incorrect feedback fields.')
     if not isinstance(result['correct'],bool): raise ValueError('Correctness must be a boolean.')
     if not isinstance(result['answer'],str) or not 1<=len(result['answer'].strip())<=160: raise ValueError('An answer is required.')
-    for k,max_size in [('explanationJa',1500),('translationJa',1000)]:
+    for k,max_size in [('explanationJa',1500),('suggestionJa',1000),('exampleJa',1000),('translationJa',1000)]:
         if not isinstance(result[k],str) or not 1<=len(result[k])<=max_size or not re.search('[ぁ-んァ-ヶ一-龯]',result[k]): raise ValueError('Japanese feedback is required.')
+    for k in ['explanationEn','suggestionEn','exampleEn']:
+        if not isinstance(result[k],str) or not 3<=len(result[k])<=1000 or not re.search('[A-Za-z]',result[k]): raise ValueError('English feedback is required.')
     return result
 
 
@@ -208,8 +211,14 @@ class Codex:
                 'Accept valid alternative expressions; ignore capitalization and harmless extra whitespace. '
                 'A referenceAnswer, when present, is guidance, not the only acceptable wording. '
                 'If correct, put the learner’s accepted word or phrase in answer; otherwise give a correct completion. '
-                'Write explanationJa as 1–2 short Japanese sentences explaining this answer and any correction. '
-                'translationJa is the Japanese translation of the completed sentence using answer. No URLs or markup.\n'
+                'Give valuable, specific learning feedback in BOTH English and Japanese. '
+                'explanationEn/explanationJa: explain WHY the completion fits this context and a transferable usage or grammar rule; '
+                'if incorrect, explain why the learner’s choice does not fit. If correct, reinforce what they understood. '
+                'suggestionEn/suggestionJa: one concrete next step or memory cue tailored to this answer; avoid generic advice like "practise more". '
+                'exampleEn/exampleJa: one new natural example illustrating the rule, with its Japanese translation. '
+                'Keep English at the learner’s level, explanations to 1–2 short sentences, and suggestions to one sentence. '
+                'The Japanese version should convey the same teaching points. '
+                'translationJa is the Japanese translation of the original completed sentence using answer. No URLs or markup.\n'
                 +json.dumps(data,ensure_ascii=False,separators=(',',':')))
         started=time.monotonic();result=self.run(prompt,FEEDBACK_SCHEMA,timeout=120)
         model_seconds=round(time.monotonic()-started,1);check_started=time.monotonic()

@@ -16,3 +16,4 @@ body{font-size:16px}.small,.field,.text-button,.btn,.option,.check,.hint,.feedba
 .translation-label{display:block;margin-bottom:6px;font-size:14px;font-weight:700;color:var(--green)}
 .question-translation p{margin:0;font-size:16px;line-height:1.8}
 .preparation{text-align:center;padding:48px 24px}.preparation .symbol{font-size:48px;color:#6c8a43;margin-bottom:20px}.preparation p{font-size:16px}.check-progress,.next-status{font-size:14px;line-height:1.6;color:var(--green);margin:18px 0 0}.state.active{background:#dbe6bb;color:var(--green)}
+.feedback-learning{display:grid;gap:18px;margin:22px 0}.feedback-pair{padding-top:18px;border-top:1px solid var(--line)}.feedback-pair h4{font-size:16px;margin:0 0 10px}.feedback-pair p{font-size:16px;line-height:1.7;margin:0 0 8px}.feedback-pair p[lang=ja]{color:var(--muted)}.checked-sentence{font-size:18px!important;line-height:1.65}
