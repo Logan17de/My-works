@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import host from '../dist/server/index.js';
 let forwarded;
-globalThis.fetch=async(url,opts)=>{forwarded={url,opts};return new Response('{"username":"Test"}',{headers:{'Set-Cookie':'__Host-eego_session=test; Path=/; HttpOnly; Secure; SameSite=Strict'}});};
+const token='a'.repeat(64);
+const expectedCookie=`__Host-eego_session=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000`;
+const cloudflareCookie='__cf_bm=unrelated; HttpOnly; Secure; Path=/; Domain=supabase.co; Expires=Sun, 04 Oct 2026 06:35:37 GMT';
+let upstreamCookie=`${expectedCookie}, ${cloudflareCookie}`;
+globalThis.fetch=async(url,opts)=>{forwarded={url,opts};return new Response('{"username":"Test"}',{headers:{'Set-Cookie':upstreamCookie}});};
 const req=(headers={},body='{}')=>new Request('https://eego.example/api/eego',{method:'POST',headers:{'content-type':'application/json','x-eego':'1',...headers},body});
 assert.equal((await host.fetch(new Request('https://eego.example/'))).status,200);
 assert.equal((await host.fetch(new Request('https://eego.example/not-a-file'))).status,404);
@@ -15,9 +19,18 @@ assert.equal(forwarded.opts.headers.Cookie,'__Host-eego_session=abc');
 assert.equal(forwarded.opts.headers['X-Real-IP'],'192.0.2.1');
 assert.equal(forwarded.opts.headers.authorization,undefined);
 assert.equal(forwarded.opts.redirect,'manual');
-assert.match(response.headers.get('set-cookie'),/HttpOnly; Secure/);
+assert.equal(response.headers.get('set-cookie'),expectedCookie);
 assert.match(response.headers.get('content-security-policy'),/connect-src 'self'/);
 console.log('PASS: host routing, bounded bodies, CSRF rejection, cookie isolation and upstream session response.');
+upstreamCookie=`${cloudflareCookie}, ${expectedCookie}`;
+assert.equal((await host.fetch(req())).headers.get('set-cookie'),expectedCookie);
+upstreamCookie=`__Host-eego_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0, ${cloudflareCookie}`;
+assert.equal((await host.fetch(req())).headers.get('set-cookie'),'__Host-eego_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0');
+for(const invalid of [cloudflareCookie,'__Host-eego_session=invalid; Path=/','other___Host-eego_session='+token]){
+ upstreamCookie=invalid;
+ assert.equal((await host.fetch(req())).headers.get('set-cookie'),null);
+}
+console.log('PASS: combined upstream cookies cannot leak foreign attributes; logout clears only the session.');
 globalThis.fetch=async()=>new Response(null,{status:302,headers:{Location:'https://untrusted.example/','Set-Cookie':'__Host-eego_session=untrusted; Secure; Path=/'}});
 const redirected=await host.fetch(req());
 assert.equal(redirected.status,502);

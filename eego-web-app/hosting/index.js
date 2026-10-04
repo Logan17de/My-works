@@ -31,8 +31,11 @@ export default {
         const response=await fetch(API,{method:'POST',headers:upstreamHeaders,body:bytes,redirect:'manual',signal:AbortSignal.timeout(20000)});
         if(response.status>=300 && response.status<400){await response.body?.cancel();return error('The authentication server redirected unexpectedly. Please try again.',502);}
         const out=new Headers(headers);out.set('Content-Type','application/json; charset=utf-8');
-        const setCookie=response.headers.get('set-cookie');
-        if(setCookie?.startsWith(COOKIE+'=')) out.set('Set-Cookie',setCookie);
+        // Fetch may combine the backend session and Cloudflare cookies into one header.
+        // Rebuild only our session cookie: foreign Domain/Expires attributes would make
+        // browsers reject the __Host- cookie and immediately lose a successful login.
+        const session=response.headers.get('set-cookie')?.match(/(?:^|,\s*)__Host-eego_session=([a-f0-9]{64}|)(?=;|$)/);
+        if(session) out.set('Set-Cookie',`${COOKIE}=${session[1]}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${session[1]?2592000:0}`);
         if(response.headers.has('retry-after'))out.set('Retry-After',response.headers.get('retry-after'));
         return new Response(response.body,{status:response.status,headers:out});
       }catch(e){console.error('eego_proxy_failed',e instanceof Error?e.name:'UnknownError');return error('Cannot reach Eego. Please try again.',503);}
