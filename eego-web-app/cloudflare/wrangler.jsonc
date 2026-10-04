@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "eego-api",
+  "main": "index.js",
+  "compatibility_date": "2026-10-04",
+  "workers_dev": true,
+  "d1_databases": [{"binding": "DB", "database_name": "eego", "database_id": "48362279-86af-45e6-8457-16b1e95fe1e3"}],
+  "observability": {"enabled": true, "logs": {"enabled": true, "invocation_logs": true}, "traces": {"enabled": true, "head_sampling_rate": 0.01}}
+}

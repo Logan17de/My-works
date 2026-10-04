@@ -1,1 +1,0 @@
-{"name":"eego-web","private":true,"version":"1.0.0","type":"module","scripts":{"build":"node build.mjs","check":"node --check app.js"},"engines":{"node":">=22"}}

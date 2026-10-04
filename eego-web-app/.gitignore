@@ -10,7 +10,8 @@ __pycache__/
 node_modules/
 .vercel/
 web/dist/
-supabase/.temp/
 dist/
 .sites-runtime/
 TEST_REPORT.json
+private/
+*.tar.gz

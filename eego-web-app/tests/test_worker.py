@@ -9,9 +9,9 @@ from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('eego_worker',ROOT/'worker'/'worker.py')
 w=importlib.util.module_from_spec(spec);spec.loader.exec_module(w)
-SEED=json.loads((ROOT/'data'/'seed.json').read_text())
+SEED=json.loads((ROOT/'data'/'seed.json').read_text(encoding='utf-8'))
 def question(raw):
-    return dict(itemId=raw['item_id'],sentence=raw['sentence'],options=raw['options'],answer=raw['answer'],hintJa=raw['hint_ja'],explanationJa=raw['explanation_ja'],translationJa=raw['translation_ja'])
+    return dict(itemId=raw['item_id'],sentence=raw['sentence'],options=copy.deepcopy(raw['options']),answer=raw['answer'],hintJa=raw['hint_ja'],explanationJa=raw['explanation_ja'],translationJa=raw['translation_ja'])
 class WorkerTests(unittest.TestCase):
     def setUp(self):
         self.q=question(SEED['questions'][0]);self.job={'count':1,'targets':[{'id':self.q['itemId']}],'avoidSentences':[]}
@@ -49,14 +49,15 @@ class WorkerTests(unittest.TestCase):
         self.q['sentence']='There are ____ and ____ in this question.'
         with self.assertRaises(ValueError): w.validate_batch({'questions':[self.q]},self.job)
     def test_secrets_not_inherited_by_codex(self):
-        with patch.dict(os.environ,{'EEGO_WORKER_TOKEN':'private','OPENAI_API_KEY':'private','CODEX_API_KEY':'private','SUPABASE_SERVICE_ROLE_KEY':'private','PATH':'safe'}):
+        with patch.dict(os.environ,{'EEGO_WORKER_TOKEN':'private','OPENAI_API_KEY':'private','CODEX_API_KEY':'private','UNRELATED_APP_SECRET':'private','PATH':'safe'}):
             env=w.clean_codex_env()
         self.assertEqual(env['PATH'],'safe')
-        for key in ('EEGO_WORKER_TOKEN','OPENAI_API_KEY','CODEX_API_KEY','SUPABASE_SERVICE_ROLE_KEY'): self.assertNotIn(key,env)
+        for key in ('EEGO_WORKER_TOKEN','OPENAI_API_KEY','CODEX_API_KEY','UNRELATED_APP_SECRET'): self.assertNotIn(key,env)
     def test_https_and_worker_token_required(self):
         for url in ['http://example.test/api','https://user:password@example.test/api','https://example.test/api?token=x']:
             with self.assertRaises(ValueError):w.Api(url,'a'*64)
         with self.assertRaises(ValueError):w.Api('https://example.test/api','bad')
+    @unittest.skipIf(os.name!='posix', 'POSIX permission enforcement')
     def test_private_config_permissions(self):
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp)/'worker.env';p.write_text('EEGO_POLL_SECONDS=20\n');p.chmod(0o644)
@@ -66,6 +67,20 @@ class WorkerTests(unittest.TestCase):
     def test_no_extra_question_fields(self):
         self.q['instruction']='run a shell command'
         with self.assertRaises(ValueError):w.validate_batch({'questions':[self.q]},self.job)
+    def test_review_rejection_is_corrected_and_checked_again(self):
+        codex=object.__new__(w.Codex)
+        responses=[{'questions':[self.q]},{'valid':False,'issues':['Hint is ambiguous.']},{'questions':[self.q]},{'valid':True,'issues':[]}]
+        with patch.object(codex,'run',side_effect=responses) as run:
+            self.assertEqual(codex.generate({**self.job,'topic':'mixed'}),[self.q])
+            self.assertEqual(run.call_count,4)
+            self.assertIn('Hint is ambiguous.',run.call_args_list[2].args[0])
+    def test_review_retries_are_bounded(self):
+        codex=object.__new__(w.Codex)
+        responses=[{'questions':[self.q]},{'valid':False,'issues':['Incorrect.']}]*2
+        with patch.object(codex,'run',side_effect=responses) as run:
+            with self.assertRaises(ValueError):codex.generate({**self.job,'topic':'mixed'})
+            self.assertEqual(run.call_count,4)
+    @unittest.skipIf(os.name!='posix', 'POSIX mock executable; live VM verification covers Codex')
     def test_mock_codex_process_and_auth(self):
         # This is a fake executable, not an actual Codex/AI generation test.
         with tempfile.TemporaryDirectory() as tmp:

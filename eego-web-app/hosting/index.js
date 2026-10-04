@@ -1,4 +1,4 @@
-const API = 'https://jxvabaqswqembehxligi.supabase.co/functions/v1/eego-api/eego';
+const API = 'https://eego-api.zetbros.workers.dev/api/eego';
 const COOKIE = '__Host-eego_session';
 const headers = {
   'Cache-Control': 'no-store, private',
@@ -10,13 +10,14 @@ const headers = {
 };
 const error = (message, status) => Response.json({error:message},{status,headers});
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
     if(url.pathname === '/api/eego') {
       if(request.method !== 'POST') return error('Method not allowed.',405);
       if(request.headers.get('origin') && request.headers.get('origin') !== url.origin) return error('Cross-site request refused.',403);
       if(request.headers.get('sec-fetch-site') === 'cross-site' || request.headers.get('x-eego') !== '1') return error('Cross-site request refused.',403);
       if(!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) return error('JSON required.',415);
+      if(!env?.EEGO_PROXY_TOKEN) return error('Eego is temporarily unavailable.',503);
       try {
         const reader=request.body?.getReader();
         if(!reader) return error('Request body required.',400);
@@ -24,7 +25,7 @@ export default {
         while(true){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>98304){await reader.cancel();return error('Request too large.',413);}parts.push(part.value);}
         const bytes=new Uint8Array(size);let pos=0;for(const p of parts){bytes.set(p,pos);pos+=p.length;}
         const cookie=(request.headers.get('cookie')||'').split(';').map(v=>v.trim()).find(v=>v.startsWith(COOKIE+'='));
-        const upstreamHeaders={'Content-Type':'application/json','X-Eego':'1','X-Real-IP':request.headers.get('cf-connecting-ip')||'unknown'};
+        const upstreamHeaders={'Content-Type':'application/json','X-Eego':'1','User-Agent':'Eego-Sites-Proxy/2.0','X-Eego-Proxy':env.EEGO_PROXY_TOKEN,'X-Eego-Client-IP':request.headers.get('cf-connecting-ip')||'unknown'};
         // Only the Eego session travels upstream. Never forward the hosting session.
         if(cookie) upstreamHeaders.Cookie=cookie;
         // Workerd only supports follow/manual; reject redirects explicitly so credentials never follow one.
