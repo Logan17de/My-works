@@ -1,7 +1,7 @@
 {
   "name":"eego-web-app",
-  "version":"2.0.0",
+  "version":"2.1.0",
   "private":true,
   "type":"module",
-  "scripts":{"build":"node scripts/build-site.mjs","test":"node tests/test_host.mjs && python -m unittest discover -s tests -p test_worker.py"}
+  "scripts":{"build":"node scripts/build-site.mjs","test":"node tests/test_host.mjs && node tests/test_api.mjs && python -m unittest discover -s tests -p test_worker.py"}
 }

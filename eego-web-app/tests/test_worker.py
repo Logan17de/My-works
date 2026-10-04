@@ -11,7 +11,7 @@ spec=importlib.util.spec_from_file_location('eego_worker',ROOT/'worker'/'worker.
 w=importlib.util.module_from_spec(spec);spec.loader.exec_module(w)
 SEED=json.loads((ROOT/'data'/'seed.json').read_text(encoding='utf-8'))
 def question(raw):
-    return dict(itemId=raw['item_id'],sentence=raw['sentence'],options=copy.deepcopy(raw['options']),answer=raw['answer'],hintJa=raw['hint_ja'],explanationJa=raw['explanation_ja'],translationJa=raw['translation_ja'])
+    return dict(itemId=raw['item_id'],sentence=raw['sentence'],answer=raw['answer'],hintJa=raw['hint_ja'],explanationJa=raw['explanation_ja'],translationJa=raw['translation_ja'])
 class WorkerTests(unittest.TestCase):
     def setUp(self):
         self.q=question(SEED['questions'][0]);self.job={'count':1,'targets':[{'id':self.q['itemId']}],'avoidSentences':[]}
@@ -31,14 +31,15 @@ class WorkerTests(unittest.TestCase):
         self.q['itemId']='other'
         with self.assertRaises(ValueError): w.validate_batch({'questions':[self.q]},self.job)
     def test_reject_missing_answer(self):
-        self.q['answer']='not an option'
+        self.q['answer']=''
         with self.assertRaises(ValueError): w.validate_batch({'questions':[self.q]},self.job)
     def test_reject_duplicates_case_and_space(self):
         self.job['avoidSentences']=['  '+self.q['sentence'].upper()+'  ']
         with self.assertRaises(ValueError): w.validate_batch({'questions':[self.q]},self.job)
-    def test_reject_duplicate_options(self):
-        self.q['options'][1]=' '+self.q['options'][0].upper()+' '
-        with self.assertRaises(ValueError): w.validate_batch({'questions':[self.q]},self.job)
+    def test_reject_answer_with_wrong_type_or_whitespace(self):
+        for answer in (None,42,'   '):
+            self.q['answer']=answer
+            with self.assertRaises(ValueError): w.validate_batch({'questions':[self.q]},self.job)
     def test_reject_missing_japanese(self):
         self.q['explanationJa']='English only explanation.'
         with self.assertRaises(ValueError): w.validate_batch({'questions':[self.q]},self.job)
@@ -67,25 +68,61 @@ class WorkerTests(unittest.TestCase):
     def test_no_extra_question_fields(self):
         self.q['instruction']='run a shell command'
         with self.assertRaises(ValueError):w.validate_batch({'questions':[self.q]},self.job)
-    def test_review_rejection_is_corrected_and_checked_again(self):
+    def test_generation_uses_one_model_call_without_options_or_review(self):
         codex=object.__new__(w.Codex)
-        responses=[{'questions':[self.q]},{'valid':False,'issues':['Hint is ambiguous.']},{'questions':[self.q]},{'valid':True,'issues':[]}]
-        with patch.object(codex,'run',side_effect=responses) as run:
+        with patch.object(codex,'run',return_value={'questions':[self.q]}) as run:
             self.assertEqual(codex.generate({**self.job,'topic':'mixed'}),[self.q])
-            self.assertEqual(run.call_count,4)
-            self.assertIn('Hint is ambiguous.',run.call_args_list[2].args[0])
-    def test_review_retries_are_bounded(self):
+            self.assertEqual(run.call_count,1)
+            self.assertNotIn('options',run.call_args.args[1]['properties']['questions']['items']['properties'])
+    def test_invalid_format_fails_without_another_model_call(self):
         codex=object.__new__(w.Codex)
-        responses=[{'questions':[self.q]},{'valid':False,'issues':['Incorrect.']}]*2
-        with patch.object(codex,'run',side_effect=responses) as run:
+        bad=copy.deepcopy(self.q);bad['answer']=''
+        with patch.object(codex,'run',return_value={'questions':[bad]}) as run:
             with self.assertRaises(ValueError):codex.generate({**self.job,'topic':'mixed'})
-            self.assertEqual(run.call_count,4)
+            self.assertEqual(run.call_count,1)
+    def test_live_generation_never_requests_an_answer_or_explanation(self):
+        codex=object.__new__(w.Codex)
+        q={k:self.q[k] for k in w.PROMPT_FIELDS}
+        with patch.object(codex,'run',return_value=q) as run:
+            self.assertEqual(codex.generate_one({**self.job,'topic':'daily life'}),q)
+            self.assertEqual(run.call_count,1)
+            self.assertEqual(set(run.call_args.args[1]['properties']),set(w.PROMPT_FIELDS))
+            self.assertNotIn('answer',run.call_args.args[1]['properties'])
+    def test_answer_check_receives_the_question_and_submitted_answer(self):
+        codex=object.__new__(w.Codex)
+        f={'correct':False,'answer':self.q['answer'],'explanationJa':self.q['explanationJa'],'translationJa':self.q['translationJa']}
+        with patch.object(codex,'run',return_value=f) as run:
+            self.assertEqual(codex.check_answer({'question':{'sentence':self.q['sentence']},'target':{'id':self.q['itemId']},'choice':'banana'}),f)
+            self.assertEqual(run.call_count,1)
+            self.assertIn('banana',run.call_args.args[0])
+            self.assertIn(self.q['sentence'],run.call_args.args[0])
+    def test_incomplete_answer_feedback_fails_format_check(self):
+        with self.assertRaises(ValueError):w.validate_feedback({'correct':True,'answer':'x'})
+        with self.assertRaises(ValueError):w.validate_feedback({'correct':'true','answer':'x','explanationJa':'説明です。','translationJa':'日本語です。'})
+    def test_live_question_rejects_an_early_answer(self):
+        q={k:self.q[k] for k in w.PROMPT_FIELDS}
+        with self.assertRaises(ValueError):w.validate_question({**q,'answer':self.q['answer']},self.job)
     @unittest.skipIf(os.name!='posix', 'POSIX mock executable; live VM verification covers Codex')
     def test_mock_codex_process_and_auth(self):
         # This is a fake executable, not an actual Codex/AI generation test.
         with tempfile.TemporaryDirectory() as tmp:
             fake=Path(tmp)/'codex';fixture=Path(tmp)/'fixture.json';fixture.write_text(json.dumps({'questions':[self.q]}))
-            fake.write_text('#!/usr/bin/env python3\nimport sys,json,os\nfrom pathlib import Path\na=sys.argv[1:]\nif "--help" in a: print("--ignore-user-config --ephemeral --output-schema --sandbox")\nelif "status" in a: print("Logged in using ChatGPT")\nelse:\n assert "EEGO_WORKER_TOKEN" not in os.environ\n assert "OPENAI_API_KEY" not in os.environ\n assert "read-only" in a\n assert "forced_login_method=\\"chatgpt\\"" in a\n s=json.loads(Path(a[a.index("--output-schema")+1]).read_text())\n r={"valid":True,"issues":[]} if "valid" in s["properties"] else json.loads(Path('+repr(str(fixture))+').read_text())\n Path(a[a.index("--output-last-message")+1]).write_text(json.dumps(r))\n')
+            fake.write_text('''#!/usr/bin/env python3
+import sys,json,os
+from pathlib import Path
+a=sys.argv[1:]
+if "--help" in a: print("--ignore-user-config --ephemeral --output-schema --sandbox")
+elif "status" in a: print("Logged in using ChatGPT")
+else:
+ assert "EEGO_WORKER_TOKEN" not in os.environ
+ assert "OPENAI_API_KEY" not in os.environ
+ assert "read-only" in a
+ assert 'model_reasoning_effort="low"' in a
+ assert a[a.index("--model")+1]=="gpt-6-luna"
+ assert 'forced_login_method="chatgpt"' in a
+ r=json.loads(Path(FIXTURE_FILE).read_text())
+ Path(a[a.index("--output-last-message")+1]).write_text(json.dumps(r))
+'''.replace('FIXTURE_FILE',repr(str(fixture))))
             fake.chmod(0o700)
             with patch.dict(os.environ,{'CODEX_BIN':str(fake),'EEGO_WORKER_TOKEN':'private','OPENAI_API_KEY':'private'}):
                 c=w.Codex();self.assertTrue(c.ready());self.assertEqual(c.run('test',w.QUESTION_SCHEMA)['questions'][0]['answer'],self.q['answer'])

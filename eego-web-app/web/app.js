@@ -4,7 +4,8 @@ const lessonTranslations=Object.freeze({"With regular practice, you can ____ you
 const $ = (id) => document.getElementById(id);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const state = { user:null, stats:{}, view:'home', kind:'all', level:'all', search:'', offset:0, historyOffset:0, mistakes:false, active:null, generation:{kind:'vocabulary',level:'B1',count:10,topic:'mixed',weakOnly:false}, version:0 };
-let polling, searchTimer, toastTimer, itemRequest=0, historyRequest=0, startingPractice=false, answering=false;
+let lastJobsRefresh=0;
+let polling, searchTimer, toastTimer, itemRequest=0, historyRequest=0, startingPractice=false, answering=false, practiceRefreshing=false;
 const formatDate = (date) => date ? new Intl.DateTimeFormat('en-GB',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tokyo'}).format(new Date(date)) : 'Not studied yet';
 const levels = (all=true, selected='all') => `${all?'<option value="all">All levels</option>':''}${['B1','B2','C1','C2'].map(x=>`<option ${x===selected?'selected':''}>${x}</option>`).join('')}`;
 const categories = (all=true,selected='all') => `${all?'<option value="all">All categories</option>':''}<option value="vocabulary" ${selected==='vocabulary'?'selected':''}>Vocabulary</option><option value="grammar" ${selected==='grammar'?'selected':''}>Grammar</option>`;
@@ -18,7 +19,7 @@ async function api(action,data={}){
   return result;
 }
 function saveActive(){try{if(state.active) sessionStorage.setItem('eego_active_v1',JSON.stringify({username:state.user,...state.active}));else sessionStorage.removeItem('eego_active_v1');}catch{/* Storage restrictions do not prevent server-side saving. */}}
-function restoreActive(){try{const a=JSON.parse(sessionStorage.getItem('eego_active_v1')||'null');if(a?.username===state.user&&Array.isArray(a.questions)&&a.index<a.questions.length)state.active=a;}catch{try{sessionStorage.removeItem('eego_active_v1');}catch{}}}
+function restoreActive(){try{const a=JSON.parse(sessionStorage.getItem('eego_active_v1')||'null');if(a?.username===state.user&&Array.isArray(a.questions)&&a.index<(a.total??a.questions.length))state.active=a;}catch{try{sessionStorage.removeItem('eego_active_v1');}catch{}}}
 function login(message=''){
  clearInterval(polling);state.user=null;state.version++;
  $('app').innerHTML=`<main class="login-wrap"><section class="login-story"><div class="wordmark">eego<span>✳</span></div><div class="eyebrow">Your English, a little further</div><h1>Find the words.<br>Make them yours.</h1><p class="intro">Vocabulary in context. Grammar that clicks. A quiet space to build the English you want to use.</p><div class="sample-cards" aria-hidden="true"><div class="sample-card"><small>A word, many possibilities</small><b>compelling</b><p>心を引きつける・説得力のある</p></div><div class="sample-card front"><small>Learn · recall · use</small><b>In your own words.</b><p>A little practice. A little progress.</p></div></div></section><section class="login-box"><div class="eyebrow">Private learning space</div><h2>Welcome back.</h2><p class="small muted">Sign in to continue where you left off.</p><form id="login-form" class="stack"><label class="field">Username<input name="username" autocomplete="username" required maxlength="80" placeholder="Your username" autocapitalize="none" spellcheck="false"></label><label class="field">Password<div class="pass-wrap"><input id="login-password" type="password" name="password" autocomplete="current-password" required maxlength="128" placeholder="Your password"><button type="button" data-action="toggle-password" aria-label="Show password">Show</button></div></label><div id="login-error" class="error ${message?'':'hidden'}" role="alert">${esc(message)}</div><button class="btn" type="submit">Step inside </button></form><p class="foot">Invitation only. No public sign-up.</p></section></main>`;
@@ -33,7 +34,7 @@ async function navigate(view){
  try{
    state.stats=await api('dashboard');if(version!==state.version)return;
    updateStatus();
-   if(view==='home')home();else if(view==='learn'||view==='weak'){catalogFrame(view);await loadItems(version);}else if(view==='history'){historyFrame();await loadHistory(version);}else if(view==='generate'){generator();await loadJobs(version);polling=setInterval(()=>{if(!document.hidden)loadJobs(version).catch(()=>{});},15000);}else if(view==='settings')settings();
+   if(view==='home')home();else if(view==='learn'||view==='weak'){catalogFrame(view);await loadItems(version);}else if(view==='history'){historyFrame();await loadHistory(version);}else if(view==='generate'){generator();await loadJobs(version);polling=setInterval(()=>{if(!document.hidden&&(state.pendingJobs||Date.now()-lastJobsRefresh>=15000))loadJobs(version).catch(()=>{});},3000);}else if(view==='settings')settings();
  }catch(error){handleError(error);if(version===state.version&&$('content'))$('content').innerHTML=empty('A pause, not a reset.',error.message,'home','Try again');}
 }
 function updateStatus(){const el=$('connection-status');if(el){el.classList.toggle('online',!!state.stats.workerOnline);el.textContent=state.stats.workerOnline?'Codex connected':'Codex not connected';}}
@@ -57,50 +58,97 @@ async function startPractice(filters={}){
  if(startingPractice)return;startingPractice=true;let r;
  try{r=await api('practice',{...filters,format:'typing'});}finally{startingPractice=false;}
  clearInterval(polling);
- if(!r.questions.length){toast(r.message||'There are no questions for this selection yet.');return;}
- state.active={sessionId:r.sessionId,questions:r.questions,index:0,score:0,weak:0,feedback:null,choice:null,unsure:false,hintUsed:false};saveActive();showPractice();
+ if(!r.live&&!r.questions.length){toast(r.message||'There are no questions for this selection yet.');return;}
+ const feedbacks=r.feedback||{},first=r.questions.findIndex(q=>!feedbacks[q.id]);
+ state.active={sessionId:r.sessionId,jobId:r.jobId,live:r.live,total:r.total??r.questions.length,questions:r.questions,index:first>=0?first:r.questions.length,score:0,weak:0,feedback:null,feedbacks,choice:null,unsure:false,hintUsed:false,checking:false,tasks:r.tasks||[],seen:{}};
+ updatePractice(state.active,r);saveActive();showPractice();
 }
-function showPractice(){state.view='practice';state.version++;shell();renderQuestion();window.scrollTo({top:0});}
+const taskError=(code)=>({quota:'Codex usage limit reached. Try again after the limit resets.',auth_required:'The generator needs its Codex login refreshed.',validation:'The response was incomplete. Please try again.',timeout:'This request took too long. Please try again.',worker_timeout:'The generator lost its connection. Please try again.',cancelled:'This request was cancelled.'})[code]||'Could not finish this request. Please try again.';
+function recordFeedback(a,f){
+ const id=a.questions[a.index]?.id;if(!id)return;
+ a.feedbacks={...(a.feedbacks||{}),[id]:f};a.feedback=f;a.checking=false;a.checkError=null;
+ a.score=Object.values(a.feedbacks).filter(x=>x.correct).length;a.weak=Object.values(a.feedbacks).filter(x=>x.weak).length;
+}
+function updatePractice(a,r){
+ a.questions=r.questions;a.total=r.total;a.tasks=r.tasks||[];a.feedbacks=r.feedback||{};
+ a.score=Object.values(a.feedbacks).filter(x=>x.correct).length;a.weak=Object.values(a.feedbacks).filter(x=>x.weak).length;
+ const q=a.questions[a.index],f=q&&a.feedbacks[q.id],check=q&&a.tasks.find(t=>t.type==='answer'&&t.questionId===q.id);
+ if(f)recordFeedback(a,f);
+ else if(check){a.checking=['queued','running'].includes(check.state);a.choice=check.choice;a.unsure=!!check.unsure;a.checkError=check.state==='failed'?taskError(check.error):null;}
+}
+async function refreshPractice(){
+ const a=state.active;if(!a||state.view!=='practice'||practiceRefreshing)return;
+ practiceRefreshing=true;
+ try{
+  const before=[a.questions[a.index]?.id,!!a.feedback,a.checking,a.checkError,a.tasks?.find(t=>t.type==='question'&&t.position===a.index)?.state].join('|');
+  const r=await api('practice_status',{sessionId:a.sessionId});if(state.active!==a)return;
+  updatePractice(a,r);saveActive();
+  const after=[a.questions[a.index]?.id,!!a.feedback,a.checking,a.checkError,a.tasks?.find(t=>t.type==='question'&&t.position===a.index)?.state].join('|');
+  if(state.view==='practice'){if(before!==after)renderQuestion();else updateNextStatus();}
+ }catch(error){handleError(error);}finally{practiceRefreshing=false;}
+}
+async function markQuestionSeen(a,q){
+ if(!a.live||a.seen?.[q.id]||state.active!==a||state.view!=='practice')return;
+ try{await api('question_seen',{sessionId:a.sessionId,questionId:q.id});a.seen={...(a.seen||{}),[q.id]:true};if(state.active===a)saveActive();}
+ catch(error){handleError(error);}
+}
+function updateNextStatus(){
+ const a=state.active,el=$('next-status');if(!a||!el||!a.live||a.index+1>=a.total)return;
+ const ready=!!a.questions[a.index+1],task=a.tasks?.find(t=>t.type==='question'&&t.position===a.index+1);
+ el.textContent=ready?'Your next question is ready.':task?.state==='failed'?'The next question needs a retry. You can finish this answer first.':'Preparing your next question while you practise…';
+}
+function showPractice(){
+ clearInterval(polling);state.view='practice';state.version++;shell();renderQuestion();window.scrollTo({top:0});
+ refreshPractice();polling=setInterval(()=>{if(!document.hidden&&(state.active?.live||state.active?.checking))refreshPractice();},2000);
+}
 function renderQuestion(){
  const a=state.active;if(!a)return navigate('home');const q=a.questions[a.index],f=a.feedback;
- const translation=q.translationJa||lessonTranslations[q.sentence]||f?.translationJa;
- const answerInput=`<input id="typed-answer" class="gap-input ${f?(f.correct?'correct':'wrong'):''}" name="answer" type="text" aria-label="Missing word or phrase" aria-describedby="question-translation answer-help" placeholder="Type here" value="${esc(a.choice??'')}" maxlength="160" required autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text" enterkeyhint="done" ${f?'disabled':''}>`;
+ const total=a.total??a.questions.length;
+ if(!q){
+  const task=a.tasks?.find(t=>t.type==='question'&&t.position===a.index),failed=task?.state==='failed'||task?.state==='cancelled';
+  $('content').innerHTML=`<section class="quiz"><div class="quiz-top"><button class="text-button" data-nav="home">← Save & leave</button><p>Question ${a.index+1} of ${total}</p></div><progress max="${total}" value="${a.index}" aria-label="Session progress"></progress><section class="question-card preparation" aria-live="polite"><div class="symbol" aria-hidden="true">✳</div><h2>${failed?'Let’s try that again.':`Preparing question ${a.index+1}…`}</h2><p>${failed?esc(taskError(task.error)):a.index?'Your next sentence is on its way.':'One fresh sentence to get you started.'}</p>${failed?'<button class="btn" data-action="retry-question">Retry question</button>':'<p class="small muted">This page updates automatically.</p>'}</section></section>`;return;
+ }
+ const checking=!!a.checking,locked=!!f||checking;
+ const translation=f?.translationJa||(!a.live&&(q.translationJa||lessonTranslations[q.sentence]));
+ const answerInput=`<input id="typed-answer" class="gap-input ${f?(f.correct?'correct':'wrong'):''}" name="answer" type="text" aria-label="Missing word or phrase" aria-describedby="question-translation answer-help" placeholder="Type here" value="${esc(a.choice??'')}" maxlength="160" required autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text" enterkeyhint="done" ${locked?'disabled':''}>`;
  $('content').innerHTML=`<section class="quiz">
-  <div class="quiz-top"><button class="text-button" data-nav="home">← Save & leave</button><p>Question ${a.index+1} of ${a.questions.length}</p></div>
-  <progress max="${a.questions.length}" value="${a.index+(f?1:0)}" aria-label="Session progress"></progress>
+  <div class="quiz-top"><button class="text-button" data-nav="home">← Save & leave</button><p>Question ${a.index+1} of ${total}</p></div>
+  <progress max="${total}" value="${a.index+(f?1:0)}" aria-label="Session progress"></progress>
   <article class="question-card"><form id="answer-form">
    <div class="row between"><span class="eyebrow" style="margin:0">Type the missing word or phrase</span><span class="badge">${esc(q.level)} · ${esc(q.kind)}</span></div>
    <p class="sentence">${esc(q.sentence).replace('____',()=>answerInput)}</p>
    <div class="question-translation" id="question-translation" lang="ja"><span class="translation-label">${translation?'日本語訳':'日本語のヒント'}</span><p>${esc(translation||q.hintJa)}</p></div>
-   <p id="answer-help" class="answer-help" lang="ja">日本語の意味に合う英単語・フレーズを空欄に入力してください。大文字・小文字は区別しません。</p>
-   <button type="button" class="text-button" data-action="hint" ${f?'disabled':''}>${a.hintUsed?'Japanese hint shown':'Need a Japanese hint?'}</button>
+   <p id="answer-help" class="answer-help" lang="ja">文の意味に合う英単語・フレーズを空欄に入力してください。送信後に解答と解説が表示されます。</p>
+   <button type="button" class="text-button" data-action="hint" ${locked?'disabled':''}>${a.hintUsed?'Japanese hint shown':'Need a Japanese hint?'}</button>
    ${a.hintUsed?`<div class="hint" lang="ja">${esc(q.hintJa)}</div>`:''}
-   ${!f?`<div class="quiz-actions"><label class="check"><input id="unsure" type="checkbox" ${a.unsure||a.hintUsed?'checked':''}> I guessed / I’m not sure</label><button class="btn" id="check-answer" type="submit" ${!a.choice?.trim()?'disabled':''}>Check answer</button></div>`:''}
+   ${!f?`<div class="quiz-actions"><label class="check"><input id="unsure" type="checkbox" ${a.unsure||a.hintUsed?'checked':''} ${checking?'disabled':''}> I guessed / I’m not sure</label><button class="btn" id="check-answer" type="submit" ${checking||!a.choice?.trim()?'disabled':''}>${checking?'Checking with Codex…':a.checkError?'Retry answer check':'Submit answer'}</button></div>${checking?'<p class="check-progress" role="status">Codex is checking your answer and preparing the explanation.</p>':''}${a.checkError?`<p class="error" role="alert">${esc(a.checkError)} Your answer is still here.</p>`:''}`:''}
   </form></article>
   ${f?`<section class="feedback ${!f.correct||f.unsure?'incorrect':''}" aria-live="polite"><h3>${f.correct?(f.unsure?'Correct. Let’s make it confident.':'That’s the expression. ✓'):'A useful one to revisit.'}</h3>
    ${!f.correct?`<p class="your-answer">Your answer: <strong>${esc(f.choice)}</strong></p>`:''}
-   <div class="answer">${esc(f.answer)}</div><p><strong>${esc(f.label)}</strong> · <span lang="ja">${esc(f.meaningJa)}</span></p><p lang="ja">${esc(f.explanationJa)}</p><p lang="ja">${esc(f.translationJa)}</p><div class="recovery">${f.weak?`Saved in Weak items · ${f.recovery}/3 scheduled recovery steps.`:'Saved to your learning history.'}<br>Next review: ${formatDate(f.nextDue)} JST. ${f.weak?'Early retries do not remove it from your weak list.':''}</div></section><div class="row between"><button class="text-button" data-action="report" data-question="${esc(q.id)}">Report a problem</button><button class="btn" data-action="next">${a.index+1===a.questions.length?'Finish session':'Next sentence'} →</button></div>`:''}
-  <p class="page-footer">${esc(q.source)}. Answers are checked and saved on the server.</p></section>`;
- if(!f) $('typed-answer').focus({preventScroll:true});
+   <div class="answer">${esc(f.answer)}</div><p><strong>${esc(f.label)}</strong> · <span lang="ja">${esc(f.meaningJa)}</span></p><p lang="ja">${esc(f.explanationJa)}</p><p lang="ja">${esc(f.translationJa)}</p><div class="recovery">${f.weak?`Saved in Weak items · ${f.recovery}/3 scheduled recovery steps.`:'Saved to your learning history.'}<br>Next review: ${formatDate(f.nextDue)} JST. ${f.weak?'Early retries do not remove it from your weak list.':''}</div></section><div class="row between"><button class="text-button" data-action="report" data-question="${esc(q.id)}">Report a problem</button><button class="btn" data-action="next">${a.index+1===total?'Finish session':'Next sentence'} →</button></div>`:''}
+  ${a.live&&a.index+1<total?'<p class="next-status" id="next-status" role="status"></p>':''}<p class="page-footer">${esc(q.source)}. Submit to receive your answer check and Japanese explanation.</p></section>`;
+ updateNextStatus();if(!locked)$('typed-answer').focus({preventScroll:true});
+ requestAnimationFrame(()=>markQuestionSeen(a,q));
 }
 async function submitAnswer(){
- const a=state.active;if(!a||a.feedback||answering)return;
+ const a=state.active;if(!a||a.feedback||a.checking||answering)return;
  a.choice=$('typed-answer')?.value??a.choice;
  if(!a.choice?.trim())return;
  a.unsure=!!($('unsure')?.checked||a.hintUsed);saveActive();answering=true;
  document.querySelectorAll('#answer-form input, #answer-form button').forEach(x=>x.disabled=true);
  $('check-answer').textContent='Checking…';
  try{
-  const f=await api('answer',{sessionId:a.sessionId,questionId:a.questions[a.index].id,choice:a.choice,unsure:a.unsure});
-  a.feedback=f;a.score+=f.correct?1:0;a.weak+=f.weak?1:0;
+  const f=await api('answer',{async:true,sessionId:a.sessionId,questionId:a.questions[a.index].id,choice:a.choice,unsure:a.unsure});
+  if(f.pending){a.checking=['queued','running'].includes(f.state);a.choice=f.choice;a.unsure=f.unsure;a.checkError=f.state==='failed'?taskError(f.error):null;}
+  else recordFeedback(a,f);
   if(state.active===a)saveActive();
  }catch(error){handleError(error);}
  finally{answering=false;if(state.active===a&&state.view==='practice')renderQuestion();}
 }
 function nextQuestion(){
  const a=state.active;if(!a?.feedback)return;
- a.index++;a.feedback=null;a.choice=null;a.unsure=false;a.hintUsed=false;
- if(a.index>=a.questions.length){const score=a.score,total=a.questions.length,weak=a.weak;state.active=null;saveActive();$('content').innerHTML=`<section class="quiz"><div class="empty"><div class="eyebrow">A little further than before</div><h1>Session complete.</h1><div class="summary-score">${score}<span class="muted"> / ${total}</span></div><p>Every answer is saved.${weak?` ${weak} answers involved items that still need reinforcement.`:' Your next reviews are scheduled.'}</p><div class="row" style="justify-content:center"><button class="btn" data-nav="weak">See weak items</button><button class="btn secondary" data-nav="home">Back to your notebook</button></div></div></section>`;}else{saveActive();renderQuestion();window.scrollTo({top:0,behavior:'smooth'});}
+ a.index++;a.feedback=null;a.choice=null;a.unsure=false;a.hintUsed=false;a.checking=false;a.checkError=null;
+ if(a.index>=(a.total??a.questions.length)){clearInterval(polling);const score=a.score,total=a.total??a.questions.length,weak=a.weak;state.active=null;saveActive();$('content').innerHTML=`<section class="quiz"><div class="empty"><div class="eyebrow">A little further than before</div><h1>Session complete.</h1><div class="summary-score">${score}<span class="muted"> / ${total}</span></div><p>Every answer is saved.${weak?` ${weak} answers involved items that still need reinforcement.`:' Your next reviews are scheduled.'}</p><div class="row" style="justify-content:center"><button class="btn" data-nav="weak">See weak items</button><button class="btn secondary" data-nav="home">Back to your notebook</button></div></div></section>`;}else{saveActive();renderQuestion();window.scrollTo({top:0,behavior:'smooth'});refreshPractice();}
 }
 function historyFrame(){
  $('content').innerHTML=`<header class="page-heading"><div class="eyebrow">Your progress, sentence by sentence</div><h1>A record of getting better.</h1><p>Your answers, corrections and explanations, kept together.</p></header><div class="row between"><div class="chips"><button class="chip ${!state.mistakes?'active':''}" data-action="history-all">All answers</button><button class="chip ${state.mistakes?'active':''}" data-action="history-mistakes">Mistakes & guesses</button></div><button class="text-button" data-action="export">Export history</button></div><div class="history-list" id="history-list"></div><div class="row between" id="history-pagination"></div>`;
@@ -113,16 +161,16 @@ async function loadHistory(version=state.version){
 }
 function generator(){
  const g=state.generation;
- $('content').innerHTML=`<header class="page-heading"><div class="eyebrow">Same learning goal. A fresh context.</div><h1>Make room for new sentences.</h1><p>Ask the private Codex worker for a new practice batch. Saved questions can be practised again without another generation request.</p></header><div class="generate-grid"><section class="panel"><h2>Create a practice batch</h2><div id="generator-notice" class="notice"><strong>${state.stats.workerOnline?'Your Codex worker is connected.':'Your generator is temporarily offline.'}</strong>${state.stats.workerOnline?'Requests use the connected Codex account.':'Your request will wait here and start automatically when the generator reconnects. Saved lessons are always ready.'}</div><form id="generate-form"><div class="form-grid"><label class="field">Category<select name="kind">${categories(false,g.kind)}</select></label><label class="field">Practice level<select name="level">${levels(false,g.level)}</select></label><label class="field">Questions<select name="count">${[5,10,20].map(n=>`<option value="${n}" ${n===Number(g.count)?'selected':''}>${n} questions</option>`).join('')}</select></label><label class="field">Context<select name="topic">${['mixed','daily life','work','travel'].map(t=>`<option ${t===g.topic?'selected':''}>${esc(t)}</option>`).join('')}</select></label></div><label class="check"><input type="checkbox" name="weakOnly" ${g.weakOnly?'checked':''}> Focus only on weak items at this level</label><p class="small muted">Up to 150 new questions per 24 hours. Two pending batches at a time. Only lesson targets, not your login or personal history, go to Codex.</p><button type="submit" class="btn">${state.stats.workerOnline?'Generate new questions':'Queue a request'} ✳</button></form></section><section class="panel"><div class="row between"><h2>Your batches</h2><button class="text-button" data-action="refresh-jobs">Refresh</button></div><div id="jobs-list"><p class="small muted">Loading your batches…</p></div></section></div><p class="page-footer">Generated questions are automatically checked, not human-reviewed. Report an incorrect question during practice to remove it from future sessions.</p>`;
+ $('content').innerHTML=`<header class="page-heading"><div class="eyebrow">Same learning goal. A fresh context.</div><h1>One sentence at a time.</h1><p>Start with one fresh question. The next is prepared while you read. Submit your answer to receive a check and Japanese explanation.</p></header><div class="generate-grid"><section class="panel"><h2>Start a fresh practice</h2><div id="generator-notice" class="notice"><strong>${state.stats.workerOnline?'Your Codex worker is connected.':'Your generator is temporarily offline.'}</strong>${state.stats.workerOnline?'Questions and answer checks use your private generator.':'Your request will start when the generator reconnects.'}</div><form id="generate-form"><div class="form-grid"><label class="field">Category<select name="kind">${categories(false,g.kind)}</select></label><label class="field">Practice level<select name="level">${levels(false,g.level)}</select></label><label class="field">Session length<select name="count">${[5,10,20].map(n=>`<option value="${n}" ${n===Number(g.count)?'selected':''}>${n} questions</option>`).join('')}</select></label><label class="field">Context<select name="topic">${['mixed','daily life','work','travel','study'].map(t=>`<option ${t===g.topic?'selected':''}>${esc(t)}</option>`).join('')}</select></label></div><label class="check"><input type="checkbox" name="weakOnly" ${g.weakOnly?'checked':''}> Focus only on weak items at this level</label><p class="small muted">Only one question is prepared ahead. Choose up to 150 questions per day across two active sessions.</p><button type="submit" class="btn">Start one question at a time ✳</button></form></section><section class="panel"><div class="row between"><h2>Your sessions</h2><button class="text-button" data-action="refresh-jobs">Refresh</button></div><div id="jobs-list"><p class="small muted">Loading your sessions…</p></div></section></div><p class="page-footer">Report a problem during practice to remove a question from future sessions.</p>`;
 }
 async function loadJobs(version=state.version){
  const [r,s]=await Promise.all([api('jobs'),api('dashboard')]);if(version!==state.version||!$('jobs-list'))return;
- state.stats=s;updateStatus();
- $('jobs-list').innerHTML=r.jobs.length?r.jobs.map(j=>`<article class="job"><div class="row between"><h3>${esc(j.level)} ${esc(j.kind)} · ${j.count} questions</h3><span class="state ${esc(j.state)}">${esc(j.state==='queued'&&!s.workerOnline?'waiting for Codex':j.state)}</span></div><p>${formatDate(j.created_at)} JST${j.state==='completed'?` · ${j.question_count} saved`:''}</p>${j.error?`<p>${esc(({cancelled:'Cancelled by you.',quota:'Codex usage limit reached. Saved practice still works.',auth_required:'The owner needs to sign in to Codex.',validation:'The generated batch did not pass the checks.',timeout:'Generation took too long.',worker_timeout:'The worker stopped responding.'})[j.error]||'Generation could not finish. Please try again.')}</p>`:''}${j.state==='completed'?`<button class="btn secondary small" data-action="batch-practice" data-job="${esc(j.id)}">Practise this batch</button>`:j.state==='queued'?`<button class="text-button" data-action="cancel-job" data-job="${esc(j.id)}">Cancel request</button>`:''}</article>`).join(''):'<p class="small muted">Your first batch will appear here. The starter questions are already available in Learn.</p>';
+ state.stats=s;state.pendingJobs=r.jobs.some(j=>['queued','running','active'].includes(j.state));lastJobsRefresh=Date.now();updateStatus();
+ $('jobs-list').innerHTML=r.jobs.length?r.jobs.map(j=>`<article class="job"><div class="row between"><h3>${esc(j.level)} ${esc(j.kind)} · ${j.count} questions</h3><span class="state ${esc(j.state)}">${esc(j.state==='queued'&&!s.workerOnline?'waiting for Codex':j.state)}</span></div><p>${formatDate(j.created_at)} JST · ${j.question_count} prepared${j.sessionId?` · ${j.answered} answered`:''}</p>${j.error?`<p>${esc(j.error==='cancelled'?'Session ended.':taskError(j.error))}</p>`:''}${j.state==='completed'||j.state==='active'?`<button class="btn secondary small" data-action="batch-practice" data-job="${esc(j.id)}">${j.state==='active'?'Continue session':'Practise again'}</button>`:''}${['queued','active'].includes(j.state)?`<button class="text-button" data-action="cancel-job" data-job="${esc(j.id)}">${j.state==='active'?'End session':'Cancel request'}</button>`:''}</article>`).join(''):'<p class="small muted">Your fresh sessions will appear here. Starter questions are available in Learn.</p>';
  const notice=$('generator-notice');if(notice)notice.innerHTML=s.workerOnline?'<strong>Your Codex worker is connected.</strong>Requests use the connected Codex account.':'<strong>Your generator is temporarily offline.</strong>Requests start automatically when the generator reconnects. Saved lessons are still available.';
 }
 function settings(){
- $('content').innerHTML=`<section class="settings"><header class="page-heading"><div class="eyebrow">Your space, your control</div><h1>Settings & your data.</h1></header><section class="panel"><h3>Signed in as ${esc(state.user)}</h3><p class="small muted">Your history and weak-item progress are saved on the server, not only on this device. Export keeps a readable copy of your study records.</p><div class="row"><button class="btn secondary" data-action="export">Export my progress</button><button class="text-button" data-action="logout">Sign out</button></div></section><section class="panel"><h3>New questions, whenever you need them</h3><p class="small">Your private generator runs automatically. Request a batch in Generate, then come back when it is ready. Your saved lessons and progress stay available while new questions are being prepared.</p></section><section class="panel"><h3>Change your password</h3><p class="small muted">Use at least 10 characters. Updating your password signs out your other sessions.</p><form id="password-form"><label class="field">Current password<input type="password" name="currentPassword" required autocomplete="current-password" maxlength="128"></label><label class="field">New password<input type="password" name="newPassword" required minlength="10" maxlength="128" autocomplete="new-password"></label><button class="btn" type="submit">Update password</button></form></section><section class="panel"><h3>How reinforcement works</h3><p class="small">A wrong answer or an uncertain guess puts the item into your weak list. After 10 minutes, answer correctly in a different sentence. The next scheduled reviews are 1 day and 3 days later. Three successful scheduled review steps move it out of the weak list, with another review after 7 days.</p><p class="small muted">Immediate retries still appear in history, but they do not count as spaced recovery. Levels are approximate learning bands; progress is not a CEFR certification.</p></section><p class="page-footer">Eego 2.0.0 · Private vocabulary & grammar practice.<br>Exports contain your learning records. Keep them private.</p></section>`;
+ $('content').innerHTML=`<section class="settings"><header class="page-heading"><div class="eyebrow">Your space, your control</div><h1>Settings & your data.</h1></header><section class="panel"><h3>Signed in as ${esc(state.user)}</h3><p class="small muted">Your history and weak-item progress are saved on the server, not only on this device. Export keeps a readable copy of your study records.</p><div class="row"><button class="btn secondary" data-action="export">Export my progress</button><button class="text-button" data-action="logout">Sign out</button></div></section><section class="panel"><h3>New questions, whenever you need them</h3><p class="small">Start a fresh session in Generate. Questions arrive one at a time, and your answer is checked when you submit it. Your progress is saved automatically.</p></section><section class="panel"><h3>Change your password</h3><p class="small muted">Use at least 10 characters. Updating your password signs out your other sessions.</p><form id="password-form"><label class="field">Current password<input type="password" name="currentPassword" required autocomplete="current-password" maxlength="128"></label><label class="field">New password<input type="password" name="newPassword" required minlength="10" maxlength="128" autocomplete="new-password"></label><button class="btn" type="submit">Update password</button></form></section><section class="panel"><h3>How reinforcement works</h3><p class="small">A wrong answer or an uncertain guess puts the item into your weak list. After 10 minutes, answer correctly in a different sentence. The next scheduled reviews are 1 day and 3 days later. Three successful scheduled review steps move it out of the weak list, with another review after 7 days.</p><p class="small muted">Immediate retries still appear in history, but they do not count as spaced recovery. Levels are approximate learning bands; progress is not a CEFR certification.</p></section><p class="page-footer">Eego 2.1.0 · Private vocabulary & grammar practice.<br>Exports contain your learning records. Keep them private.</p></section>`;
 }
 async function exportData(){const data=await api('export');const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`eego-study-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);toast('Your study export is ready.');}
 document.addEventListener('click',async event=>{
@@ -136,7 +184,8 @@ document.addEventListener('click',async event=>{
   else if(action==='item-practice')await startPractice({itemId:el.dataset.item});
   else if(action==='batch-practice')await startPractice({jobId:el.dataset.job});
   else if(action==='resume'&&state.active)showPractice();
-  else if(action==='hint'&&!state.active.feedback&&!answering){state.active.hintUsed=true;state.active.unsure=true;saveActive();renderQuestion();}
+  else if(action==='hint'&&!state.active.feedback&&!state.active.checking&&!answering){state.active.hintUsed=true;state.active.unsure=true;saveActive();renderQuestion();}
+  else if(action==='retry-question'&&state.active){el.disabled=true;await api('retry_question',{sessionId:state.active.sessionId});await refreshPractice();}
   else if(action==='next')nextQuestion();
   else if(action==='report'){await api('report',{questionId:el.dataset.question});el.disabled=true;el.textContent='Reported';toast('Reported. This question will not appear in future practice.');}
   else if(action==='weak-generate'){state.generation.weakOnly=true;state.generation.kind=state.kind==='all'?'vocabulary':state.kind;state.generation.level=state.level==='all'?'B1':state.level;await navigate('generate');}
@@ -155,7 +204,7 @@ document.addEventListener('change',event=>{
  if(event.target.id==='unsure'&&state.active){state.active.unsure=event.target.checked;saveActive();}
 });
 document.addEventListener('input',event=>{
- if(event.target.id==='typed-answer'&&state.active&&!state.active.feedback&&!answering){state.active.choice=event.target.value;saveActive();$('check-answer').disabled=!event.target.value.trim();}
+ if(event.target.id==='typed-answer'&&state.active&&!state.active.feedback&&!state.active.checking&&!answering){state.active.choice=event.target.value;saveActive();$('check-answer').disabled=!event.target.value.trim();}
  if(event.target.id==='search-filter'){state.search=event.target.value;state.offset=0;clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadItems().catch(handleError),250);}
 });
 document.addEventListener('keydown',event=>{if(event.target.id==='typed-answer'&&event.key==='Enter'&&event.isComposing)event.preventDefault();});
@@ -166,7 +215,7 @@ document.addEventListener('submit',async event=>{
  event.preventDefault();const button=form.querySelector('button[type="submit"]');const original=button.textContent;button.disabled=true;button.textContent='One moment…';const data=Object.fromEntries(new FormData(form));
  try{
   if(form.id==='login-form'){const r=await api('login',data);state.user=r.username;restoreActive();await navigate('home');}
-  else if(form.id==='generate-form'){data.count=Number(data.count);data.weakOnly=!!data.weakOnly;state.generation=data;const r=await api('generate',data);toast(r.workerOnline?'Your batch is queued for Codex.':'Request saved. Waiting for the owner’s Codex worker.');await loadJobs();}
+  else if(form.id==='generate-form'){data.count=Number(data.count);data.weakOnly=!!data.weakOnly;data.incremental=true;state.generation=data;const r=await api('generate',data);await startPractice({jobId:r.jobId});}
   else{await api('password',data);form.reset();toast('Password updated. Other sessions have been signed out.');}
  }catch(error){if(form.id==='login-form'){$('login-error').textContent=error.message;$('login-error').classList.remove('hidden');}else if(form.id==='password-form')toast(error.message);else handleError(error);}
  finally{if(button.isConnected){button.disabled=false;button.textContent=original;}}

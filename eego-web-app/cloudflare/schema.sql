@@ -13,3 +13,7 @@ CREATE INDEX attempts_user ON attempts(user_id,created_at);
 CREATE TABLE reports (user_id TEXT NOT NULL REFERENCES users(id), question_id TEXT NOT NULL REFERENCES questions(id), PRIMARY KEY(user_id,question_id));
 CREATE TABLE worker_status (id INTEGER PRIMARY KEY CHECK(id=1), ready INTEGER NOT NULL DEFAULT 0, last_seen INTEGER NOT NULL DEFAULT 0);
 INSERT INTO worker_status(id) VALUES(1);
+-- On existing installations, apply migrations/0002_live_practice.sql instead.
+CREATE TABLE live_practice (session_id TEXT PRIMARY KEY REFERENCES practice(id), job_id TEXT NOT NULL UNIQUE REFERENCES jobs(id), total_count INTEGER NOT NULL CHECK(total_count BETWEEN 1 AND 20), seen_position INTEGER NOT NULL DEFAULT -1);
+CREATE TABLE codex_tasks (id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES practice(id), type TEXT NOT NULL CHECK(type IN ('question','answer')), position INTEGER NOT NULL, question_id TEXT REFERENCES questions(id), choice TEXT NOT NULL DEFAULT '', unsure INTEGER NOT NULL DEFAULT 0, state TEXT NOT NULL DEFAULT 'queued', created_at INTEGER NOT NULL, lease TEXT, lease_expires INTEGER, result TEXT, error TEXT, UNIQUE(session_id,type,position));
+CREATE INDEX codex_tasks_queue ON codex_tasks(type,state,created_at);
