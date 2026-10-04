@@ -30,7 +30,7 @@ class Fixture:
                 if data.get('itemId') and q['item_id']!=data['itemId']:continue
                 if data.get('mode')=='weak' and q['item_id'] not in self.weak:continue
                 if not data.get('itemId') and any(x['itemId']==q['item_id'] for x in qs):continue
-                qs.append({'id':str(uuid.uuid5(uuid.NAMESPACE_DNS,'eego-test-'+str(n))),'itemId':q['item_id'],'kind':item['kind'],'level':item['level'],'sentence':q['sentence'],'options':q['options'],'hintJa':q['hint_ja'],'source':'Local UI fixture','raw':q})
+                qs.append({'id':str(uuid.uuid5(uuid.NAMESPACE_DNS,'eego-test-'+str(n))),'itemId':q['item_id'],'kind':item['kind'],'level':item['level'],'sentence':q['sentence'],'translationJa':q['translation_ja'],'options':q['options'],'hintJa':q['hint_ja'],'source':'Local UI fixture','raw':q})
                 if len(qs)>=4:break
             sid=str(uuid.uuid4());self.sessions[sid]=qs
             return 200,{'sessionId':sid,'questions':[{k:v for k,v in q.items() if k not in ('raw','itemId','options')} for q in qs]}
@@ -93,6 +93,7 @@ try:
     page.locator('#preview-label').evaluate('(e)=>e.remove()')
     page.get_by_role('button',name='Start a mixed practice').click();page.locator('.question-card').wait_for()
     assert page.locator('.option').count()==0;assert page.locator('.sentence #typed-answer').count()==1
+    assert page.locator('#question-translation').is_visible();assert '日本語訳' in page.locator('#question-translation').inner_text()
     assert page.locator('#check-answer').is_disabled();page.locator('#typed-answer').fill('   ');assert page.locator('#check-answer').is_disabled();ok('Inline typing replaces choices and prevents empty answers')
     page.locator('#typed-answer').fill('not-the-word')
     page.get_by_role('button',name='Save & leave').click();page.get_by_role('button',name='Resume session').click();assert page.locator('#typed-answer').input_value()=='not-the-word';ok('Unsubmitted typed answer survives leaving and resuming')

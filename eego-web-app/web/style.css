@@ -12,3 +12,6 @@ body{font-size:16px}.small,.field,.text-button,.btn,.option,.check,.hint,.feedba
 .gap-input.wrong{border-color:#bc7054;background:#f7e2d8}
 .answer-help{font-size:14px;color:var(--muted);line-height:1.7;margin:0 0 12px}
 .your-answer{overflow-wrap:anywhere}
+.question-translation{margin:0 0 18px;padding:15px 17px;border-left:3px solid #73935b;border-radius:0 12px 12px 0;background:#eef2e3;overflow-wrap:anywhere}
+.translation-label{display:block;margin-bottom:6px;font-size:14px;font-weight:700;color:var(--green)}
+.question-translation p{margin:0;font-size:16px;line-height:1.8}

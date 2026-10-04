@@ -11,6 +11,7 @@ The web app is published through ChatGPT Sites. Its owner-private audience is se
 - B1–C2 practice bands, vocabulary and grammar filters, Japanese meanings and contextual examples.
 - 40 original starter lessons and 80 saved fill-in-the-blank questions. These are estimated learning bands, not the full CEFR corpus.
 - Type the missing word or phrase directly into the sentence, then press Enter or Check answer. Answers are checked on the server; case, extra spaces, full-width characters and straight/curly apostrophes are normalized. Spelling still matters.
+- The 80 saved starter questions show their Japanese translation before answering, including in older resumed lessons. These translations are bundled with the app; reading one does not mark the answer as a guess. For future generated questions, the UI also accepts a translation supplied with the question and otherwise shows its Japanese hint.
 - Persistent history, a separate weak list, due reviews, and JSON progress export.
 - A wrong answer, a hint, or an uncertain answer schedules another review. Immediate repetition cannot clear weak status.
 - New-question requests go into a durable queue. The app shows whether Codex is actually online.
