@@ -190,7 +190,7 @@ document.addEventListener('click',async event=>{
   else if(action==='report'){await api('report',{questionId:el.dataset.question});el.disabled=true;el.textContent='Reported';toast('Reported. This question will not appear in future practice.');}
   else if(action==='weak-generate'){state.generation.weakOnly=true;state.generation.kind=state.kind==='all'?'vocabulary':state.kind;state.generation.level=state.level==='all'?'B1':state.level;await navigate('generate');}
   else if(action==='refresh-jobs')await loadJobs();
-  else if(action==='cancel-job'){await api('cancel_job',{jobId:el.dataset.job});await loadJobs();}
+  else if(action==='cancel-job'){await api('cancel_job',{jobId:el.dataset.job});if(state.active?.jobId===el.dataset.job){state.active=null;saveActive();}await loadJobs();}
   else if(action==='history-all'||action==='history-mistakes'){state.mistakes=action==='history-mistakes';state.historyOffset=0;historyFrame();await loadHistory();}
   else if(action==='history-prev'||action==='history-next'){state.historyOffset=Math.max(0,state.historyOffset+(action.endsWith('next')?30:-30));await loadHistory();window.scrollTo({top:0});}
   else if(action==='catalog-prev'||action==='catalog-next'){state.offset=Math.max(0,state.offset+(action.endsWith('next')?100:-100));await loadItems();window.scrollTo({top:0});}
