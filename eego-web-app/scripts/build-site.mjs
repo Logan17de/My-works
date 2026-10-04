@@ -1,0 +1,17 @@
+import { readFile, writeFile, mkdir, rm, copyFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+const files={'index.html':'text/html; charset=utf-8','app.js':'text/javascript; charset=utf-8','style.css':'text/css; charset=utf-8','icon.svg':'image/svg+xml','manifest.webmanifest':'application/manifest+json'};
+execFileSync(process.execPath,['--check','web/app.js'],{stdio:'inherit'});
+execFileSync(process.execPath,['--check','hosting/index.js'],{stdio:'inherit'});
+const assets={};
+for(const [name,type]of Object.entries(files))assets['/'+name]={type,body:await readFile('web/'+name,'utf8')};
+await rm('dist',{recursive:true,force:true});
+await mkdir('dist/server',{recursive:true});
+await mkdir('dist/.openai',{recursive:true});
+await writeFile('dist/server/index.js','const ASSETS='+JSON.stringify(assets)+';\n'+await readFile('hosting/index.js','utf8'));
+await copyFile('.openai/hosting.json','dist/.openai/hosting.json');
+const built=await import('../dist/server/index.js?build='+Date.now());
+if(typeof built.default?.fetch!=='function')throw new Error('Missing Worker handler');
+const response=await built.default.fetch(new Request('https://eego.example/'));
+if(response.status!==200 || !(await response.text()).includes('Eego'))throw new Error('Invalid home page');
+console.log('Eego build passed: static assets and same-origin authenticated API proxy.');

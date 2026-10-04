@@ -1,0 +1,44 @@
+const API = 'https://jxvabaqswqembehxligi.supabase.co/functions/v1/eego-api/eego';
+const COOKIE = '__Host-eego_session';
+const headers = {
+  'Cache-Control': 'no-store, private',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+};
+const error = (message, status) => Response.json({error:message},{status,headers});
+export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+    if(url.pathname === '/api/eego') {
+      if(request.method !== 'POST') return error('Method not allowed.',405);
+      if(request.headers.get('origin') && request.headers.get('origin') !== url.origin) return error('Cross-site request refused.',403);
+      if(request.headers.get('sec-fetch-site') === 'cross-site' || request.headers.get('x-eego') !== '1') return error('Cross-site request refused.',403);
+      if(!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) return error('JSON required.',415);
+      try {
+        const reader=request.body?.getReader();
+        if(!reader) return error('Request body required.',400);
+        let size=0; const parts=[];
+        while(true){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>98304){await reader.cancel();return error('Request too large.',413);}parts.push(part.value);}
+        const bytes=new Uint8Array(size);let pos=0;for(const p of parts){bytes.set(p,pos);pos+=p.length;}
+        const cookie=(request.headers.get('cookie')||'').split(';').map(v=>v.trim()).find(v=>v.startsWith(COOKIE+'='));
+        const upstreamHeaders={'Content-Type':'application/json','X-Eego':'1','X-Real-IP':request.headers.get('cf-connecting-ip')||'unknown'};
+        // Only the Eego session travels upstream. Never forward the hosting session.
+        if(cookie) upstreamHeaders.Cookie=cookie;
+        const response=await fetch(API,{method:'POST',headers:upstreamHeaders,body:bytes,redirect:'error',signal:AbortSignal.timeout(20000)});
+        const out=new Headers(headers);out.set('Content-Type','application/json; charset=utf-8');
+        const setCookie=response.headers.get('set-cookie');
+        if(setCookie?.startsWith(COOKIE+'=')) out.set('Set-Cookie',setCookie);
+        if(response.headers.has('retry-after'))out.set('Retry-After',response.headers.get('retry-after'));
+        return new Response(response.body,{status:response.status,headers:out});
+      }catch{return error('Cannot reach Eego. Please try again.',503);}
+    }
+    if(request.method!=='GET' && request.method!=='HEAD') return error('Method not allowed.',405);
+    const path=url.pathname==='/'?'/index.html':url.pathname;
+    const asset=ASSETS[path];
+    if(!asset)return new Response('Page not found.',{status:404,headers});
+    return new Response(request.method==='HEAD'?null:asset.body,{headers:{...headers,'Content-Type':asset.type}});
+  }
+};

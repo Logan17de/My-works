@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+worker.env
+*.private.sql
+auth.json
+.codex/
+__pycache__/
+*.py[cod]
+node_modules/
+.vercel/
+web/dist/
+supabase/.temp/
+dist/
+.sites-runtime/
+TEST_REPORT.json

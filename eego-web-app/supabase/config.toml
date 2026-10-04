@@ -1,0 +1,6 @@
+project_id = "eego"
+
+# Custom Eego sessions and scoped worker tokens are verified by the handler.
+# This is not an anonymous data API. Do not remove handler authentication.
+[functions.eego-api]
+verify_jwt = false

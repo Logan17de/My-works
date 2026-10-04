@@ -1,0 +1,22 @@
+[Unit]
+Description=Eego private Codex lesson worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=eego
+Group=eego
+WorkingDirectory=/opt/eego/worker
+ExecStart=/usr/bin/python3 /opt/eego/worker/worker.py --env /etc/eego/worker.env
+Restart=on-failure
+RestartSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/eego/.codex
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
