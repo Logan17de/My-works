@@ -27,13 +27,15 @@ export default {
         const upstreamHeaders={'Content-Type':'application/json','X-Eego':'1','X-Real-IP':request.headers.get('cf-connecting-ip')||'unknown'};
         // Only the Eego session travels upstream. Never forward the hosting session.
         if(cookie) upstreamHeaders.Cookie=cookie;
-        const response=await fetch(API,{method:'POST',headers:upstreamHeaders,body:bytes,redirect:'error',signal:AbortSignal.timeout(20000)});
+        // Workerd only supports follow/manual; reject redirects explicitly so credentials never follow one.
+        const response=await fetch(API,{method:'POST',headers:upstreamHeaders,body:bytes,redirect:'manual',signal:AbortSignal.timeout(20000)});
+        if(response.status>=300 && response.status<400){await response.body?.cancel();return error('The authentication server redirected unexpectedly. Please try again.',502);}
         const out=new Headers(headers);out.set('Content-Type','application/json; charset=utf-8');
         const setCookie=response.headers.get('set-cookie');
         if(setCookie?.startsWith(COOKIE+'=')) out.set('Set-Cookie',setCookie);
         if(response.headers.has('retry-after'))out.set('Retry-After',response.headers.get('retry-after'));
         return new Response(response.body,{status:response.status,headers:out});
-      }catch{return error('Cannot reach Eego. Please try again.',503);}
+      }catch(e){console.error('eego_proxy_failed',e instanceof Error?e.name:'UnknownError');return error('Cannot reach Eego. Please try again.',503);}
     }
     if(request.method!=='GET' && request.method!=='HEAD') return error('Method not allowed.',405);
     const path=url.pathname==='/'?'/index.html':url.pathname;
