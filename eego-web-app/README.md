@@ -6,13 +6,11 @@ This app lives in **`Logan17de/My-works/eego-web-app`**. It is separate from AIK
 
 ## Use the web app
 
-**[Open Eego](https://eego.leedaway.chatgpt.site)**
-
 The web app is published through ChatGPT Sites. Its owner-private audience is separate from Eego's own login. Sign in with the existing **Mayuna** account and its existing password; this update does not reset it.
 
 - B1–C2 practice bands, vocabulary and grammar filters, Japanese meanings and contextual examples.
 - 40 original starter lessons and 80 saved fill-in-the-blank questions. These are estimated learning bands, not the full CEFR corpus.
-- Four choices per question; answers are checked on the server.
+- Type the missing word or phrase directly into the sentence, then press Enter or Check answer. Answers are checked on the server; case, extra spaces, full-width characters and straight/curly apostrophes are normalized. Spelling still matters.
 - Persistent history, a separate weak list, due reviews, and JSON progress export.
 - A wrong answer, a hint, or an uncertain answer schedules another review. Immediate repetition cannot clear weak status.
 - New-question requests go into a durable queue. The app shows whether Codex is actually online.

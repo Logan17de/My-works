@@ -113,7 +113,8 @@ begin
    )t;
    if ids is null then return '{"status":200,"data":{"questions":[],"message":"No matching questions yet. Try another level or generate a batch."}}'; end if;
    insert into eego.practice(user_id,question_ids) values(uid,ids) returning * into s;
-   select jsonb_agg(jsonb_build_object('id',q.id,'kind',i.kind,'level',i.level,'sentence',q.sentence,'options',(select jsonb_agg(value order by random()) from jsonb_array_elements(q.options)),'hintJa',q.hint_ja,'source',q.source) order by array_position(ids,q.id)) into arr from eego.questions q join eego.items i on i.id=q.item_id where q.id=any(ids);
+   -- Typing lessons do not expose possible answers. Keep the old payload for already-open older clients.
+   select jsonb_agg((jsonb_build_object('id',q.id,'kind',i.kind,'level',i.level,'sentence',q.sentence,'hintJa',q.hint_ja,'source',q.source) || case when p_data->>'format'='typing' then '{}'::jsonb else jsonb_build_object('options',(select jsonb_agg(value order by random()) from jsonb_array_elements(q.options))) end) order by array_position(ids,q.id)) into arr from eego.questions q join eego.items i on i.id=q.item_id where q.id=any(ids);
    return jsonb_build_object('status',200,'data',jsonb_build_object('sessionId',s.id,'questions',arr));
  end if;
  if p_action='answer' then
@@ -122,9 +123,11 @@ begin
    select feedback into fb from eego.attempts where session_id=s.id and question_id=(p_data->>'questionId')::uuid;
    if fb is not null then return jsonb_build_object('status',200,'data',fb); end if;
    select * into q from eego.questions where id=(p_data->>'questionId')::uuid;
-   choice:=trim(coalesce(p_data->>'choice','')); unsure:=coalesce((p_data->>'unsure')::boolean,false);
-   if not (q.options ? choice) then return '{"status":400,"error":"Please choose one of the four answers."}'; end if;
-   ok:=choice=q.answer;
+   if jsonb_typeof(p_data->'choice') is distinct from 'string' or length(p_data->>'choice')>160 then return '{"status":400,"error":"Type a word or phrase of up to 160 characters."}'; end if;
+   choice:=trim(regexp_replace(normalize(p_data->>'choice',NFKC),'\s+',' ','g')); unsure:=coalesce((p_data->>'unsure')::boolean,false);
+   if choice='' then return '{"status":400,"error":"Type the missing word or phrase first."}'; end if;
+   -- Ignore keyboard formatting, while keeping spelling and word order significant.
+   ok:=lower(translate(choice,'‘’',chr(39)||chr(39)))=lower(translate(trim(regexp_replace(normalize(q.answer,NFKC),'\s+',' ','g')),'‘’',chr(39)||chr(39)));
    insert into eego.mastery(user_id,item_id) values(uid,q.item_id) on conflict do nothing;
    select * into m from eego.mastery where user_id=uid and item_id=q.item_id for update;
    step:=m.recovery; isweak:=m.weak; due:=m.next_due;

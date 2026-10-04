@@ -3,12 +3,13 @@ import datetime as dt
 import json
 from pathlib import Path
 import uuid
+import unicodedata
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 DATA=json.loads((ROOT/'data'/'seed.json').read_text())
 NOW=lambda:dt.datetime.now(dt.timezone.utc).isoformat()
 class Fixture:
-    def __init__(self):self.auth=False;self.attempts=[];self.weak={};self.jobs=[];self.sessions={}
+    def __init__(self):self.auth=False;self.attempts=[];self.weak={};self.jobs=[];self.sessions={};self.fail_answer=False
     def item(self,i):
         a=[a for a in self.attempts if a['feedback']['itemId']==i['id']]
         return {**i,'question_count':2,'seen':len(a),'correct':sum(a['feedback']['correct'] for a in a),'weak':i['id'] in self.weak,'recovery':0,'next_due':NOW()}
@@ -22,6 +23,7 @@ class Fixture:
             items=[self.item(i) for i in DATA['items'] if (data.get('kind','all')=='all' or data['kind']==i['kind']) and (data.get('level','all')=='all' or data['level']==i['level']) and (not data.get('search') or data['search'].lower() in i['label'].lower() or data['search'] in i['meaning_ja']) and (action!='weak' or i['id'] in self.weak)]
             return 200,{'items':items[data.get('offset',0):][:100]}
         if action=='practice':
+            assert data.get('format')=='typing'
             qs=[]
             for n,q in enumerate(DATA['questions']):
                 item=next(i for i in DATA['items'] if i['id']==q['item_id'])
@@ -31,12 +33,14 @@ class Fixture:
                 qs.append({'id':str(uuid.uuid5(uuid.NAMESPACE_DNS,'eego-test-'+str(n))),'itemId':q['item_id'],'kind':item['kind'],'level':item['level'],'sentence':q['sentence'],'options':q['options'],'hintJa':q['hint_ja'],'source':'Local UI fixture','raw':q})
                 if len(qs)>=4:break
             sid=str(uuid.uuid4());self.sessions[sid]=qs
-            return 200,{'sessionId':sid,'questions':[{k:v for k,v in q.items() if k not in ('raw','itemId')} for q in qs]}
+            return 200,{'sessionId':sid,'questions':[{k:v for k,v in q.items() if k not in ('raw','itemId','options')} for q in qs]}
         if action=='answer':
+            if self.fail_answer:self.fail_answer=False;return 503,{'error':'Fixture connection failure. Please retry.'}
             q=next(q for q in self.sessions[data['sessionId']] if q['id']==data['questionId']);raw=q['raw'];i=next(i for i in DATA['items'] if i['id']==raw['item_id'])
             existing=next((a for a in self.attempts if a['key']==data['sessionId']+q['id']),None)
             if existing:return 200,existing['feedback']
-            correct=data['choice']==raw['answer'];weak=not correct or data['unsure']
+            norm=lambda s:' '.join(unicodedata.normalize('NFKC',s).replace('’',"'").replace('‘',"'").lower().split())
+            correct=norm(data['choice'])==norm(raw['answer']);weak=not correct or data['unsure']
             if weak:self.weak[i['id']]=True
             f=dict(correct=correct,unsure=data['unsure'],choice=data['choice'],answer=raw['answer'],sentence=raw['sentence'],explanationJa=raw['explanation_ja'],translationJa=raw['translation_ja'],label=i['label'],meaningJa=i['meaning_ja'],notesJa=i['notes_ja'],itemId=i['id'],kind=i['kind'],level=i['level'],weak=i['id'] in self.weak,recovery=0,nextDue=NOW(),questionId=q['id'])
             self.attempts.insert(0,{'id':str(uuid.uuid4()),'key':data['sessionId']+q['id'],'created_at':NOW(),'feedback':f});return 200,f
@@ -88,12 +92,23 @@ try:
     page.screenshot(path=str(screens/'mobile-home.png'),full_page=False)
     page.locator('#preview-label').evaluate('(e)=>e.remove()')
     page.get_by_role('button',name='Start a mixed practice').click();page.locator('.question-card').wait_for()
-    page.locator('.option').nth(1).click();page.get_by_role('button',name='Check answer').click();page.locator('.feedback.incorrect').wait_for();assert len(fixture.attempts)==1;ok('Wrong answer shows Japanese explanation and saves once')
+    assert page.locator('.option').count()==0;assert page.locator('.sentence #typed-answer').count()==1
+    assert page.locator('#check-answer').is_disabled();page.locator('#typed-answer').fill('   ');assert page.locator('#check-answer').is_disabled();ok('Inline typing replaces choices and prevents empty answers')
+    page.locator('#typed-answer').fill('not-the-word')
+    page.get_by_role('button',name='Save & leave').click();page.get_by_role('button',name='Resume session').click();assert page.locator('#typed-answer').input_value()=='not-the-word';ok('Unsubmitted typed answer survives leaving and resuming')
+    page.get_by_role('button',name='Need a Japanese hint?').click();assert page.locator('#typed-answer').input_value()=='not-the-word';assert page.locator('#unsure').is_checked();ok('Hint preserves typed text and marks uncertainty')
+    page.screenshot(path=str(screens/'mobile-typing.png'),full_page=True)
+    for width,height in [(360,800),(768,1024),(1365,900)]:
+        page.set_viewport_size({'width':width,'height':height});assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),f'typing overflow {width}'
+    page.set_viewport_size({'width':390,'height':844})
+    fixture.fail_answer=True;page.get_by_role('button',name='Check answer').click();page.get_by_text('Fixture connection failure. Please retry.').wait_for();page.locator('#typed-answer:enabled').wait_for();assert page.locator('#typed-answer').input_value()=='not-the-word';assert len(fixture.attempts)==0;ok('Failed submission keeps text and allows retry')
+    page.locator('#typed-answer').press('Enter');page.locator('.feedback.incorrect').wait_for();assert len(fixture.attempts)==1;assert 'not-the-word' in page.locator('.your-answer').inner_text();ok('Enter submits a typed mistake, shows Japanese explanation and saves once')
     page.screenshot(path=str(screens/'mobile-feedback.png'),full_page=False)
     page.get_by_role('button',name='Weak items',exact=True).click();page.locator('.item').first.wait_for();assert page.locator('.item').count()==1;ok('Weak items are separated')
     page.get_by_role('button',name='History',exact=True).click();page.locator('.history-item').wait_for();page.get_by_text('Why this works',exact=True).click();ok('History reveals Japanese correction')
     saved=page.evaluate('window.__eegoSessionStore');page.close();page=mount(saved);page.get_by_role('heading',name='Hello, Mayuna.').wait_for();page.get_by_role('button',name='Resume session').click();page.locator('.feedback.incorrect').wait_for();ok('Refresh preserves active practice without duplicating attempts')
-    page.get_by_role('button',name='Next sentence').click();page.locator('.option').first.click();page.get_by_role('button',name='Check answer').click();page.locator('.feedback:not(.incorrect)').wait_for();ok('Correct answer advances normally')
+    page.get_by_role('button',name='Next sentence').click();assert page.locator('#typed-answer').input_value()=='';assert page.locator('#typed-answer').evaluate('(e)=>e===document.activeElement')
+    answer=list(fixture.sessions.values())[-1][1]['raw']['answer'];page.locator('#typed-answer').fill('  '+answer.upper()+'  ');page.get_by_role('button',name='Check answer').click();page.locator('.feedback:not(.incorrect)').wait_for();ok('Typed correct answer advances, clears and focuses the next blank')
     page.get_by_role('button',name='Learn',exact=True).click();page.locator('#kind-filter').select_option('grammar');page.locator('#level-filter').select_option('C1');page.wait_for_timeout(200);assert page.locator('.item').count()==4;ok('Library filters category and level')
     page.locator('#search-filter').fill('cleft');page.wait_for_timeout(400);assert page.locator('.item').count()==1;page.locator('.item summary').click();page.locator('.example').first.wait_for();ok('Search and contextual examples work')
     page.get_by_role('button',name='Generate',exact=True).click();page.locator('#generate-form').wait_for();assert 'not connected' in page.locator('#generator-notice').inner_text();page.locator('#generate-form button[type=submit]').click();page.get_by_text('waiting for Codex',exact=True).wait_for();ok('Offline Codex is honestly shown and request stays queued')

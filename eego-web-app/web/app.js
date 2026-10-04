@@ -2,7 +2,7 @@
 const $ = (id) => document.getElementById(id);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const state = { user:null, stats:{}, view:'home', kind:'all', level:'all', search:'', offset:0, historyOffset:0, mistakes:false, active:null, generation:{kind:'vocabulary',level:'B1',count:10,topic:'mixed',weakOnly:false}, version:0 };
-let polling, searchTimer, toastTimer, itemRequest=0, historyRequest=0, startingPractice=false;
+let polling, searchTimer, toastTimer, itemRequest=0, historyRequest=0, startingPractice=false, answering=false;
 const formatDate = (date) => date ? new Intl.DateTimeFormat('en-GB',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tokyo'}).format(new Date(date)) : 'Not studied yet';
 const levels = (all=true, selected='all') => `${all?'<option value="all">All levels</option>':''}${['B1','B2','C1','C2'].map(x=>`<option ${x===selected?'selected':''}>${x}</option>`).join('')}`;
 const categories = (all=true,selected='all') => `${all?'<option value="all">All categories</option>':''}<option value="vocabulary" ${selected==='vocabulary'?'selected':''}>Vocabulary</option><option value="grammar" ${selected==='grammar'?'selected':''}>Grammar</option>`;
@@ -53,7 +53,7 @@ async function loadItems(version=state.version){
 }
 async function startPractice(filters={}){
  if(startingPractice)return;startingPractice=true;let r;
- try{r=await api('practice',filters);}finally{startingPractice=false;}
+ try{r=await api('practice',{...filters,format:'typing'});}finally{startingPractice=false;}
  clearInterval(polling);
  if(!r.questions.length){toast(r.message||'There are no questions for this selection yet.');return;}
  state.active={sessionId:r.sessionId,questions:r.questions,index:0,score:0,weak:0,feedback:null,choice:null,unsure:false,hintUsed:false};saveActive();showPractice();
@@ -61,13 +61,37 @@ async function startPractice(filters={}){
 function showPractice(){state.view='practice';state.version++;shell();renderQuestion();window.scrollTo({top:0});}
 function renderQuestion(){
  const a=state.active;if(!a)return navigate('home');const q=a.questions[a.index],f=a.feedback;
- $('content').innerHTML=`<section class="quiz"><div class="quiz-top"><button class="text-button" data-nav="home">← Save & leave</button><p>Question ${a.index+1} of ${a.questions.length}</p></div><progress max="${a.questions.length}" value="${a.index+(f?1:0)}" aria-label="Session progress"></progress><article class="question-card"><div class="row between"><span class="eyebrow" style="margin:0">Choose the missing expression</span><span class="badge">${esc(q.level)} · ${esc(q.kind)}</span></div><p class="sentence">${esc(q.sentence).replace('____','<span class="gap">&nbsp;?&nbsp;</span>')}</p><button class="text-button" data-action="hint" ${f?'disabled':''}>${a.hintUsed?'Japanese hint shown':'Need a Japanese hint?'}</button>${a.hintUsed?`<div class="hint" lang="ja">${esc(q.hintJa)}</div>`:''}<div class="options" role="group" aria-label="Answer choices">${q.options.map((o,i)=>`<button class="option ${a.choice===o?'selected':''} ${f&&o===f.answer?'correct':''} ${f&&o===f.choice&&!f.correct?'wrong':''}" data-action="option" data-option="${i}" ${f?'disabled':''} aria-pressed="${a.choice===o}"><span class="letter">${'ABCD'[i]}</span><span>${esc(o)}</span></button>`).join('')}</div>${!f?`<div class="quiz-actions"><label class="check"><input id="unsure" type="checkbox" ${a.unsure||a.hintUsed?'checked':''}> I guessed / I’m not sure</label><button class="btn" id="check-answer" data-action="answer" ${a.choice==null?'disabled':''}>Check answer</button></div>`:''}</article>${f?`<section class="feedback ${!f.correct||f.unsure?'incorrect':''}" aria-live="polite"><h3>${f.correct?(f.unsure?'Correct. Let’s make it confident.':'That’s the expression. ✓'):'A useful one to revisit.'}</h3><div class="answer">${esc(f.answer)}</div><p><strong>${esc(f.label)}</strong> · <span lang="ja">${esc(f.meaningJa)}</span></p><p lang="ja">${esc(f.explanationJa)}</p><p lang="ja">${esc(f.translationJa)}</p><div class="recovery">${f.weak?`Saved in Weak items · ${f.recovery}/3 scheduled recovery steps.`:'Saved to your learning history.'}<br>Next review: ${formatDate(f.nextDue)} JST. ${f.weak?'Early retries do not remove it from your weak list.':''}</div></section><div class="row between"><button class="text-button" data-action="report" data-question="${esc(q.id)}">Report a problem</button><button class="btn" data-action="next">${a.index+1===a.questions.length?'Finish session':'Next sentence'} →</button></div>`:''}<p class="page-footer">${esc(q.source)}. Answers are checked and saved on the server.</p></section>`;
+ const answerInput=`<input id="typed-answer" class="gap-input ${f?(f.correct?'correct':'wrong'):''}" name="answer" type="text" aria-label="Missing word or phrase" aria-describedby="answer-help" placeholder="Type here" value="${esc(a.choice??'')}" maxlength="160" required autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text" enterkeyhint="done" ${f?'disabled':''}>`;
+ $('content').innerHTML=`<section class="quiz">
+  <div class="quiz-top"><button class="text-button" data-nav="home">← Save & leave</button><p>Question ${a.index+1} of ${a.questions.length}</p></div>
+  <progress max="${a.questions.length}" value="${a.index+(f?1:0)}" aria-label="Session progress"></progress>
+  <article class="question-card"><form id="answer-form">
+   <div class="row between"><span class="eyebrow" style="margin:0">Type the missing word or phrase</span><span class="badge">${esc(q.level)} · ${esc(q.kind)}</span></div>
+   <p class="sentence">${esc(q.sentence).replace('____',()=>answerInput)}</p>
+   <p id="answer-help" class="answer-help" lang="ja">空欄に英単語・フレーズを入力してください。大文字・小文字は区別しません。</p>
+   <button type="button" class="text-button" data-action="hint" ${f?'disabled':''}>${a.hintUsed?'Japanese hint shown':'Need a Japanese hint?'}</button>
+   ${a.hintUsed?`<div class="hint" lang="ja">${esc(q.hintJa)}</div>`:''}
+   ${!f?`<div class="quiz-actions"><label class="check"><input id="unsure" type="checkbox" ${a.unsure||a.hintUsed?'checked':''}> I guessed / I’m not sure</label><button class="btn" id="check-answer" type="submit" ${!a.choice?.trim()?'disabled':''}>Check answer</button></div>`:''}
+  </form></article>
+  ${f?`<section class="feedback ${!f.correct||f.unsure?'incorrect':''}" aria-live="polite"><h3>${f.correct?(f.unsure?'Correct. Let’s make it confident.':'That’s the expression. ✓'):'A useful one to revisit.'}</h3>
+   ${!f.correct?`<p class="your-answer">Your answer: <strong>${esc(f.choice)}</strong></p>`:''}
+   <div class="answer">${esc(f.answer)}</div><p><strong>${esc(f.label)}</strong> · <span lang="ja">${esc(f.meaningJa)}</span></p><p lang="ja">${esc(f.explanationJa)}</p><p lang="ja">${esc(f.translationJa)}</p><div class="recovery">${f.weak?`Saved in Weak items · ${f.recovery}/3 scheduled recovery steps.`:'Saved to your learning history.'}<br>Next review: ${formatDate(f.nextDue)} JST. ${f.weak?'Early retries do not remove it from your weak list.':''}</div></section><div class="row between"><button class="text-button" data-action="report" data-question="${esc(q.id)}">Report a problem</button><button class="btn" data-action="next">${a.index+1===a.questions.length?'Finish session':'Next sentence'} →</button></div>`:''}
+  <p class="page-footer">${esc(q.source)}. Answers are checked and saved on the server.</p></section>`;
+ if(!f) $('typed-answer').focus({preventScroll:true});
 }
 async function submitAnswer(){
- const a=state.active;if(!a||a.feedback||a.choice==null)return;
- $('check-answer').disabled=true;document.querySelectorAll('.option').forEach(x=>x.disabled=true);
- try{const f=await api('answer',{sessionId:a.sessionId,questionId:a.questions[a.index].id,choice:a.choice,unsure:!!($('unsure')?.checked||a.hintUsed)});a.feedback=f;a.score+=f.correct?1:0;a.weak+=f.weak?1:0;if(state.active===a){saveActive();if(state.view==='practice')renderQuestion();}}
- catch(error){handleError(error);if(state.active)renderQuestion();}
+ const a=state.active;if(!a||a.feedback||answering)return;
+ a.choice=$('typed-answer')?.value??a.choice;
+ if(!a.choice?.trim())return;
+ a.unsure=!!($('unsure')?.checked||a.hintUsed);saveActive();answering=true;
+ document.querySelectorAll('#answer-form input, #answer-form button').forEach(x=>x.disabled=true);
+ $('check-answer').textContent='Checking…';
+ try{
+  const f=await api('answer',{sessionId:a.sessionId,questionId:a.questions[a.index].id,choice:a.choice,unsure:a.unsure});
+  a.feedback=f;a.score+=f.correct?1:0;a.weak+=f.weak?1:0;
+  if(state.active===a)saveActive();
+ }catch(error){handleError(error);}
+ finally{answering=false;if(state.active===a&&state.view==='practice')renderQuestion();}
 }
 function nextQuestion(){
  const a=state.active;if(!a?.feedback)return;
@@ -108,9 +132,7 @@ document.addEventListener('click',async event=>{
   else if(action==='item-practice')await startPractice({itemId:el.dataset.item});
   else if(action==='batch-practice')await startPractice({jobId:el.dataset.job});
   else if(action==='resume'&&state.active)showPractice();
-  else if(action==='option'&&!state.active.feedback){state.active.choice=state.active.questions[state.active.index].options[Number(el.dataset.option)];state.active.unsure=!!$('unsure')?.checked;saveActive();renderQuestion();}
-  else if(action==='hint'&&!state.active.feedback){state.active.hintUsed=true;state.active.unsure=true;saveActive();renderQuestion();}
-  else if(action==='answer')await submitAnswer();
+  else if(action==='hint'&&!state.active.feedback&&!answering){state.active.hintUsed=true;state.active.unsure=true;saveActive();renderQuestion();}
   else if(action==='next')nextQuestion();
   else if(action==='report'){await api('report',{questionId:el.dataset.question});el.disabled=true;el.textContent='Reported';toast('Reported. This question will not appear in future practice.');}
   else if(action==='weak-generate'){state.generation.weakOnly=true;state.generation.kind=state.kind==='all'?'vocabulary':state.kind;state.generation.level=state.level==='all'?'B1':state.level;await navigate('generate');}
@@ -128,9 +150,15 @@ document.addEventListener('change',event=>{
  if(event.target.id==='level-filter'){state.level=event.target.value;state.offset=0;loadItems().catch(handleError);}
  if(event.target.id==='unsure'&&state.active){state.active.unsure=event.target.checked;saveActive();}
 });
-document.addEventListener('input',event=>{if(event.target.id==='search-filter'){state.search=event.target.value;state.offset=0;clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadItems().catch(handleError),250);}});
+document.addEventListener('input',event=>{
+ if(event.target.id==='typed-answer'&&state.active&&!state.active.feedback&&!answering){state.active.choice=event.target.value;saveActive();$('check-answer').disabled=!event.target.value.trim();}
+ if(event.target.id==='search-filter'){state.search=event.target.value;state.offset=0;clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadItems().catch(handleError),250);}
+});
+document.addEventListener('keydown',event=>{if(event.target.id==='typed-answer'&&event.key==='Enter'&&event.isComposing)event.preventDefault();});
 document.addEventListener('submit',async event=>{
- const form=event.target;if(!['login-form','generate-form','password-form'].includes(form.id))return;
+ const form=event.target;
+ if(form.id==='answer-form'){event.preventDefault();await submitAnswer();return;}
+ if(!['login-form','generate-form','password-form'].includes(form.id))return;
  event.preventDefault();const button=form.querySelector('button[type="submit"]');const original=button.textContent;button.disabled=true;button.textContent='One moment…';const data=Object.fromEntries(new FormData(form));
  try{
   if(form.id==='login-form'){const r=await api('login',data);state.user=r.username;restoreActive();await navigate('home');}

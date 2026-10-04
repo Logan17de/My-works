@@ -16,16 +16,20 @@ begin
  r:=public.eego_api('login',jsonb_build_object('username','__eego_test_b','password',pw),'','test-ip-b'); t2:=r->>'token';
  r:=public.eego_api('catalog','{"kind":"grammar","level":"B2"}',t,'');
  if exists(select 1 from jsonb_array_elements(r->'data'->'items') x where x->>'kind'<>'grammar') then raise exception 'FAIL: category filtering'; end if;
- p:=public.eego_api('practice','{"itemId":"__test_vocab"}',t,''); sid:=(p->'data'->>'sessionId')::uuid; qid:=(p->'data'->'questions'->0->>'id')::uuid;
- if jsonb_array_length(p->'data'->'questions')<>2 or p->'data'->'questions'->0 ? 'answer' then raise exception 'FAIL: practice or answer leak'; end if;
+ p:=public.eego_api('practice','{"itemId":"__test_vocab","format":"typing"}',t,''); sid:=(p->'data'->>'sessionId')::uuid; qid:=(p->'data'->'questions'->0->>'id')::uuid;
+ if jsonb_array_length(p->'data'->'questions')<>2 or p->'data'->'questions'->0 ? 'answer' or p->'data'->'questions'->0 ? 'options' then raise exception 'FAIL: practice or answer leak'; end if;
  r:=public.eego_api('answer',jsonb_build_object('sessionId',sid,'questionId',qid,'choice','lend'),t2,''); if (r->>'status')::int<>403 then raise exception 'FAIL: cross-user session'; end if;
- r:=public.eego_api('answer',jsonb_build_object('sessionId',sid,'questionId',qid,'choice','not-an-option'),t,''); if (r->>'status')::int<>400 then raise exception 'FAIL: answer validation'; end if;
- f:=public.eego_api('answer',jsonb_build_object('sessionId',sid,'questionId',qid,'choice','lend'),t,''); if not (f->'data'->>'weak')::boolean or (f->'data'->>'correct')::boolean then raise exception 'FAIL: weak promotion'; end if;
+ r:=public.eego_api('answer',jsonb_build_object('sessionId',sid,'questionId',qid,'choice',E' \t\n '),t,''); if (r->>'status')::int<>400 then raise exception 'FAIL: empty answer validation'; end if;
+ r:=public.eego_api('answer',jsonb_build_object('sessionId',sid,'questionId',qid,'choice',repeat('a',161)),t,''); if (r->>'status')::int<>400 then raise exception 'FAIL: answer length validation'; end if;
+ r:=public.eego_api('answer',jsonb_build_object('sessionId',sid,'questionId',qid,'choice','{}'::jsonb),t,''); if (r->>'status')::int<>400 then raise exception 'FAIL: answer type validation'; end if;
+ if exists(select 1 from eego.attempts where user_id=uid) then raise exception 'FAIL: invalid input saved'; end if;
+ f:=public.eego_api('answer',jsonb_build_object('sessionId',sid,'questionId',qid,'choice','borow'),t,''); if (f->>'status')::int<>200 or not (f->'data'->>'weak')::boolean or (f->'data'->>'correct')::boolean or f->'data'->>'choice'<>'borow' then raise exception 'FAIL: typed mistake or weak promotion'; end if;
  r:=public.eego_api('answer',jsonb_build_object('sessionId',sid,'questionId',qid,'choice','borrow'),t,'');
  if r<>f or (select count(*) from eego.attempts where user_id=uid)<>1 then raise exception 'FAIL: answer idempotency'; end if;
  r:=public.eego_api('weak','{}',t,''); if jsonb_array_length(r->'data'->'items')<>1 then raise exception 'FAIL: weak list'; end if;
  qid:=(p->'data'->'questions'->1->>'id')::uuid;
- r:=public.eego_api('answer',jsonb_build_object('sessionId',sid,'questionId',qid,'choice','borrow'),t,'');
+ r:=public.eego_api('answer',jsonb_build_object('sessionId',sid,'questionId',qid,'choice',E' \tＢＯＲＲＯＷ \n'),t,'');
+ if not (r->'data'->>'correct')::boolean then raise exception 'FAIL: case, width and whitespace normalization'; end if;
  if not (r->'data'->>'weak')::boolean or (r->'data'->>'recovery')::int<>0 then raise exception 'FAIL: immediate retry cleared weak status'; end if;
  for k in 1..3 loop
    update eego.mastery set next_due=now()-interval '1 second' where user_id=uid and item_id='__test_vocab';
@@ -38,6 +42,16 @@ begin
  r:=public.eego_api('history','{}',t,''); if jsonb_array_length(r->'data'->'attempts')<>5 then raise exception 'FAIL: history'; end if;
  r:=public.eego_api('history','{}',t2,''); if jsonb_array_length(r->'data'->'attempts')<>0 then raise exception 'FAIL: private history'; end if;
  r:=public.eego_api('export','{}',t,''); if r->'data' ? 'password_hash' or r->'data' ? 'token' or (r->'data'->>'schemaVersion')::int<>1 then raise exception 'FAIL: export'; end if;
+ insert into eego.questions(item_id,sentence,options,answer,hint_ja,explanation_ja,translation_ja,fingerprint) values
+ ('__test_grammar','I ____ known if you had told me.','["would have","will have","would","will"]','would have','仮定','過去の仮定には would have を使います。','教えてくれていたら知っていたでしょう。','__test_q3'),
+ ('__test_grammar','I ____ think that is right.','["don''t","doesn''t","isn''t","won''t"]','don''t','否定','現在形の否定です。','それは正しいと思いません。','__test_q4');
+ p:=public.eego_api('practice','{"itemId":"__test_grammar","format":"typing"}',t,''); sid:=(p->'data'->>'sessionId')::uuid;
+ select id into qid from eego.questions where fingerprint='__test_q3';
+ r:=public.eego_api('answer',jsonb_build_object('sessionId',sid,'questionId',qid,'choice',E'  WOULD   \tHAVE  '),t,'');
+ if not (r->'data'->>'correct')::boolean then raise exception 'FAIL: typed phrase normalization'; end if;
+ select id into qid from eego.questions where fingerprint='__test_q4';
+ r:=public.eego_api('answer',jsonb_build_object('sessionId',sid,'questionId',qid,'choice','DON’T'),t,'');
+ if not (r->'data'->>'correct')::boolean then raise exception 'FAIL: mobile apostrophe normalization'; end if;
  r:=public.eego_api('generate','{"kind":"vocabulary","level":"B1","count":5,"topic":"work","itemId":"__test_vocab"}',t,''); jid:=(r->'data'->>'jobId')::uuid;
  if (r->>'status')::int<>202 then raise exception 'FAIL: generation queue'; end if;
  r:=public.eego_api('generate','{"kind":"vocabulary","level":"B1","count":5,"topic":"work","itemId":"__test_vocab"}',t,''); if (r->>'status')::int<>409 then raise exception 'FAIL: duplicate active generation'; end if;
