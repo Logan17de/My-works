@@ -126,5 +126,5 @@ class ReplyAction(StrictModel):
 class TransportResult(StrictModel):
     submission: Literal["accepted", "rejected", "uncertain"]
     sent_copy: Literal["stored", "failed", "not_attempted", "unknown"]
-    error_class: Literal["none", "provider_rejected", "provider_uncertain", "adapter_exception", "transport_timeout", "invalid_adapter_result"] = "none"
+    error_class: Literal["none", "provider_rejected", "provider_uncertain", "adapter_exception", "transport_timeout", "invalid_adapter_result", "source_revalidation_failed", "submission_gate_refused"] = "none"
     delivery: Literal["unverified"] = "unverified"

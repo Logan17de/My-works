@@ -55,7 +55,7 @@ def restore(settings, source_path: Path):
             identity=target.execute("SELECT value FROM metadata WHERE key='deployment_identity'").fetchone()
             if not identity or identity[0] != settings.identity_digest:
                 raise StoreError("restore_identity_mismatch",409)
-        staged=Store(settings.model_copy(update={"database_path":str(candidate)}))
+        staged=Store(settings.model_copy(update={"database_path":str(candidate)}),maintenance_only=True)
         with staged.transaction() as conn:
             conn.execute("UPDATE metadata SET value='true' WHERE key='execution_quarantine'")
             rows=conn.execute("SELECT e.proposal_id,e.digest,e.state,p.payload FROM executions e JOIN proposals p ON p.id=e.proposal_id WHERE e.state IN ('claimed','queued')").fetchall()

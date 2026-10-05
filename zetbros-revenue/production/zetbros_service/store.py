@@ -22,8 +22,11 @@ class StoreError(Exception):
 
 
 class Store:
-    def __init__(self, settings: Settings, clock=time.time, *, initialize: bool = False):
+    workflow_contract = "action_v1"
+
+    def __init__(self, settings: Settings, clock=time.time, *, initialize: bool = False, maintenance_only: bool = False):
         self.settings, self.clock = settings, clock
+        self.maintenance_only = maintenance_only
         self.path = Path(settings.database_path)
         if not self.path.parent.is_dir() or self.path.is_symlink() or not self.path.is_file():
             raise RuntimeError("initialized local database required; use explicit init only for a new deployment")
@@ -86,6 +89,12 @@ PRAGMA user_version=1;
 COMMIT;
 """)
         with self.transaction() as conn:
+            mail_schema = conn.execute("SELECT value FROM metadata WHERE key='mail_review_schema'").fetchone()
+            mail_table = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mail_previews'").fetchone()
+            if bool(mail_schema) != bool(mail_table):
+                raise RuntimeError("mail-review ledger extension metadata/table is incomplete")
+            if mail_schema and (mail_schema[0] != "1" or (self.workflow_contract != "mail_exact_wire_v1" and not maintenance_only)):
+                raise RuntimeError("mail-review ledger cannot use the action-only workflow")
             existing = conn.execute("SELECT value FROM metadata WHERE key='deployment_identity'").fetchone()
             if not existing and not initialize:
                 raise RuntimeError("deployment identity metadata is missing")
@@ -163,6 +172,8 @@ COMMIT;
             conn.execute("INSERT INTO rate_limits VALUES(?,?,1) ON CONFLICT(principal,bucket) DO UPDATE SET count=count+1", (key,bucket))
 
     def create(self, action: ReplyAction, request_digest: str, actor: Principal, request_id: str):
+        if self.maintenance_only:
+            raise StoreError("maintenance_only")
         with self.transaction() as conn:
             old = conn.execute("SELECT * FROM proposals WHERE tenant_id=? AND connector_id=? AND operation_key=?",
                                (action.tenant_id,action.connector_id,action.operation_key)).fetchone()
@@ -201,7 +212,13 @@ COMMIT;
         except sqlite3.Error as exc:
             raise StoreError("storage_unavailable",503) from exc
 
+    def bound_digest(self, conn, proposal_id: str, action: ReplyAction) -> str:
+        """Default action-only contract; specialized ledgers bind exact previews."""
+        return digest(action)
+
     def decide(self, proposal_id: str, shown_digest: str, decision: str, actor: Principal, request_id: str):
+        if self.maintenance_only:
+            raise StoreError("maintenance_only")
         if actor.role != "reviewer" or self.settings.role(actor.subject,actor.client_id) != "reviewer":
             raise StoreError("reviewer_required",403)
         with self.transaction() as conn:
@@ -211,7 +228,7 @@ COMMIT;
             if row["digest"] != shown_digest:
                 raise StoreError("digest_mismatch")
             action = ReplyAction.model_validate_json(row["payload"])
-            if digest(action) != shown_digest or action.policy_version != self.settings.policy_version:
+            if self.bound_digest(conn,proposal_id,action) != shown_digest or action.policy_version != self.settings.policy_version:
                 raise StoreError("policy_or_payload_changed")
             now = int(self.clock())
             if now < row["created_at"] or now >= row["expires_at"]:
@@ -256,6 +273,8 @@ COMMIT;
                 self.event(conn,request_id,Principal("service-worker","service-worker","worker"),row["proposal_id"],row["digest"],action.policy_version,"uncertainty","uncertain","claim_interrupted")
 
     def claim(self, proposal_id: str, source_fingerprint: str | None, transport_enabled: bool, request_id: str):
+        if self.maintenance_only:
+            raise StoreError("maintenance_only")
         with self.transaction() as conn:
             row = conn.execute("SELECT p.*,e.state AS execution_state FROM proposals p JOIN executions e ON p.id=e.proposal_id WHERE p.id=?",(proposal_id,)).fetchone()
             if not row or row["execution_state"] != "queued":
@@ -275,7 +294,7 @@ COMMIT;
                 error = "proposer_revoked"
             elif not row["approval_at"] <= now < row["approval_expires_at"] or now >= action.expires_at:
                 error = "approval_expired"
-            elif action.policy_version != self.settings.policy_version or digest(action) != row["digest"] or action.source_fingerprint != source_fingerprint:
+            elif action.policy_version != self.settings.policy_version or self.bound_digest(conn,proposal_id,action) != row["digest"] or action.source_fingerprint != source_fingerprint:
                 error = "source_policy_or_payload_changed"
             if error:
                 state = "expired" if error == "approval_expired" else "blocked" if error in ("delivery_disabled","source_unavailable","restore_quarantine") else "invalidated"

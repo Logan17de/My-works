@@ -6,11 +6,12 @@ from the existing offline proof. It is not a universal gateway or a hosted
 multi-tenant product.
 
 **Live outbound delivery is disabled in code. Buyer production release is
-blocked until the actual Mail source/adapter, existing customer identity
+blocked until the reviewed live Mail bridge, existing customer identity
 configuration, approved deployment, and release acceptance are available.**
-No environment switch enables sending. No Mail source, real mailbox, provider
-credential, customer deployment, model/client integration, or real delivery was
-accessed or tested for this change.
+No environment switch enables sending. The supplied Mail source has now been inspected and an offline exact-preview
+integration candidate is documented in [MAIL_OWNER_INTEGRATION.md](MAIL_OWNER_INTEGRATION.md).
+No real mailbox, provider credential, customer deployment, live model/client
+integration or real delivery was accessed or tested.
 
 ## Run and verify
 

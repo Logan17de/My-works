@@ -8,7 +8,7 @@ import uuid
 from .adapters import DisabledTransport, SnapshotSource, SourceNotFound, SourceUnavailable
 from .auth import Principal, Verifier
 from .config import Settings
-from .models import ProposalInput, ReplyAction, TransportResult, digest
+from .models import ProposalInput, ReplyAction, TransportResult, canonical, digest
 from .store import Store, StoreError
 
 
@@ -77,7 +77,9 @@ class Service:
             cancellation = False
             try:
                 raw = await asyncio.wait_for(self.transport.submit(action),timeout=self.settings.adapter_timeout_seconds)
-                result = TransportResult.model_validate(raw).model_dump(mode="json")
+                if isinstance(raw, TransportResult):
+                    raw = raw.model_dump(mode="json", warnings=False)
+                result = TransportResult.model_validate_json(canonical(raw)).model_dump(mode="json")
             except asyncio.TimeoutError:
                 result = TransportResult(submission="uncertain",sent_copy="unknown",error_class="transport_timeout").model_dump(mode="json")
             except asyncio.CancelledError:

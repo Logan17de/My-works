@@ -91,6 +91,17 @@ delivery `unverified`. A failed or uncertain Sent copy preserves accepted
 submission, and cannot trigger a resend. Raw provider strings are not accepted
 into result fields or logs.
 
+## Current integration checkpoint
+
+The supplied owning Mail 0.1.2 source is now inspected. Our own read-interface
+adapter and authenticated exact-preview/ledger candidate are documented in
+[MAIL_OWNER_INTEGRATION.md](MAIL_OWNER_INTEGRATION.md). They are verified only
+with fictional ports and remain unreachable from configured production.
+The original convenience send tools cannot submit the approved exact wire and
+are never used by the candidate. Historical unavailable-source descriptions
+below refer to this contract's original checkpoint; the current live gates are
+listed in the new integration document.
+
 ## Required live bridge and approval integration
 
 The existing Mail connector's owning source remains unavailable. This addition
