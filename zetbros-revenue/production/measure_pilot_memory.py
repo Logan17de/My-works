@@ -44,7 +44,7 @@ def main():
         app=create_app(service,run_worker=False)
         with TestClient(app,base_url='http://127.0.0.1:8081') as client:
             startup=status()
-            agent=fixture.fixture.fixture.headers()
+            agent={"Authorization":"Bearer "+fixture.fixture.fixture.token(iss=fixture.settings.issuer,aud=fixture.settings.audience)}
             record=client.get('/v1/source/imap-v1:123:42',headers=agent).json()
             def propose(index):
                 request={'operation_key':f'memory-pilot-operation-{index:04d}',
@@ -55,7 +55,7 @@ def main():
                 return response.json()
             with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
                 proposals=list(pool.map(propose,range(8)))
-            reviewer=fixture.fixture.fixture.headers(reviewer=True)
+            reviewer={"Authorization":"Bearer "+fixture.fixture.fixture.token(subject="human-reviewer",client="review-client",iss=fixture.settings.issuer,aud=fixture.settings.audience)}
             for proposal in proposals:
                 shown=client.get('/review/api/proposals/'+proposal['id'],headers=reviewer)
                 if shown.status_code!=200:raise RuntimeError('offline review sample failed')

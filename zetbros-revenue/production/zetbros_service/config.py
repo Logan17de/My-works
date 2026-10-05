@@ -18,6 +18,22 @@ class Grant(StrictModel):
     role: Literal["agent", "reviewer"]
 
 
+class PendingPilotConfig(StrictModel):
+    """Disabled install configuration, deliberately containing no identity values."""
+    runtime_state: Literal["disabled_pending_identity"]
+    deployment_profile: Literal["single_host_local_volume"] = "single_host_local_volume"
+    source_adapter: Literal["disabled"] = "disabled"
+    outbound_adapter: Literal["disabled"] = "disabled"
+    database_path: str
+
+    @field_validator("database_path")
+    @classmethod
+    def proposed_database_path(cls, value):
+        if not Path(value).is_absolute() or "\x00" in value:
+            raise ValueError("proposed database path must be absolute")
+        return value
+
+
 class Settings(StrictModel):
     tenant_id: Identifier
     connector_id: Identifier
@@ -85,8 +101,10 @@ class Settings(StrictModel):
     def separate_principals(self) -> "Settings":
         live_source = self.source_adapter == "private_spacemail"
         live_transport = self.outbound_adapter == "private_spacemail"
-        if live_source != live_transport or (live_source and (self.private_bridge_profile_file is None or self.review_origin is None)):
-            raise ValueError("explicit paired private adapters, profile and reviewer origin required")
+        if live_transport and not live_source:
+            raise ValueError("private delivery requires its private source contract")
+        if live_source and (self.private_bridge_profile_file is None or self.review_origin is None):
+            raise ValueError("private source contract requires profile and reviewer origin")
         keys = [(g.subject, g.client_id) for g in self.principals]
         if not keys or len(keys) != len(set(keys)) or {g.role for g in self.principals} != {"agent", "reviewer"}:
             raise ValueError("distinct configured agent and reviewer principal/client pairs required")
@@ -109,7 +127,7 @@ class Settings(StrictModel):
         return next((g.role for g in self.principals if g.subject == subject and g.client_id == client_id), None)
 
 
-def load_settings() -> Settings:
+def load_settings() -> Settings | PendingPilotConfig:
     path = os.environ.get("ZETBROS_CONFIG_FILE")
     if not path:
         raise RuntimeError("ZETBROS_CONFIG_FILE is required; service cannot start unconfigured")
@@ -117,6 +135,9 @@ def load_settings() -> Settings:
         raw = Path(path).read_bytes()
         if len(raw) > 65536:
             raise ValueError("configuration too large")
+        value = json.loads(raw)
+        if isinstance(value, dict) and value.get("runtime_state") == "disabled_pending_identity":
+            return PendingPilotConfig.model_validate_json(raw)
         return Settings.model_validate_json(raw)
     except (OSError, ValueError) as exc:
         raise RuntimeError("deployment configuration is missing or invalid") from exc

@@ -5,7 +5,12 @@ single-host deployment and one support-mail reply workflow. This is separate
 from the existing offline proof. It is not a universal gateway or a hosted
 multi-tenant product.
 
-**Shipped configuration remains non-sending.** The reviewed pilot runtime now
+**Shipped configuration remains non-sending.** The default disabled pilot now
+stages without a ledger until actual owner identity configuration is available;
+see [DISABLED_STAGING.md](DISABLED_STAGING.md) for the supported init/check/start
+walkthrough. No placeholder identity is permanently pinned.
+
+ The reviewed pilot runtime now
 includes our own live-capable session factory and human exact-preview interface,
 but requires explicit operator configuration and protected existing credentials.
 No real provider, identity deployment, customer-host setup or delivery was tested.

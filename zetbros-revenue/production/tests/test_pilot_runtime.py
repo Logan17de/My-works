@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 import test_mail_integration as integration
 import test_private_wire_bridge as bridge
-from zetbros_service.config import Settings
+from zetbros_service.config import PendingPilotConfig, Settings
 from zetbros_service.live_session_factory import (BoundedResolver, ConnectionGuard, LiveSessionFactory,
     PinnedConnector, SystemdCredentialSource, _PinnedImap, _PinnedSmtp)
 from zetbros_service.models import canonical
@@ -176,8 +176,13 @@ class PilotAssemblyTests(unittest.TestCase):
         self.fixture=integration.MailIntegrationTests("test_exact_claim_gate_and_wire_no_retry_survive_restart")
         self.fixture.setUp()
         self.profile_file=self.fixture.fixture.root/"private-profile.json"
-        self.profile_file.write_text(canonical(LIVE))
+        self.configured_profile=LIVE.model_copy(update={
+            "binding":LIVE.binding.model_copy(update={"sender_address":"support@owner-runtime.net"}),
+            "mailbox_address":"support@owner-runtime.net"})
+        self.profile_file.write_text(canonical(self.configured_profile))
         data=self.fixture.fixture.settings.model_dump(mode="json")
+        data.update(sender_address="support@owner-runtime.net",issuer="https://identity.owner-runtime.net",
+            database_path=str(self.fixture.fixture.root/"data/runtime-pilot.sqlite3"))
         data.update(source_adapter="private_spacemail",outbound_adapter="private_spacemail",
             private_bridge_profile_file=str(self.profile_file),review_origin="http://127.0.0.1:8081")
         self.settings=Settings.model_validate_json(json.dumps(data))
@@ -186,6 +191,7 @@ class PilotAssemblyTests(unittest.TestCase):
             obj=FakeAuthenticatedSmtp(host,port,guard,connector);self.sessions.append(obj);return obj
         self.factory=lambda profile:LiveSessionFactory(profile,credentials=self.credentials,
             smtp_client=smtp,imap_client=FakeAuthenticatedImap)
+        initialize_new_pilot(self.settings,factory_builder=self.factory,clock=self.fixture.fixture.clock)
     def tearDown(self):self.fixture.tearDown()
 
     def test_operator_runtime_is_assembled_without_startup_connections_or_credentials(self):
@@ -248,17 +254,18 @@ class PilotAssemblyTests(unittest.TestCase):
 
     def test_proposed_unit_limits_and_shipped_runtime_remain_dormant(self):
         root=pathlib.Path(__file__).resolve().parents[1]
-        settings=Settings.model_validate_json((root/'deploy/pilot-runtime.disabled.example.json').read_text())
-        self.assertEqual((settings.source_adapter,settings.outbound_adapter),('customer_staged_snapshot','disabled'))
+        settings=PendingPilotConfig.model_validate_json((root/'deploy/pilot-runtime.disabled.example.json').read_text())
+        self.assertEqual((settings.source_adapter,settings.outbound_adapter),('disabled','disabled'))
         unit=(root/'deploy/zetbros-pilot.service.example').read_text()
         for value in ('User=zetbros-pilot','MemoryHigh=96M','MemoryMax=128M','MemorySwapMax=0','CPUQuota=25%',
-                      'TasksMax=32','--host 127.0.0.1 --port 8081 --workers 1','LoadCredential=spacemail-password:'):
+                      'TasksMax=32','--host 127.0.0.1 --port 8081 --workers 1'):
             self.assertIn(value,unit)
+        self.assertNotIn('LoadCredential=',unit)
         self.assertNotIn('SYNTHETIC_NOT_A_PROVIDER_SECRET',unit)
 
     def test_profile_drift_and_unpaired_adapters_fail_closed(self):
-        self.profile_file.write_text(canonical(LIVE.model_copy(update={"binding":LIVE.binding.model_copy(update={"tenant_id":"other-customer"})})))
+        self.profile_file.write_text(canonical(self.configured_profile.model_copy(update={"binding":self.configured_profile.binding.model_copy(update={"tenant_id":"other-customer"})})))
         with self.assertRaises(RuntimeError):build_service(self.settings,factory_builder=self.factory)
-        data=self.settings.model_dump(mode="json");data["outbound_adapter"]="disabled"
+        data=self.settings.model_dump(mode="json");data["source_adapter"]="customer_staged_snapshot"
         with self.assertRaises(ValueError):Settings.model_validate_json(json.dumps(data))
         self.assertEqual(self.credentials.calls,0)

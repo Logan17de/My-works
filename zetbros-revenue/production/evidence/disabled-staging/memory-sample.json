@@ -1,0 +1,15 @@
+{
+  "cloud_sample_not_target_host_acceptance": true,
+  "ledger_created": false,
+  "listener_sockets": "not_opened",
+  "peak_rss_kib": 48628,
+  "provider_connections": "not_performed",
+  "real_credentials": "not_read",
+  "sample": "shipped pending-identity disabled init and8 concurrent ASGI health/readiness callers",
+  "sampled_peak_threads": 15,
+  "startup_rss_kib": 47964,
+  "under_memory_high_96m": true,
+  "under_memory_max_128m": true,
+  "under_tasks_max_32": true,
+  "verifier_calls": 0
+}

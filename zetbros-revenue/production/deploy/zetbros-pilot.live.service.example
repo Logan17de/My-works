@@ -1,4 +1,4 @@
-# DISABLED PENDING-IDENTITY STAGING UNIT. No credential dependency or ledger initialization.
+# PROPOSED LIVE UNIT ONLY. Needs separate credential/access and live-setup approval.
 [Unit]
 Description=Zetbros single-customer reviewed-reply pilot
 After=network-online.target
@@ -11,6 +11,7 @@ Group=zetbros-pilot
 WorkingDirectory=/srv/zetbros/pilot/production
 Environment=ZETBROS_CONFIG_FILE=/srv/zetbros/pilot/config/service.json
 Environment=MALLOC_ARENA_MAX=2
+LoadCredential=spacemail-password:/etc/zetbros/pilot/spacemail-password
 ExecStart=/srv/zetbros/pilot/venv/bin/python -m uvicorn zetbros_service.pilot_runtime:configured_pilot_app --factory --host 127.0.0.1 --port 8081 --workers 1 --no-access-log --limit-concurrency 8 --timeout-keep-alive 5 --timeout-graceful-shutdown 30
 Restart=on-failure
 RestartSec=5

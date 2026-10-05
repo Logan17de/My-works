@@ -1,0 +1,1158 @@
+{
+  "base_git_blob_sha": {
+    ".gitignore": "a1238798cd5c40e7a9b6f165d7dfca510353b73b",
+    "MAIL_OWNER_INTEGRATION.md": "af394fb1c7d1bab76085d76798ab28e8fa97a2fc",
+    "PILOT_RUNTIME.md": "c021b46a39db2a03050a49d0a067770cc0e14ea4",
+    "PRIVATE_WIRE_BRIDGE.md": "0ca583b3ab102045b0bca9a248dd995dd171706e",
+    "README.md": "50817fda2e3dd7611701d4f06c7712f10c626388",
+    "SPACEMAIL_ADAPTER_CONTRACT.md": "752bb6e819bc8cbfbc1e9291d5dd0a31bcffcffe",
+    "deploy/config.example.json": "006bc4b64903d73818e3076a945109e74bce220d",
+    "deploy/environment.example": "7d8a763b74108bf4b2adb452a5f834f29bb884ec",
+    "deploy/pilot-runtime.disabled.example.json": "3b1aa8ee752298f415fae822023b7f4f76757d89",
+    "deploy/private-bridge-profile.example.json": "2c20777691ff0cc13b93894659f321b87f44b1aa",
+    "deploy/private-bridge-staging.example.json": "195f66e1b9459b759986d206b7c87f77501ae42c",
+    "deploy/zetbros-pilot.service.example": "372fae6af04b0084a31f7a0bcbaafa7f1ea5781e",
+    "deploy/zetbros.service.example": "d342bd555de4bad12f6073be38876311d938c327",
+    "evidence/mail-integration/base-manifest.json": "d96f61da5d2ecdd7a6b50a38a2ad5c45083d18f2",
+    "evidence/mail-integration/prior-combined-test-results.json": "a5f64a772a0b91e365e321e90166463e86c7b432",
+    "evidence/mail-integration/prior-combined-unit-test-output.txt": "2c25932bb4d6d6c7dc02483652b0e50e75d6bcb7",
+    "evidence/mail-integration/test-results.json": "19f872a246d91e55ec116c3b94ca542a2bf00c71",
+    "evidence/mail-integration/unit-test-output.txt": "550a2751eb6d980a0e1c670fc887498d9ea789f0",
+    "evidence/pilot-runtime/base-manifest.json": "978c6258e08af624ad09b5d6ab20d70a1a7b1edf",
+    "evidence/pilot-runtime/memory-sample.json": "b74919a1421db1107d1074620549092cc190633f",
+    "evidence/pilot-runtime/memory-samples.json": "30820f9664ff4dc9edb9183584b0058e2c313250",
+    "evidence/pilot-runtime/test-results.json": "7e17b5787e14362372fe8c49bb9024403895e0f0",
+    "evidence/pilot-runtime/unit-test-output.txt": "e9d5d1c144c860d579f3e0b83d9fe43e0471b555",
+    "evidence/private-wire-bridge/base-manifest.json": "414fd36edd42b3b78b33b673b3f6a99cd070f26b",
+    "evidence/private-wire-bridge/test-results.json": "7827eabce2ed387bf96b54a121e25a73442c077c",
+    "evidence/private-wire-bridge/unit-test-output.txt": "8543b5ccb2a4fc1d02ee934e35acf5c7a25b9ff4",
+    "evidence/spacemail/base-manifest.json": "566af948ede7a40793e16cad5dc0bb2fc84ade26",
+    "evidence/spacemail/test-results.json": "af97f5369d4b5f45b21b25db28cb96c392d7e782",
+    "evidence/spacemail/unit-test-output.txt": "18153169b7318697106f469a1d3015d7f235b926",
+    "evidence/test-results.json": "407b1c1390ef1ad587baf96f4224e49427d2f9d9",
+    "evidence/unit-test-output.txt": "2bdedd67f7d1013a3d5f958d079583ac7411cca9",
+    "evidence/verification-summary.md": "a476c322a72cb515f7ca5abb485b186d267d6063",
+    "measure_pilot_memory.py": "110aeb8951f20e093d02afd9d17203ba765765f8",
+    "requirements-lock.txt": "52ca4cd654658aafd51bd65162eb70fd4d52dd1a",
+    "requirements-test.txt": "f3d63975e42d6914096a09a43b11af113c7f0110",
+    "requirements.txt": "76f4c9ca585fc0a6ad803be0af32279a5c259a15",
+    "run_checks.py": "6b8decba174590e7b6216489a5e9694201df8ef8",
+    "run_mail_integration_checks.py": "9ec1be76b33ec677caa32c8558e0301c5447cc15",
+    "run_pilot_checks.py": "a1bd9ac67d78d9e7b7f0a59c693082e8f19d3213",
+    "run_private_bridge_checks.py": "fcc006a47080131aecb7e81d611ce8e7edc152e0",
+    "run_spacemail_checks.py": "18129354651d7ba04db7993dbc9e4aac62e6f19d",
+    "tests/test_http_runtime.py": "5a69c53d4b64d42efd5f25a458eb935dcff60acd",
+    "tests/test_mail_integration.py": "3fac31a1e104c82d9492fcc5099e068e0e6ef378",
+    "tests/test_pilot_runtime.py": "662ed00dcfb942e6a7df1ffaff9a26b33601d1c3",
+    "tests/test_private_wire_bridge.py": "06993758c0e7224f4f716befdb63d4e095eeb05b",
+    "tests/test_review_ui.py": "5cbf0b6f1b5a11928328b401836385245979955b",
+    "tests/test_service.py": "62f8a8c0906727fa3178fdeed5f62046bf5caabd",
+    "tests/test_spacemail_contract.py": "3ab7289c3957e7f4134bcbd8ae3ad9a330c25e24",
+    "zetbros_service/__init__.py": "156e9e7c2c210fdd31db357a6baae34d546d6b39",
+    "zetbros_service/adapters.py": "afa157dc846cb367b63398c0a1373b370361623a",
+    "zetbros_service/api.py": "ef0a6564502f9169f5723dfd030540c7107b579e",
+    "zetbros_service/auth.py": "598d010a33c2a4f0699e0e0a8091dac515cdcb1f",
+    "zetbros_service/config.py": "425d9298a1caf0332bee35556a8154a6334f5371",
+    "zetbros_service/live_session_factory.py": "0646c074ee06516aeb4c5abf0e293e054b6d3e2a",
+    "zetbros_service/mail_integration.py": "c09819178eba942d038d188a8711ffa55139b83e",
+    "zetbros_service/mail_owner.py": "218863a46f8ce6a94acb314d5db2056b4e43220a",
+    "zetbros_service/maintenance.py": "88469854f47098a4e747c343f7e9289043c3340e",
+    "zetbros_service/models.py": "d1d22802dc84b4ed8e99c897694e573fa470ae36",
+    "zetbros_service/pilot.py": "bb0b979579962b2f0cff182f4bc1405c28867f3c",
+    "zetbros_service/pilot_runtime.py": "9748874905de90a597554697a574791d923743de",
+    "zetbros_service/private_wire_bridge.py": "239e283e2467dd775b26d6cf28f1c53b946bfff3",
+    "zetbros_service/review_assets/browser_check.cjs": "1d597c94707bc5617d070ed4b09b3537553c1f3b",
+    "zetbros_service/review_assets/review.css": "7142686eb3325dadacc395df58a439560a27912b",
+    "zetbros_service/review_assets/review.html": "8edb5553ad8e51e46b00c2ddfc0ea6248c4ff355",
+    "zetbros_service/review_assets/review.js": "b96e07f6461de276c3cf70d57374f6e331c9d124",
+    "zetbros_service/review_assets/state_check.cjs": "9db1f4fd4461841b1b57df58dd547fefa82b6eb1",
+    "zetbros_service/review_ui.py": "4a116763cda2a63d682d3107f7188fcdf252bf82",
+    "zetbros_service/service.py": "d2a0761256c30e41fecfacacc4d9e8074ef6de15",
+    "zetbros_service/spacemail_contract.py": "c30e52d4ce0b573265199a648201d8640e65b9d7",
+    "zetbros_service/store.py": "75d4b40fcea5e3bb275006f48dc1387c975e13d9"
+  },
+  "base_remote_commit": "339b3e62adfb9dda770e1bb0f143d2a28aac12d0",
+  "base_repository": "Logan17de/My-works",
+  "browser_pixels": "Chromium_launch_blocked_by_sandbox_socket_restriction_no_escalation",
+  "buyer_ready": false,
+  "configured_delivery": "default_pending_identity_stage_no_ledger_factory_credential_or_worker",
+  "configured_disabled_init": "validates_public_JWKS_profile_and_identity_before_new_exact_wire_ledger",
+  "credential_source": "systemd_fixed_name_implementation_no_actual_credential_read",
+  "current_run_network": "socket_free_tests_only",
+  "default_unit_credentials": "no_LoadCredential_dependency",
+  "errors": 0,
+  "event_loop_ipc": "standard_local_asyncio_socketpair_only_no_provider_or_listener_network_socket",
+  "excluded_loopback_tests": [
+    "test_http_runtime.RuntimeTests.test_loopback_http_authenticated_workflow_graceful_shutdown_and_restart",
+    "test_review_ui.ReviewUiTests.test_mocked_local_chromium_interrupted_repeated_and_racing_flows"
+  ],
+  "existing_http_regression": "passed_in_prior_combined_run_not_rerun_on_final_revision",
+  "failed": 0,
+  "human_exact_wire_preview": "authenticated_ASGI_UI_composite_preview_and_immutable_ledger_verified",
+  "identity_rebinding": "refused_no_migration",
+  "live_account_endpoint_attestation": "unverified",
+  "live_factory": "own_pinned_stdlib_implementation_verified_with_fake_connector_clients_and_synthetic_fixture_only",
+  "live_identity_and_customer_deployment": "unrun",
+  "live_prepared_wire_bridge": "own_factory_runtime_and_exact_wire_bridge_implemented_actual_provider_and_deployment_unrun",
+  "mail_test_ports": "fictional_stdlib_shaped_smtp_imap_sessions_no_actual_sockets",
+  "modified_base_files": [
+    "PILOT_RUNTIME.md",
+    "README.md",
+    "deploy/pilot-runtime.disabled.example.json",
+    "deploy/zetbros-pilot.service.example",
+    "measure_pilot_memory.py",
+    "tests/test_pilot_runtime.py",
+    "zetbros_service/api.py",
+    "zetbros_service/config.py",
+    "zetbros_service/mail_integration.py",
+    "zetbros_service/maintenance.py",
+    "zetbros_service/pilot.py",
+    "zetbros_service/pilot_runtime.py"
+  ],
+  "owning_source_interface": "inspected_not_vendored_or_republished",
+  "passed": 177,
+  "pending_init": "successfully_stages_without_identity_pin_or_ledger_creation",
+  "prior_combined_evidence": "../mail-integration/prior-combined-test-results.json",
+  "private_factory": "implemented_owner_credential_and_identity_configuration_required",
+  "provider_connections": "not_performed",
+  "provider_credentials": "not_read_or_created",
+  "real_delivery": "disabled_unrun",
+  "recorded_at": "2026-10-05T03:39:35.830872+00:00",
+  "review_ui": "ASGI_and_Node_state_harness_verified",
+  "runtime": {
+    "packages": {
+      "PyJWT": "2.13.0",
+      "cryptography": "50.0.0",
+      "fastapi": "0.141.1",
+      "httpx": "0.28.1",
+      "pydantic": "2.13.4",
+      "starlette": "1.6.0",
+      "uvicorn": "0.52.1"
+    },
+    "python": "3.12.14",
+    "sqlite": "3.53.1"
+  },
+  "skipped": 0,
+  "source_content_revision": "ee686829da3467253b63f5761bf7076ab5f24de4e8770049dfe4774e11259d6a",
+  "source_sha256": {
+    ".gitignore": "1de6b7d3991b225c31134f6269b07f4811e220869911aeee87be19b231f91f8d",
+    "DISABLED_STAGING.md": "721b01760774304d0aeff57d686feaeb2985f2f8a0dba44a528a14cdbb0b2c1d",
+    "MAIL_OWNER_INTEGRATION.md": "73a020f4e65f754bc0a224aa3302ed19b0964a23c5fc7241f0b9e53dad2e8c31",
+    "PILOT_RUNTIME.md": "01c63f48e699660c17bf29a6ba9e458e01a17c80ccb6e1abf289a3b834ef99bb",
+    "PRIVATE_WIRE_BRIDGE.md": "364cd61a3e2b36ee0b077a4fef038a72ea745991001dd00f36615dadd8054b98",
+    "README.md": "33819f8a53bae3df66b2132ac08ccb6c677f3633b271631830e131783405652f",
+    "SPACEMAIL_ADAPTER_CONTRACT.md": "315ed604a2f8881512bcde98c669c5d7a707e41ff0e1142feae7e89380d1b5bd",
+    "deploy/config.example.json": "660c1e2a0e80f820ebe876d64102443ee939842d6826b480213c80a23c0fcfc8",
+    "deploy/environment.example": "778d0015d4ba31f9599e78cd52e5b50e8517bb86e67353fbdcfb153bdf7cdd95",
+    "deploy/pilot-runtime.disabled.example.json": "f7f941c997666336b0e7d950a2a55932c15d790fa319eea99596d005083ad21b",
+    "deploy/private-bridge-profile.example.json": "07d0466d1769c96f273e5503a36d575a083c91fee35a3673de17a255c825b1e9",
+    "deploy/private-bridge-staging.example.json": "69b1e8306a7bf6da4a1aead5acb5d1401fbaa8dc0107ef6f859a02a703831f6c",
+    "deploy/zetbros-pilot.live.service.example": "1176715643d5d6fa9ad1ab15ef938389fbb68648b9a789c8d3171de8f19a0273",
+    "deploy/zetbros-pilot.service.example": "cb77e40f48215eccaf2538fae39b00b877f1913867e972b696e08ca9a925959f",
+    "deploy/zetbros.service.example": "1d93c0b4c32ea25beb31f7d02a3df1a64b664623b5f1d8df93b0a2cc27931834",
+    "measure_disabled_staging_memory.py": "2a374f650f3a43fcd0415eebaf489aafd4be5d6baaa29a7b99f2eae9d2b29caf",
+    "measure_pilot_memory.py": "30c0533affc50a58c0aec6a85fe0585091b76940b96742c205d4c2a576ef6c20",
+    "requirements-lock.txt": "ed8289bbd7b1784e1b8ff50d1875d46552e7569b1a6c32a99d8ed23fc9a524ae",
+    "requirements-test.txt": "934fbb549ab3209320a68f549631f92ffa7dcd1372d15620c148eb5f55bd7735",
+    "requirements.txt": "4252d1117618181b37e6c4158b77eacd4c8a81fab507debcc1c156c5d17b17f2",
+    "run_checks.py": "3682d0446e5b9c64e1ec19991e0dbb9f199a693d63f3b01251d9235322efa015",
+    "run_disabled_stage_checks.py": "2fcc10bd957f55250339e3e96e2065f499bc9ac34d17639312fab8ef1abe2bba",
+    "run_mail_integration_checks.py": "e1cd59d2249be0bfd87ba44bdda5d01a9592629ee7988abb6489fc1c37478127",
+    "run_pilot_checks.py": "f1d2861cf456363c7d7e4dcf21c1e3c6951d34324ecce9403f7ea0a68e73d1c8",
+    "run_private_bridge_checks.py": "07efcb7ae13118f61159791d4dcf37e686b6acc4dc997dd5fea553a1fd6dd789",
+    "run_spacemail_checks.py": "8c5ecc4c2eb618fccc7d95f49b6428cfd43c58f773a59f8db1ed8e193291a26b",
+    "tests/test_disabled_pilot_walkthrough.py": "69360608c9789ef233785afef47c46d46044d4bf0f1ff4c6dcb2bfa6f9558211",
+    "tests/test_http_runtime.py": "2f98f4e87447a2c4d1e868c8ccd52097fd34237d83454ae462094a67b330538b",
+    "tests/test_mail_integration.py": "c6956d27b99d0acc0d8a22114326a652129a15eb539b6bf8a81bfb508293e992",
+    "tests/test_pilot_runtime.py": "87680324afea3fef0acaf03cf33c02f4290336cfb6ab2c7d1a2c11ceeec9e4b7",
+    "tests/test_private_wire_bridge.py": "b515ae1896824fa8f3d0cf122d289e2a5fb9d8e2d08cd7835240f8f5cc82285d",
+    "tests/test_review_ui.py": "3529f82c9c616d76be08bda34c6ccb088aa0090b7b6295102a350431f1650f7c",
+    "tests/test_service.py": "4637aceddef5fcf30b194dfc8edc0d595c864972fb8402df937bba51019a20d0",
+    "tests/test_spacemail_contract.py": "0fd874b1f741926a66f430aaf0168b12682dd3f617dcd8938aaa8e16008186e1",
+    "zetbros_service/__init__.py": "7ffb922d0eb34ace2350b62335f32335f6e9c6012771caa302d6d3979e9a63c3",
+    "zetbros_service/adapters.py": "f76ad03900f68332e5c3f49a9b322db711d99f5e1fc435f0da0e2e009162078b",
+    "zetbros_service/api.py": "23eef30612f70c0e794981d56fa3c1a8a2b52ae8ed570a4175d42bbbe1d6839f",
+    "zetbros_service/auth.py": "89494e9a6df2d7b72cad322400602e2638811c93c0f0c7d2b2394b2ff9115432",
+    "zetbros_service/config.py": "09f5b0d5c013344eb1ed21f1048bb1bf963c5b3e08c7c41a0885aeb9da5d3b7e",
+    "zetbros_service/live_session_factory.py": "f5f99554e0322e57ba89fbe20cf1f33b1bdde0f9ff3d39ae68e21c0fa4b00356",
+    "zetbros_service/mail_integration.py": "08f671edad7b7fdc4524413ed26aaec3051e7b9dc519e5775319e7cb2d8c2bdc",
+    "zetbros_service/mail_owner.py": "644f905b3b76a9931a3ea7be2a731a8041be2e923fd2e6ea21c298dff1a599d3",
+    "zetbros_service/maintenance.py": "8a056f4f6e5177118ed5d750d1933cf1fcdd454e6be83f989333c58a350c73ef",
+    "zetbros_service/models.py": "a1d516668f672e7efba20ef88e1bc0c4f91a72d24bb779d359e44b792eed66ad",
+    "zetbros_service/pilot.py": "1e1ce71fdce5cb38bc77e9f64e59bce08ace2bdf27a31d181ae50a2996ccad15",
+    "zetbros_service/pilot_runtime.py": "b827fd896283ae4cb18b53b5d885a4e9454642c91994d00d962094710c185688",
+    "zetbros_service/private_wire_bridge.py": "a6eb3626a7f20a824e3e94fc148fd3668b9be33e69805d3de09c16f562f01baf",
+    "zetbros_service/review_assets/browser_check.cjs": "dd4a25a4ee9af7d16bcbad2c14d681cbb0779a884989c17bf8a5e8ea1656cb96",
+    "zetbros_service/review_assets/review.css": "cbe855b81bc7a3751b51659bd119ad8a1d8c6de006ec4dccccb04ca56653d714",
+    "zetbros_service/review_assets/review.html": "f9825cc6e93a4c0b12175b3be046554ad7714a3a5ef0a09a013ef02792c3153e",
+    "zetbros_service/review_assets/review.js": "34ac9e2d97b976a61b11f37efd5baace1933d1adfe31af19f499c3b6726a5599",
+    "zetbros_service/review_assets/state_check.cjs": "264a3040c08970ea2e2ec2508de58f396961b382b9dfb478a4a40e0a6d2be49d",
+    "zetbros_service/review_ui.py": "0597f6afab3266ba6866c6718875856ca0438451c03a119d9e346e87f3d567cd",
+    "zetbros_service/service.py": "28a258b3b27bffed53f72ff008f06404dcd01234d07279a4a3811c70ad97c28f",
+    "zetbros_service/spacemail_contract.py": "42e8278eaab07c846cafa524fe026b313195cd79e4c871a4237474dd9b464c96",
+    "zetbros_service/store.py": "72e8c8e8405b91fe55fd716d1a009f249c9db474161f703eadec2f5a8b937292"
+  },
+  "supplied_private_archive_artifacts": "not_opened_or_published",
+  "tenant_profile": "one_customer_account_and_local_ledger_per_process_no_shared_multitenant_claim",
+  "tests": [
+    {
+      "duration_seconds": 0.093984,
+      "outcome": "passed",
+      "test": "test_disabled_pilot_walkthrough.ConfiguredDisabledLedgerTests.test_actual_mailbox_cannot_change_behind_an_unchanged_account_label"
+    },
+    {
+      "duration_seconds": 0.061538,
+      "outcome": "passed",
+      "test": "test_disabled_pilot_walkthrough.ConfiguredDisabledLedgerTests.test_bad_public_jwks_or_placeholder_identity_never_writes_new_ledger"
+    },
+    {
+      "duration_seconds": 0.045182,
+      "outcome": "passed",
+      "test": "test_disabled_pilot_walkthrough.ConfiguredDisabledLedgerTests.test_disabled_init_check_and_app_use_mail_store_without_any_factory"
+    },
+    {
+      "duration_seconds": 0.074009,
+      "outcome": "passed",
+      "test": "test_disabled_pilot_walkthrough.ConfiguredDisabledLedgerTests.test_later_live_configuration_preserves_same_identity_and_mail_ledger"
+    },
+    {
+      "duration_seconds": 0.260639,
+      "outcome": "passed",
+      "test": "test_disabled_pilot_walkthrough.ConfiguredDisabledLedgerTests.test_private_maintenance_init_cannot_create_the_wrong_action_ledger"
+    },
+    {
+      "duration_seconds": 0.031207,
+      "outcome": "passed",
+      "test": "test_disabled_pilot_walkthrough.ConfiguredDisabledLedgerTests.test_resolved_identity_cannot_rebind_existing_disabled_ledger"
+    },
+    {
+      "duration_seconds": 0.000379,
+      "outcome": "passed",
+      "test": "test_disabled_pilot_walkthrough.PendingWalkthroughTests.test_default_disabled_unit_has_no_credential_dependency"
+    },
+    {
+      "duration_seconds": 0.384089,
+      "outcome": "passed",
+      "test": "test_disabled_pilot_walkthrough.PendingWalkthroughTests.test_exact_shipped_disabled_config_init_check_start_never_creates_ledger"
+    },
+    {
+      "duration_seconds": 0.000467,
+      "outcome": "passed",
+      "test": "test_disabled_pilot_walkthrough.PendingWalkthroughTests.test_pending_init_refuses_existing_and_dangling_symlink_paths_without_change"
+    },
+    {
+      "duration_seconds": 0.573724,
+      "outcome": "passed",
+      "test": "test_disabled_pilot_walkthrough.PendingWalkthroughTests.test_pending_maintenance_entrypoint_cannot_create_or_restore_a_ledger"
+    },
+    {
+      "duration_seconds": 0.000622,
+      "outcome": "passed",
+      "test": "test_disabled_pilot_walkthrough.PendingWalkthroughTests.test_pending_schema_rejects_identity_fields_and_live_flags"
+    },
+    {
+      "duration_seconds": 0.022924,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_action_only_preview_only_or_changed_digest_cannot_approve"
+    },
+    {
+      "duration_seconds": 0.032896,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_authenticated_api_shows_full_wire_preview_and_agent_cannot_decide"
+    },
+    {
+      "duration_seconds": 0.062385,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_current_identity_removal_and_quarantine_gate_before_body"
+    },
+    {
+      "duration_seconds": 0.028706,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_disabled_candidate_consumes_no_approval_and_configured_app_stays_base"
+    },
+    {
+      "duration_seconds": 0.028369,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_duplicate_or_failed_body_gate_is_sticky_and_cannot_record_acceptance"
+    },
+    {
+      "duration_seconds": 0.022939,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_exact_action_wire_preview_and_composite_digest_persist_for_review"
+    },
+    {
+      "duration_seconds": 0.029887,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_exact_claim_gate_and_wire_no_retry_survive_restart"
+    },
+    {
+      "duration_seconds": 0.019813,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_explicit_maintenance_handle_cannot_create_decide_or_claim"
+    },
+    {
+      "duration_seconds": 0.023085,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_forged_claim_token_changed_wire_and_expired_claim_gate_refuse"
+    },
+    {
+      "duration_seconds": 0.057516,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_forged_pydantic_and_unknown_adapter_results_are_sanitized_uncertain"
+    },
+    {
+      "duration_seconds": 0.031466,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_idempotency_restart_conflict_and_other_agent_view"
+    },
+    {
+      "duration_seconds": 0.026783,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_invalid_locator_and_late_source_failures_are_sanitized_api_errors"
+    },
+    {
+      "duration_seconds": 0.028089,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_missing_gate_acceptance_is_uncertain_and_never_retried"
+    },
+    {
+      "duration_seconds": 0.022123,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_missing_preview_table_or_marker_never_falls_back_to_action_digest"
+    },
+    {
+      "duration_seconds": 0.021189,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_owner_result_mapping_preserves_acceptance_uncertainty_and_sent_copy"
+    },
+    {
+      "duration_seconds": 0.023997,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_preclaim_thread_source_drift_invalidates_without_consuming"
+    },
+    {
+      "duration_seconds": 0.02073,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_preview_audit_failure_rolls_back_both_records"
+    },
+    {
+      "duration_seconds": 0.024276,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_restore_preserves_exact_preview_and_quarantines_unfinished_action"
+    },
+    {
+      "duration_seconds": 0.028667,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_shorter_approval_expiry_is_rechecked_before_body"
+    },
+    {
+      "duration_seconds": 0.046976,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_smtp_uncertain_and_sent_copy_failure_stay_distinct_without_retry"
+    },
+    {
+      "duration_seconds": 0.026031,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_source_changes_after_claim_cannot_reach_prepared_port"
+    },
+    {
+      "duration_seconds": 0.020396,
+      "outcome": "passed",
+      "test": "test_mail_integration.MailIntegrationTests.test_wire_preview_is_immutable_in_ledger"
+    },
+    {
+      "duration_seconds": 0.000244,
+      "outcome": "passed",
+      "test": "test_mail_integration.OwnerInterfaceTests.test_opaque_ids_reject_padding_alternate_folder_values_and_ranges"
+    },
+    {
+      "duration_seconds": 0.001136,
+      "outcome": "passed",
+      "test": "test_mail_integration.OwnerInterfaceTests.test_opaque_ids_roundtrip_with_exact_inspected_format"
+    },
+    {
+      "duration_seconds": 0.001235,
+      "outcome": "passed",
+      "test": "test_mail_integration.OwnerInterfaceTests.test_owner_mailbox_read_is_exact_peek_plan_without_convenience_tools"
+    },
+    {
+      "duration_seconds": 4e-05,
+      "outcome": "passed",
+      "test": "test_mail_integration.OwnerInterfaceTests.test_raw_provider_errors_are_discarded"
+    },
+    {
+      "duration_seconds": 2.2e-05,
+      "outcome": "passed",
+      "test": "test_mail_integration.OwnerInterfaceTests.test_sender_allowlist_cannot_choose_an_unconfigured_alias"
+    },
+    {
+      "duration_seconds": 2.5e-05,
+      "outcome": "passed",
+      "test": "test_mail_integration.OwnerInterfaceTests.test_uidvalidity_rollover_refuses_before_fetch"
+    },
+    {
+      "duration_seconds": 6e-05,
+      "outcome": "passed",
+      "test": "test_mail_integration.OwnerInterfaceTests.test_wrong_uid_and_oversize_refuse_before_body_fetch"
+    },
+    {
+      "duration_seconds": 0.000331,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.FactoryTests.test_disabled_or_mismatched_profile_refuses_before_credential"
+    },
+    {
+      "duration_seconds": 0.001173,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.FactoryTests.test_factory_authenticates_fixed_account_readonly_folder_and_isolated_sessions"
+    },
+    {
+      "duration_seconds": 2.4e-05,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.FactoryTests.test_imap_debug_cache_never_retains_login_or_provider_text"
+    },
+    {
+      "duration_seconds": 0.00044,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.FactoryTests.test_pinned_connector_registers_tls_before_handshake_without_actual_socket"
+    },
+    {
+      "duration_seconds": 0.001186,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.FactoryTests.test_protected_credential_missing_unsafe_symlink_oversize_and_no_echo"
+    },
+    {
+      "duration_seconds": 0.002857,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.FactoryTests.test_real_smtp_subclass_uses_no_local_dns_with_fake_io"
+    },
+    {
+      "duration_seconds": 0.000225,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.FactoryTests.test_resolver_cached_addresses_remain_correct_for_each_port"
+    },
+    {
+      "duration_seconds": 0.030621,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.FactoryTests.test_resolver_wait_and_worker_count_are_bounded"
+    },
+    {
+      "duration_seconds": 0.000408,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.FactoryTests.test_smtp_aggregate_multiline_and_imap_literal_limits_precede_materialization"
+    },
+    {
+      "duration_seconds": 0.00057,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.FactoryTests.test_smtp_auth_ack_must_be_positive_for_the_fresh_account_session"
+    },
+    {
+      "duration_seconds": 0.088528,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.PilotAssemblyTests.test_blocked_source_does_not_block_async_review_or_health_loop"
+    },
+    {
+      "duration_seconds": 0.046618,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.PilotAssemblyTests.test_new_absent_pilot_ledger_initializes_without_provider_io"
+    },
+    {
+      "duration_seconds": 0.045892,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.PilotAssemblyTests.test_new_ledger_initializer_refuses_existing_path_without_credentials_or_network"
+    },
+    {
+      "duration_seconds": 0.070319,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.PilotAssemblyTests.test_operator_runtime_is_assembled_without_startup_connections_or_credentials"
+    },
+    {
+      "duration_seconds": 0.025834,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.PilotAssemblyTests.test_profile_drift_and_unpaired_adapters_fail_closed"
+    },
+    {
+      "duration_seconds": 0.037372,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.PilotAssemblyTests.test_proposed_unit_limits_and_shipped_runtime_remain_dormant"
+    },
+    {
+      "duration_seconds": 0.063601,
+      "outcome": "passed",
+      "test": "test_pilot_runtime.PilotAssemblyTests.test_shipped_default_runtime_stays_disabled_and_reads_no_profile"
+    },
+    {
+      "duration_seconds": 0.057502,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateBridgeLedgerTests.test_real_ledger_gate_follows_data354_and_precedes_exact_bytes"
+    },
+    {
+      "duration_seconds": 0.06153,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateBridgeLedgerTests.test_real_ledger_identity_revocation_after354_writes_no_body"
+    },
+    {
+      "duration_seconds": 0.046043,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateBridgeLedgerTests.test_service_rejects_cross_binding_transport_before_factory"
+    },
+    {
+      "duration_seconds": 0.007165,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_cancellation_after_final250_preserves_acceptance_and_copy_uncertainty"
+    },
+    {
+      "duration_seconds": 0.047834,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_cancellation_before_body_and_during_body_is_fenced"
+    },
+    {
+      "duration_seconds": 0.011164,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_cross_tenant_account_mailbox_and_forged_session_identity_refuse"
+    },
+    {
+      "duration_seconds": 0.00918,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_cross_tenant_action_and_corrupt_wire_refuse_before_factory"
+    },
+    {
+      "duration_seconds": 0.006787,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_deadline_or_action_expiry_after_354_fences_body"
+    },
+    {
+      "duration_seconds": 0.002816,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_default_disabled_and_nonfake_factory_cannot_activate"
+    },
+    {
+      "duration_seconds": 0.002684,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_disabled_profile_and_review_only_staging_templates_validate"
+    },
+    {
+      "duration_seconds": 0.002982,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_dot_stuffing_restores_exact_bytes_without_newline_changes"
+    },
+    {
+      "duration_seconds": 0.013788,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_each_negative_smtp_phase_is_known_rejected_and_stops"
+    },
+    {
+      "duration_seconds": 0.007667,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_existing_sent_header_collision_or_ambiguity_is_not_exact_copy"
+    },
+    {
+      "duration_seconds": 0.004638,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_explicit_stdlib_phases_gate_and_exact_wire_no_regeneration"
+    },
+    {
+      "duration_seconds": 0.008945,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_failed_and_unknown_sent_copy_preserve_acceptance"
+    },
+    {
+      "duration_seconds": 0.002737,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_forged_profile_overrides_fail_at_construction"
+    },
+    {
+      "duration_seconds": 0.006598,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_known_final_acceptance_survives_quit_and_postack_deadline"
+    },
+    {
+      "duration_seconds": 0.011829,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_malformed_or_unexpected_smtp_response_cannot_establish_acceptance"
+    },
+    {
+      "duration_seconds": 0.007667,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_missing_final_ack_and_partial_body_write_are_uncertain"
+    },
+    {
+      "duration_seconds": 0.008185,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_prebody_connection_loss_and_gate_refusal_write_no_bytes"
+    },
+    {
+      "duration_seconds": 0.004271,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_private_read_port_is_account_bound_readonly_and_size_peek_only"
+    },
+    {
+      "duration_seconds": 0.002576,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_private_source_same_sender_other_tenant_or_account_cannot_be_assembled"
+    },
+    {
+      "duration_seconds": 0.009136,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_sent_copy_exact_append_existing_copy_and_copy_cleanup"
+    },
+    {
+      "duration_seconds": 1.00423,
+      "outcome": "passed",
+      "test": "test_private_wire_bridge.PrivateWireTests.test_watchdog_interrupts_blocked_final_reply_without_socket"
+    },
+    {
+      "duration_seconds": 0.036755,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_action_only_ledger_is_refused_without_recording_decision"
+    },
+    {
+      "duration_seconds": 0.020614,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_assets_have_no_mail_html_storage_or_external_dependencies"
+    },
+    {
+      "duration_seconds": 0.056084,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_auth_requires_verified_existing_reviewer_mapping"
+    },
+    {
+      "duration_seconds": 0.039219,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_authenticated_preview_is_complete_composite_and_preserves_body"
+    },
+    {
+      "duration_seconds": 0.043467,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_cookies_urls_foreign_origin_host_fetch_and_cors_fail_closed"
+    },
+    {
+      "duration_seconds": 0.039923,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_decision_uses_full_digest_and_records_once_without_delivery"
+    },
+    {
+      "duration_seconds": 0.029996,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_denial_is_terminal_and_expiry_fails_closed"
+    },
+    {
+      "duration_seconds": 0.047759,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_expired_stale_and_extra_fields_are_rejected"
+    },
+    {
+      "duration_seconds": 0.058983,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_json_boundary_rejects_duplicate_invalid_and_oversized_bodies"
+    },
+    {
+      "duration_seconds": 0.030201,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_page_and_local_assets_have_csp_no_store_and_no_credentials"
+    },
+    {
+      "duration_seconds": 0.030988,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_persistent_rate_limit_applies_and_v1_browser_boundary_is_unchanged"
+    },
+    {
+      "duration_seconds": 0.017724,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_pin_rejects_paths_credentials_default_ports_and_foreign_http"
+    },
+    {
+      "duration_seconds": 0.033935,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_private_mode_notice_discloses_submission_authority"
+    },
+    {
+      "duration_seconds": 0.043888,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_public_shell_cross_site_navigation_is_allowed_but_api_is_not"
+    },
+    {
+      "duration_seconds": 0.038426,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_racing_ui_approvals_record_one_decision"
+    },
+    {
+      "duration_seconds": 0.100171,
+      "outcome": "passed",
+      "test": "test_review_ui.ReviewUiTests.test_socket_free_node_state_machine_interrupted_and_racing_flows"
+    },
+    {
+      "duration_seconds": 0.012681,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_accepted_sent_copy_failure_is_never_resent"
+    },
+    {
+      "duration_seconds": 0.02645,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_agent_cannot_approve_even_with_spoofed_human_claims"
+    },
+    {
+      "duration_seconds": 0.019712,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_api_rejects_missing_auth_tokens_in_urls_and_browser_origin"
+    },
+    {
+      "duration_seconds": 0.011876,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_approve_and_reservation_atomic_and_replay_one_submission"
+    },
+    {
+      "duration_seconds": 0.018957,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_audit_minimization_and_reviewer_only_access"
+    },
+    {
+      "duration_seconds": 0.010427,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_auth_claim_boundaries"
+    },
+    {
+      "duration_seconds": 0.007488,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_auth_rejects_wrong_signature_algorithm_kid_and_remote_key_headers"
+    },
+    {
+      "duration_seconds": 0.016026,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_authenticated_preview_and_exact_bound_reply"
+    },
+    {
+      "duration_seconds": 0.024899,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_backup_restore_preserves_ledger_and_quarantines"
+    },
+    {
+      "duration_seconds": 0.009802,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_config_rejects_shared_client_between_agent_and_reviewer"
+    },
+    {
+      "duration_seconds": 0.010361,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_config_requires_separate_agent_reviewer_and_fixed_profile"
+    },
+    {
+      "duration_seconds": 0.0081,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_cross_proposal_digest_cannot_approve"
+    },
+    {
+      "duration_seconds": 0.009379,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_database_capacity_before_submit_causes_zero_adapter_calls"
+    },
+    {
+      "duration_seconds": 0.008394,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_database_identity_cannot_be_rebound"
+    },
+    {
+      "duration_seconds": 0.009305,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_decision_audit_failure_rolls_back_decision_and_reservation"
+    },
+    {
+      "duration_seconds": 0.010677,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_denial_terminal_and_revocation_prevents_claim"
+    },
+    {
+      "duration_seconds": 0.012826,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_disabled_runtime_records_block_without_consuming_approval"
+    },
+    {
+      "duration_seconds": 0.008396,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_expiry_at_boundary_and_before_issuance"
+    },
+    {
+      "duration_seconds": 0.00918,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_explicit_fresh_database_initialization_refuses_existing_or_restore_candidate"
+    },
+    {
+      "duration_seconds": 0.006837,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_fail_closed_without_configuration"
+    },
+    {
+      "duration_seconds": 0.499955,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_fifo_source_is_rejected_without_blocking"
+    },
+    {
+      "duration_seconds": 0.014173,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_graceful_worker_stop_finishes_inflight_but_does_not_claim_next"
+    },
+    {
+      "duration_seconds": 0.011663,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_health_readiness_truthfully_discloses_disabled_delivery"
+    },
+    {
+      "duration_seconds": 0.009664,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_idempotency_same_key_returns_stored_and_changed_body_conflicts"
+    },
+    {
+      "duration_seconds": 0.529552,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_independent_processes_only_one_claim_commits"
+    },
+    {
+      "duration_seconds": 0.017913,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_intentional_second_operation_requires_new_approval"
+    },
+    {
+      "duration_seconds": 0.325584,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_interrupted_restore_does_not_publish_unquarantined_final_database"
+    },
+    {
+      "duration_seconds": 0.011668,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_json_duplicate_keys_and_nonfinite_values_rejected"
+    },
+    {
+      "duration_seconds": 0.014936,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_jwks_rejects_private_oct_and_small_keys"
+    },
+    {
+      "duration_seconds": 0.010445,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_late_completion_fenced_and_revoke_after_claim_refused"
+    },
+    {
+      "duration_seconds": 0.00611,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_migration_wal_full_and_append_only_audit"
+    },
+    {
+      "duration_seconds": 0.005418,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_missing_or_uninitialized_ledger_fails_closed_on_startup_and_reconnect"
+    },
+    {
+      "duration_seconds": 0.013331,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_missing_or_wrong_digest_never_approves"
+    },
+    {
+      "duration_seconds": 0.011566,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_payload_types_size_and_header_injection"
+    },
+    {
+      "duration_seconds": 0.014466,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_postsubmit_audit_failure_quarantines_no_retry"
+    },
+    {
+      "duration_seconds": 0.01255,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_preclaim_audit_failure_rolls_back_approval_consumption"
+    },
+    {
+      "duration_seconds": 0.637695,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_process_crash_after_claim_or_possible_submission_never_reclaims"
+    },
+    {
+      "duration_seconds": 0.009277,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_queued_approval_expiry_blocks_without_consumption"
+    },
+    {
+      "duration_seconds": 0.007617,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_rate_limit_persists_across_service_restart"
+    },
+    {
+      "duration_seconds": 0.011094,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_reconciliation_is_observation_never_reopens_uncertainty"
+    },
+    {
+      "duration_seconds": 0.019157,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_reconciliation_preserves_append_only_evidence_references"
+    },
+    {
+      "duration_seconds": 0.009173,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_required_access_token_claims_and_header_type_are_enforced"
+    },
+    {
+      "duration_seconds": 0.012827,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_restart_preserves_result_and_no_duplicate_submission"
+    },
+    {
+      "duration_seconds": 0.008448,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_restore_final_publication_never_overwrites_racing_destination"
+    },
+    {
+      "duration_seconds": 0.009101,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_restore_quarantine_blocks_without_claim"
+    },
+    {
+      "duration_seconds": 0.009995,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_revoked_configured_identity_blocks_queued_approval"
+    },
+    {
+      "duration_seconds": 0.112884,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_source_drift_and_policy_change_block_execution"
+    },
+    {
+      "duration_seconds": 0.009666,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_source_missing_at_execution_blocks_without_consumption"
+    },
+    {
+      "duration_seconds": 0.006357,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_source_path_boundaries_symlinks_and_customer_binding"
+    },
+    {
+      "duration_seconds": 0.006398,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_stale_source_proposal_rejected"
+    },
+    {
+      "duration_seconds": 1.01966,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_timeout_and_cancellation_after_invocation_remain_uncertain"
+    },
+    {
+      "duration_seconds": 0.021257,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_transaction_contention_uses_fresh_expiry_and_deadline_clock"
+    },
+    {
+      "duration_seconds": 0.019669,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_uncertain_rejected_and_adapter_exception_are_not_retried"
+    },
+    {
+      "duration_seconds": 0.03444,
+      "outcome": "passed",
+      "test": "test_service.ServiceTests.test_unknown_actor_destination_tool_and_approval_fields_rejected"
+    },
+    {
+      "duration_seconds": 0.008149,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_ascii_and_quoted_printable_sources_have_exact_plain_body"
+    },
+    {
+      "duration_seconds": 0.000142,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_body_fetch_matches_requested_uid_declared_size_and_single_literal"
+    },
+    {
+      "duration_seconds": 0.011735,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_duplicate_malformed_routing_and_thread_headers_refused"
+    },
+    {
+      "duration_seconds": 0.000108,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_duplicate_out_of_order_and_malformed_codes_cannot_establish_acceptance"
+    },
+    {
+      "duration_seconds": 0.000945,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_fixed_official_tls_endpoints_and_no_activation_surface"
+    },
+    {
+      "duration_seconds": 6.8e-05,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_known_negative_smtp_response_terminal_without_internal_retry"
+    },
+    {
+      "duration_seconds": 3.3e-05,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_lost_ack_timeout_and_cancellation_after_body_uncertain"
+    },
+    {
+      "duration_seconds": 0.002023,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_malformed_encoded_words_are_never_silently_repaired"
+    },
+    {
+      "duration_seconds": 0.002547,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_nested_encoded_word_subject_cannot_change_approved_wire_preview"
+    },
+    {
+      "duration_seconds": 0.004023,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_parent_in_reply_to_fallback_is_bound_and_visible_in_references"
+    },
+    {
+      "duration_seconds": 0.005832,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_raw_header_or_thread_change_changes_source_fingerprint"
+    },
+    {
+      "duration_seconds": 0.001032,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_read_plan_and_transcript_never_mark_seen_or_mutate"
+    },
+    {
+      "duration_seconds": 0.000114,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_size_preflight_rejects_missing_wrong_uid_duplicates_and_oversize"
+    },
+    {
+      "duration_seconds": 6.2e-05,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_smtp_acceptance_requires_final_data_ack_and_never_proves_delivery"
+    },
+    {
+      "duration_seconds": 0.001166,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_source_decodes_unicode_and_bound_thread_fields_without_authority"
+    },
+    {
+      "duration_seconds": 0.003389,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_source_recipient_subject_policy_and_identity_drift_refused"
+    },
+    {
+      "duration_seconds": 0.000121,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_uid_locator_bounds_no_sequence_ranges_paths_or_folders"
+    },
+    {
+      "duration_seconds": 5e-05,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_uidvalidity_rollover_and_ambiguous_responses_refused"
+    },
+    {
+      "duration_seconds": 0.006954,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_unsupported_mime_attachments_charset_and_encoding_refused"
+    },
+    {
+      "duration_seconds": 0.014002,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailContractTests.test_wire_preview_is_exact_deterministic_and_binds_visible_headers"
+    },
+    {
+      "duration_seconds": 0.009568,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailDurableBridgeTests.test_configured_production_keeps_delivery_disabled_with_addition_present"
+    },
+    {
+      "duration_seconds": 0.016766,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailDurableBridgeTests.test_data_ack_loss_terminal_uncertainty_across_restart"
+    },
+    {
+      "duration_seconds": 0.01952,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailDurableBridgeTests.test_durable_claim_before_exchange_restart_replay_and_failed_sent_copy"
+    },
+    {
+      "duration_seconds": 0.010692,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailDurableBridgeTests.test_no_approval_means_no_protocol_exchange"
+    },
+    {
+      "duration_seconds": 0.018063,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailDurableBridgeTests.test_thread_drift_after_claim_refused_before_any_smtp_body"
+    },
+    {
+      "duration_seconds": 0.013634,
+      "outcome": "passed",
+      "test": "test_spacemail_contract.SpaceMailDurableBridgeTests.test_uid_or_thread_drift_before_claim_blocks_without_consumption"
+    }
+  ],
+  "tests_run": 177,
+  "total_deadline": "offline_fake_socket_watchdog_verified_real_socket_interrupt_unrun",
+  "unchanged_base_files": {
+    ".gitignore": true,
+    "MAIL_OWNER_INTEGRATION.md": true,
+    "PILOT_RUNTIME.md": false,
+    "PRIVATE_WIRE_BRIDGE.md": true,
+    "README.md": false,
+    "SPACEMAIL_ADAPTER_CONTRACT.md": true,
+    "deploy/config.example.json": true,
+    "deploy/environment.example": true,
+    "deploy/pilot-runtime.disabled.example.json": false,
+    "deploy/private-bridge-profile.example.json": true,
+    "deploy/private-bridge-staging.example.json": true,
+    "deploy/zetbros-pilot.service.example": false,
+    "deploy/zetbros.service.example": true,
+    "evidence/mail-integration/base-manifest.json": true,
+    "evidence/mail-integration/prior-combined-test-results.json": true,
+    "evidence/mail-integration/prior-combined-unit-test-output.txt": true,
+    "evidence/mail-integration/test-results.json": true,
+    "evidence/mail-integration/unit-test-output.txt": true,
+    "evidence/pilot-runtime/base-manifest.json": true,
+    "evidence/pilot-runtime/memory-sample.json": true,
+    "evidence/pilot-runtime/memory-samples.json": true,
+    "evidence/pilot-runtime/test-results.json": true,
+    "evidence/pilot-runtime/unit-test-output.txt": true,
+    "evidence/private-wire-bridge/base-manifest.json": true,
+    "evidence/private-wire-bridge/test-results.json": true,
+    "evidence/private-wire-bridge/unit-test-output.txt": true,
+    "evidence/spacemail/base-manifest.json": true,
+    "evidence/spacemail/test-results.json": true,
+    "evidence/spacemail/unit-test-output.txt": true,
+    "evidence/test-results.json": true,
+    "evidence/unit-test-output.txt": true,
+    "evidence/verification-summary.md": true,
+    "measure_pilot_memory.py": false,
+    "requirements-lock.txt": true,
+    "requirements-test.txt": true,
+    "requirements.txt": true,
+    "run_checks.py": true,
+    "run_mail_integration_checks.py": true,
+    "run_pilot_checks.py": true,
+    "run_private_bridge_checks.py": true,
+    "run_spacemail_checks.py": true,
+    "tests/test_http_runtime.py": true,
+    "tests/test_mail_integration.py": true,
+    "tests/test_pilot_runtime.py": false,
+    "tests/test_private_wire_bridge.py": true,
+    "tests/test_review_ui.py": true,
+    "tests/test_service.py": true,
+    "tests/test_spacemail_contract.py": true,
+    "zetbros_service/__init__.py": true,
+    "zetbros_service/adapters.py": true,
+    "zetbros_service/api.py": false,
+    "zetbros_service/auth.py": true,
+    "zetbros_service/config.py": false,
+    "zetbros_service/live_session_factory.py": true,
+    "zetbros_service/mail_integration.py": false,
+    "zetbros_service/mail_owner.py": true,
+    "zetbros_service/maintenance.py": false,
+    "zetbros_service/models.py": true,
+    "zetbros_service/pilot.py": false,
+    "zetbros_service/pilot_runtime.py": false,
+    "zetbros_service/private_wire_bridge.py": true,
+    "zetbros_service/review_assets/browser_check.cjs": true,
+    "zetbros_service/review_assets/review.css": true,
+    "zetbros_service/review_assets/review.html": true,
+    "zetbros_service/review_assets/review.js": true,
+    "zetbros_service/review_assets/state_check.cjs": true,
+    "zetbros_service/review_ui.py": true,
+    "zetbros_service/service.py": true,
+    "zetbros_service/spacemail_contract.py": true,
+    "zetbros_service/store.py": true
+  }
+}

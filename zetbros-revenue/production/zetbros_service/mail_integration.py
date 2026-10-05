@@ -35,6 +35,17 @@ class PreparedWirePort(Protocol):
 class MailStore(Store):
     """Separate explicit offline ledger extension; base startup never migrates it."""
     workflow_contract = "mail_exact_wire_v1"
+
+    @staticmethod
+    def account_identity(source):
+        profile = getattr(source.owner, "profile", None)
+        if profile is None:
+            return None  # Legacy fictional owner port, never the private runtime.
+        return digest({"tenant_id": profile.binding.tenant_id, "connector_id": profile.binding.connector_id,
+                       "account_id": profile.binding.account_id, "sender_address": profile.binding.sender_address,
+                       "mailbox_address": profile.mailbox_address, "host": profile.endpoints.host,
+                       "imap_port": profile.endpoints.imap_port, "smtp_port": profile.endpoints.smtp_port,
+                       "security": profile.endpoints.security, "inbox": profile.endpoints.inbox})
     def __init__(self, settings, clock=time.time, *, source: OwnerMailSource):
         super().__init__(settings, clock)
         self.source = source
@@ -44,6 +55,10 @@ class MailStore(Store):
                 raise RuntimeError("explicit new offline mail-review ledger required")
             # Missing table is a fail-closed startup error, never a fallback.
             conn.execute("SELECT proposal_id,preview_digest,preview,wire_base64 FROM mail_previews LIMIT 0")
+            expected_account = self.account_identity(source)
+            account = conn.execute("SELECT value FROM metadata WHERE key='mail_account_identity'").fetchone()
+            if expected_account is not None and (account is None or account[0] != expected_account):
+                raise RuntimeError("private account identity is missing or changed; no existing-ledger migration is supported")
 
     @classmethod
     def initialize_offline(cls, settings, clock=time.time, *, source: OwnerMailSource):
@@ -55,6 +70,9 @@ class MailStore(Store):
             conn.execute("CREATE TRIGGER mail_preview_no_update BEFORE UPDATE ON mail_previews BEGIN SELECT RAISE(ABORT,'immutable_preview'); END")
             conn.execute("CREATE TRIGGER mail_preview_no_delete BEFORE DELETE ON mail_previews BEGIN SELECT RAISE(ABORT,'immutable_preview'); END")
             conn.execute("INSERT INTO metadata VALUES ('mail_review_schema','1')")
+            account = cls.account_identity(source)
+            if account is not None:
+                conn.execute("INSERT INTO metadata VALUES ('mail_account_identity',?)", (account,))
         return cls(settings, clock, source=source)
 
     def prepared(self, conn, proposal_id: str, action: ReplyAction) -> PreparedReply:
@@ -173,6 +191,9 @@ class MailService(Service):
         result = super().readiness()
         result["source"] = "owner_mail_interface_offline_candidate"
         result["owner_account_attestation"] = "unverified"
+        if self.settings.source_adapter == "private_spacemail" and self.settings.outbound_adapter == "disabled":
+            result["source"] = "private_mail_disabled"
+            result["delivery"] = "disabled"
         if self.settings.outbound_adapter == "private_spacemail":
             result["source"] = "operator_configured_private_mail"
             result["delivery"] = "operator_configured_pilot_unverified"

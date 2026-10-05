@@ -12,7 +12,7 @@ from contextlib import closing
 from pathlib import Path
 
 from .auth import Principal
-from .config import load_settings
+from .config import PendingPilotConfig, load_settings
 from .models import ReplyAction, canonical
 from .store import Store, StoreError
 
@@ -100,12 +100,16 @@ def main():
     restore_parser=sub.add_parser("restore"); restore_parser.add_argument("--source",type=Path,required=True)
     args=parser.parse_args()
     settings=load_settings()
+    if isinstance(settings, PendingPilotConfig):
+        raise RuntimeError("identity pending: use pilot staging; no maintenance ledger exists")
+    if settings.source_adapter == "private_spacemail" and args.command == "init":
+        raise RuntimeError("private pilot initialization requires pilot init; action-only initialization is refused")
     if args.command=="restore": result=restore(settings,args.source)
     elif args.command=="init":
         store=Store.initialize(settings)
         result={"initialization":"complete","new_deployment_only":True,"database_healthy":store.healthy()}
     else:
-        store=Store(settings)
+        store=Store(settings,maintenance_only=settings.source_adapter == "private_spacemail")
         result=backup(store,args.destination) if args.command=="backup" else {"database_healthy":store.healthy(),"schema_version":1,"deployment_profile":settings.deployment_profile}
     print(json.dumps(result,sort_keys=True))
 

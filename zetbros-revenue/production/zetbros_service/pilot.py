@@ -1,8 +1,8 @@
 """Operator CLI: init only an absent new pilot ledger, or check without Mail I/O."""
 import argparse
 import json
-from .config import load_settings
-from .pilot_runtime import build_service, initialize_new_pilot
+from .config import PendingPilotConfig, load_settings
+from .pilot_runtime import build_service, initialize_new_pilot, pending_status
 
 
 def main():
@@ -11,10 +11,11 @@ def main():
     args = parser.parse_args()
     settings = load_settings()
     if args.command == "init":
-        store = initialize_new_pilot(settings)
-        result = {"new_ledger_initialized": store.healthy(), "provider_connections": "not_performed"}
+        initialized = initialize_new_pilot(settings)
+        result = (initialized if isinstance(initialized, dict) else
+                  {"new_ledger_initialized": initialized.healthy(), "provider_connections": "not_performed"})
     else:
-        result = build_service(settings).readiness()
+        result = pending_status() if isinstance(settings, PendingPilotConfig) else build_service(settings).readiness()
     print(json.dumps(result, sort_keys=True))
 
 

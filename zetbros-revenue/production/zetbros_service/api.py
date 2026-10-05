@@ -158,5 +158,7 @@ def create_app(service: Service, *, run_worker: bool = True) -> FastAPI:
 
 def configured_app() -> FastAPI:
     # No developer auth, token creation, credentials or live transport startup.
-    from .pilot_runtime import build_service
-    return create_app(build_service(load_settings()))
+    from .config import PendingPilotConfig
+    from .pilot_runtime import build_service, create_staging_app
+    settings = load_settings()
+    return create_staging_app(settings) if isinstance(settings, PendingPilotConfig) else create_app(build_service(settings))

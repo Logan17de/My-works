@@ -7,6 +7,14 @@ All shipped configuration examples still select disabled outbound delivery.
 No real provider connection, credential, issuer grant, host modification, ledger
 migration, deployment or mail send was performed in this implementation stage.
 
+## Disabled-install correction
+
+The current supported default is now the explicit pending-identity health-only
+stage. Its init/check/start walkthrough creates no ledger and has no credential
+dependency. After actual identity setup, a disabled exact-wire MailStore workflow
+is supported without live flags. See [DISABLED_STAGING.md](DISABLED_STAGING.md).
+The original runtime details below describe the identity-configured modes.
+
 ## Runtime assembly and live safety boundary
 
 `configured_app` and `configured_pilot_app` use the same explicit runtime builder.
@@ -46,7 +54,8 @@ opens a session. It rejects missing/nonregular/symlinked, exposed, oversized or
 malformed files and returns only sanitized errors. It does not read archived
 configuration, arbitrary environment password values, agent inputs or chat.
 
-The proposed unit uses `LoadCredential` with a source path but no secret value.
+The separately proposed live unit uses `LoadCredential` with a source path but
+no secret value. The default disabled staging unit has no credential dependency.
 The owner/operator must securely supply or reuse the approved protected source;
 creating the service account, configuring credential access and enabling the
 unit are separate consequential actions requiring approval. No real secret
@@ -84,9 +93,10 @@ acceptance and browser pixel/host behavior remain part of live setup acceptance.
 
 ## New ledger only
 
-`python -m zetbros_service.pilot init` explicitly creates an absent new private
-ledger after validating its operator configuration. It performs no Mail I/O or
-credential lookup. Existing paths fail through O_EXCL. It never migrates, replaces
+`python -m zetbros_service.pilot init` stages without a ledger while identity is
+pending. With actual identity configuration, it verifies public JWKS and profile
+before explicitly creating an absent new private ledger, including in disabled
+mode. It performs no Mail I/O or credential lookup. Existing paths fail through O_EXCL. It never migrates, replaces
 or repairs an existing ledger; lost/restored operation history must retain the
 existing quarantine/reconciliation policy.
 
