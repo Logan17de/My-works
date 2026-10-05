@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import os
 import stat
+import time
 from pathlib import Path
 from urllib.parse import urlsplit
 from contextlib import contextmanager, asynccontextmanager
 
 from .adapters import SourceUnavailable
 from .auth import Verifier
-from .config import PendingPilotConfig, Settings, load_settings
+from .config import PendingPilotConfig, ReviewerPendingConfig, Settings, load_settings
 from .live_session_factory import LiveSessionFactory
 from .mail_integration import MailService, MailStore
 from .mail_owner import OwnerMailSource
@@ -91,9 +92,26 @@ def assemble_source(settings, *, factory_builder=LiveSessionFactory):
     return profile, factory, OwnerMailSource(profile.binding, PrivateReadPort(profile, factory))
 
 
+class ReviewerPendingRuntime:
+    """Authentication only; deliberately has no store, verifier, provider or worker."""
+    def __init__(self, settings, clock=None):
+        self.settings = settings
+        self.clock = time.time if clock is None else clock
+
+    def readiness(self):
+        return {"runtime_state": "reviewer_enabled_workflow_pending",
+                "reviewer_login_enabled": True, "workflow_ready": False,
+                "agent_api_enabled": False, "delivery": "disabled",
+                "ledger_initialized": False, "provider_connections": "not_performed"}
+
+
 def build_service(settings, *, factory_builder=LiveSessionFactory, clock=None):
     if isinstance(settings, PendingPilotConfig):
         raise RuntimeError("pending identity uses the staging app without a service ledger")
+    if isinstance(settings, ReviewerPendingConfig):
+        settings = ReviewerPendingConfig.model_validate_json(canonical(settings))
+        from .google_auth_runtime import configure_google_review
+        return configure_google_review(ReviewerPendingRuntime(settings, clock))
     settings = Settings.model_validate_json(canonical(settings))
     options = {} if clock is None else {"clock": clock}
     if settings.source_adapter == "customer_staged_snapshot" and settings.outbound_adapter == "disabled":
@@ -113,6 +131,8 @@ def build_service(settings, *, factory_builder=LiveSessionFactory, clock=None):
 def initialize_new_pilot(settings, *, factory_builder=LiveSessionFactory, clock=None):
     if isinstance(settings, PendingPilotConfig):
         return stage_without_ledger(settings)
+    if isinstance(settings, ReviewerPendingConfig):
+        return build_service(settings, clock=clock).readiness() | {"ledger_created": False}
     settings = Settings.model_validate_json(canonical(settings))
     if os.path.lexists(settings.database_path):
         raise FileExistsError("new pilot initialization refuses existing ledger paths")
@@ -155,6 +175,37 @@ def create_staging_app(settings: PendingPilotConfig):
     @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
     def unavailable(path: str):
         return JSONResponse({"error": "identity_configuration_pending", "delivery": "disabled"}, status_code=503)
+    return app
+
+
+def create_reviewer_pending_app(service):
+    from fastapi import FastAPI, Request
+    from fastapi.responses import JSONResponse
+    from .review_ui import install_review_ui
+    from .store import StoreError
+    if not isinstance(service.settings, ReviewerPendingConfig):
+        raise ValueError("reviewer pending configuration required")
+    @asynccontextmanager
+    async def lifespan(app):
+        import anyio
+        anyio.to_thread.current_default_thread_limiter().total_tokens = 4
+        yield
+    app = FastAPI(title="Zetbros reviewer login", docs_url=None, redoc_url=None,
+                  openapi_url=None, lifespan=lifespan)
+    @app.exception_handler(StoreError)
+    async def failure(request, exc):
+        return JSONResponse({"error": "review_unavailable"}, status_code=404)
+    @app.get('/healthz')
+    def health():
+        return {"status": "up"} | service.readiness()
+    @app.get('/readyz')
+    def ready():
+        return JSONResponse(service.readiness(), status_code=503)
+    install_review_ui(app, service, service.settings.review_origin)
+    @app.api_route('/{path:path}', methods=['GET','POST','PUT','PATCH','DELETE','OPTIONS','HEAD'])
+    def unavailable(path):
+        return JSONResponse({"error": "workflow_configuration_pending",
+                             "agent_api_enabled": False, "delivery": "disabled"}, status_code=503)
     return app
 
 

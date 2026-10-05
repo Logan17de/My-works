@@ -34,6 +34,43 @@ class PendingPilotConfig(StrictModel):
         return value
 
 
+class ReviewerPendingConfig(StrictModel):
+    """Approved reviewer login, with no agent, workflow, ledger or Mail settings."""
+    runtime_state: Literal["reviewer_enabled_workflow_pending"]
+    reviewer_auth: Literal["google_oidc"] = "google_oidc"
+    review_origin: str
+    google_reviewer_profile_file: str
+    principals: tuple[Grant, ...]
+    outbound_adapter: Literal["disabled"] = "disabled"
+
+    @field_validator("review_origin")
+    @classmethod
+    def origin(cls, value):
+        from .review_ui import validate_review_origin
+        if not value.startswith("https://"):
+            raise ValueError("reviewer login requires HTTPS")
+        return validate_review_origin(value)
+
+    @field_validator("google_reviewer_profile_file")
+    @classmethod
+    def profile_path(cls, value):
+        if not Path(value).is_absolute() or "\x00" in value:
+            raise ValueError("absolute reviewer profile path required")
+        return value
+
+    @model_validator(mode="after")
+    def reviewers_only(self):
+        pairs = [(g.subject, g.client_id) for g in self.principals]
+        if (not 1 <= len(pairs) <= 32 or len(pairs) != len(set(pairs))
+                or any(g.role != "reviewer" for g in self.principals)):
+            raise ValueError("bounded distinct reviewer mappings only")
+        return self
+
+    def role(self, subject, client_id):
+        return next((g.role for g in self.principals
+                     if (g.subject, g.client_id) == (subject, client_id)), None)
+
+
 class Settings(StrictModel):
     tenant_id: Identifier
     connector_id: Identifier
@@ -131,7 +168,7 @@ class Settings(StrictModel):
         return next((g.role for g in self.principals if g.subject == subject and g.client_id == client_id), None)
 
 
-def load_settings() -> Settings | PendingPilotConfig:
+def load_settings() -> Settings | PendingPilotConfig | ReviewerPendingConfig:
     path = os.environ.get("ZETBROS_CONFIG_FILE")
     if not path:
         raise RuntimeError("ZETBROS_CONFIG_FILE is required; service cannot start unconfigured")
@@ -142,6 +179,8 @@ def load_settings() -> Settings | PendingPilotConfig:
         value = json.loads(raw)
         if isinstance(value, dict) and value.get("runtime_state") == "disabled_pending_identity":
             return PendingPilotConfig.model_validate_json(raw)
+        if isinstance(value, dict) and value.get("runtime_state") == "reviewer_enabled_workflow_pending":
+            return ReviewerPendingConfig.model_validate_json(raw)
         return Settings.model_validate_json(raw)
     except (OSError, ValueError) as exc:
         raise RuntimeError("deployment configuration is missing or invalid") from exc

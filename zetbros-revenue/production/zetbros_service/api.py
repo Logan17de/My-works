@@ -12,7 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .auth import AuthenticationError
-from .config import load_settings
+from .config import load_settings, ReviewerPendingConfig
 from .models import DecisionInput, Identifier, ProposalInput, ReconciliationInput
 from .service import Service
 from .store import StoreError
@@ -22,6 +22,8 @@ MAX_BODY = 32768
 
 
 def create_app(service: Service, *, run_worker: bool = True) -> FastAPI:
+    if isinstance(service.settings, ReviewerPendingConfig):
+        raise ValueError("reviewer pending mode requires its login-only app")
     if service.settings.reviewer_auth == "google_oidc" and getattr(service, "google_reviewer_auth", None) is None:
         raise RuntimeError("Google reviewer mode requires its configured login boundary")
     @asynccontextmanager
@@ -165,7 +167,9 @@ def create_app(service: Service, *, run_worker: bool = True) -> FastAPI:
 
 def configured_app() -> FastAPI:
     # No developer auth, token creation, credentials or live transport startup.
-    from .config import PendingPilotConfig
-    from .pilot_runtime import build_service, create_staging_app
+    from .config import PendingPilotConfig, ReviewerPendingConfig
+    from .pilot_runtime import build_service, create_staging_app, create_reviewer_pending_app
     settings = load_settings()
+    if isinstance(settings, ReviewerPendingConfig):
+        return create_reviewer_pending_app(build_service(settings))
     return create_staging_app(settings) if isinstance(settings, PendingPilotConfig) else create_app(build_service(settings))

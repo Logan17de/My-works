@@ -47,7 +47,7 @@ class GoogleAuthTests(unittest.TestCase):
         self.proposal=self.fixture.propose()
     def tearDown(self):self.client.close();self.fixture.tearDown()
     def token(self,expected_nonce,**changes):
-        now=int(time.time());claims={'iss':'https://accounts.google.com','aud':CID,'sub':SUB,'iat':now-1,
+        now=int(self.fixture.fixture.clock());claims={'iss':'https://accounts.google.com','aud':CID,'sub':SUB,'iat':now-1,
             'exp':now+300,'nonce':expected_nonce,'email':'ignored@untrusted.invalid','role':'agent','user_metadata':{'role':'admin'}}
         claims.update(changes)
         return jwt.encode(claims,self.key,algorithm='RS256',headers={'kid':'mock-google','typ':'JWT'})

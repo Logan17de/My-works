@@ -8,6 +8,7 @@
   const panel = byId("preview");
   const pin = document.documentElement.dataset.reviewOrigin;
   const googleMode = document.documentElement.dataset.authMode === "google_oidc";
+  const workflowPending = document.documentElement.dataset.workflowState === "pending";
   const sessionForm = byId("session-form");
   const googleSession = byId("google-session");
   const googleButton = byId("google-button");
@@ -63,12 +64,12 @@
       && !attempted.has(preview.id);
   }
   function controls() {
-    byId("load").disabled = !authenticated() || deciding || logoutBusy || location.origin !== pin;
+    byId("load").disabled = workflowPending || !authenticated() || deciding || logoutBusy || location.origin !== pin;
     if (byId("unlock")) byId("unlock").disabled = googleMode || deciding || location.origin !== pin;
     if (googleButton) googleButton.hidden = !googleMode || !googleReady || authBusy || logoutBusy || deciding || googleAuthenticated || location.origin !== pin;
     if (googleRetry) googleRetry.disabled = authBusy || logoutBusy || deciding || location.origin !== pin;
     byId("logout").disabled = googleMode && logoutBusy;
-    const permitted = authenticated() && !!pending() && confirmation.checked && !deciding && !loadController && !logoutBusy;
+    const permitted = !workflowPending && authenticated() && !!pending() && confirmation.checked && !deciding && !loadController && !logoutBusy;
     byId("approve").disabled = !permitted;
     byId("deny").disabled = !permitted;
   }
@@ -150,8 +151,8 @@
     authBusy = false;
     googleReady = false;
     if (googleRetry) googleRetry.hidden = true;
-    googleMessage("Reviewer signed in. Log out or Cancel to clear this session.");
-    if (!deciding) message("Reviewer session verified. Load a proposal to review its exact preview.");
+    googleMessage(workflowPending ? "Reviewer signed in. Proposed actions are not available yet. Log out to clear this session." : "Reviewer signed in. Log out or Cancel to clear this session.");
+    if (!deciding) message(workflowPending ? "Reviewer access verified. Proposed actions are not available yet. Email sending is disabled." : "Reviewer session verified. Load a proposal to review its exact preview.");
     controls();
   }
   async function prepareGoogleSignIn(version) {
@@ -175,7 +176,7 @@
     authBusy = false;
     googleReady = true;
     googleMessage("Sign in with an approved reviewer account.");
-    if (!deciding) message("Sign in with Google, then load a proposal.");
+    if (!deciding) message(workflowPending ? "Sign in with your approved Google account. Proposed actions are not available yet." : "Sign in with Google, then load a proposal.");
     controls();
   }
   async function checkGoogleSession() {
@@ -344,11 +345,11 @@
   byId("logout").addEventListener("click", logout);
   byId("cancel").addEventListener("click", logout);
   if (googleRetry) googleRetry.addEventListener("click", checkGoogleSession);
-  idInput.addEventListener("input", () => { invalidate(); message(deciding ? "A decision is in flight. Changing this field does not cancel it." : "Proposal changed. Load a fresh preview before deciding."); });
+  idInput.addEventListener("input", () => { if (workflowPending) return; invalidate(); message(deciding ? "A decision is in flight. Changing this field does not cancel it." : "Proposal changed. Load a fresh preview before deciding."); });
   confirmation.addEventListener("change", controls);
   byId("proposal-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!authenticated() || deciding || logoutBusy || location.origin !== pin) return;
+    if (workflowPending || !authenticated() || deciding || logoutBusy || location.origin !== pin) return;
     const id = idInput.value;
     invalidate();
     if (!uuid.test(id)) { message("Enter a complete proposal UUID."); return; }
@@ -375,7 +376,7 @@
     }
   });
   async function decide(decision) {
-    if (!authenticated() || !pending() || !confirmation.checked || deciding || loadController || logoutBusy || location.origin !== pin) return;
+    if (workflowPending || !authenticated() || !pending() || !confirmation.checked || deciding || loadController || logoutBusy || location.origin !== pin) return;
     const shown = preview;
     const version = generation;
     attempted.add(shown.id);

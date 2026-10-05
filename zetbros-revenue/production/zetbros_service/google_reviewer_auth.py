@@ -25,6 +25,7 @@ from pydantic import Field, field_validator, model_validator
 
 from .auth import AuthenticationError, Principal, Verifier
 from .models import PrincipalId, StrictModel
+from .config import ReviewerPendingConfig
 
 CHALLENGE_COOKIE = "__Secure-zetbros-login"
 SESSION_COOKIE = "__Secure-zetbros-review"
@@ -151,7 +152,7 @@ class GoogleReviewerAuth:
         self.profile = GoogleReviewerProfile.model_validate_json(profile.model_dump_json())
         if not self.profile.enabled: raise ValueError("Google reviewer login is disabled")
         if settings.review_origin != profile.origin: raise ValueError("review origin mismatch")
-        if settings.issuer in ('https://accounts.google.com','accounts.google.com') or settings.audience==profile.client_id:
+        if not isinstance(settings, ReviewerPendingConfig) and (settings.issuer in ('https://accounts.google.com','accounts.google.com') or settings.audience==profile.client_id):
             raise ValueError("agent access credentials need a separate issuer/resource audience")
         reviewer_pairs={(g.subject,g.client_id) for g in settings.principals if g.role=='reviewer'}
         expected={(sub,profile.client_id) for sub in profile.reviewer_subjects}

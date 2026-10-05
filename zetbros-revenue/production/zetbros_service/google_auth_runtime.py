@@ -3,6 +3,7 @@ import os
 import stat
 from .google_reviewer_auth import AgentOnlyVerifier,GoogleReviewerAuth,GoogleReviewerProfile
 from .google_public_keys import GooglePublicKeys
+from .config import ReviewerPendingConfig
 
 
 def load_google_review_profile(settings):
@@ -14,7 +15,7 @@ def load_google_review_profile(settings):
             if not stat.S_ISREG(meta.st_mode) or not 1<=meta.st_size<=16384:raise ValueError
             profile=GoogleReviewerProfile.model_validate_json(handle.read(16385))
         if not profile.enabled or settings.review_origin!=profile.origin:raise ValueError
-        if settings.issuer in ('https://accounts.google.com','accounts.google.com') or settings.audience==profile.client_id:
+        if not isinstance(settings, ReviewerPendingConfig) and (settings.issuer in ('https://accounts.google.com','accounts.google.com') or settings.audience==profile.client_id):
             raise ValueError('agent access credentials need a separate issuer/resource audience')
         expected={(sub,profile.client_id) for sub in profile.reviewer_subjects}
         actual={(g.subject,g.client_id) for g in settings.principals if g.role=='reviewer'}
@@ -29,5 +30,6 @@ def configure_google_review(service, *, key_source=None):
     profile=load_google_review_profile(service.settings)
     service.google_reviewer_auth=GoogleReviewerAuth(profile,service.settings,
         key_source if key_source is not None else GooglePublicKeys(),clock=service.clock)
-    service.verifier=AgentOnlyVerifier(service.verifier)
+    if not isinstance(service.settings, ReviewerPendingConfig):
+        service.verifier=AgentOnlyVerifier(service.verifier)
     return service

@@ -59,7 +59,7 @@ function setup(fixture, options = {}) {
   };
   const loadScript = (script = scripts.at(-1)) => { context.google = gis; script.onload(); };
   const document = {
-    documentElement: {dataset: {reviewOrigin: fixture.origin, authMode: options.mode || "google_oidc"}},
+    documentElement: {dataset: {reviewOrigin: fixture.origin, authMode: options.mode || "google_oidc", workflowState: options.workflowState || "configured"}},
     getElementById: (id) => elements.get(id), createElement: (tag) => new Element(tag),
     head: {appendChild: (script) => { scripts.push(script); if (options.autoScript !== false) Promise.resolve().then(() => loadScript(script)); }},
   };
@@ -317,6 +317,18 @@ async function main(fixture) {
   await s.e("google-retry").emit("click"); await s.e("logout").emit("click"); await s.e("cancel").emit("click"); await s.load();
   assert.equal(s.calls.length, 0); assert.equal(s.scripts.length, 0); assert.equal(s.e("load").disabled, true);
   completed.push("foreign-origin session, retry, logout, Cancel, and preview remain disabled");
+
+  for (const restored of [false, true]) {
+    s = setup(fixture, {workflowState: "pending", restored}); await flush();
+    if (!restored) { s.callback()({credential}); await flush(); }
+    assert.match(s.e("google-state").textContent, /Reviewer signed in/);
+    assert.equal(s.e("load").disabled, true);
+    await s.load(); await s.confirm(); await s.e("approve").emit("click"); await s.e("deny").emit("click");
+    assert.equal(s.e("approve").disabled, true); assert.equal(s.e("deny").disabled, true);
+    assert.equal(s.calls.filter((call) => call.url.startsWith("/review/api/")).length, 0);
+    assert.match(s.e("status").textContent, /Proposed actions are not available yet/);
+    completed.push(restored ? "pending workflow restored login keeps all action controls disabled" : "pending workflow fresh login keeps all action controls disabled");
+  }
 
   process.stdout.write(JSON.stringify({result: "google socket-free state checks passed", scenarios: completed}, null, 2) + "\n");
 }

@@ -23,6 +23,7 @@ from .auth import AuthenticationError, Principal
 from .models import Digest, StrictModel, ReconciliationInput
 from .service import Service
 from .store import StoreError
+from .config import ReviewerPendingConfig
 
 ASSETS = Path(__file__).with_name("review_assets")
 MAX_BODY = 32768
@@ -93,11 +94,19 @@ def install_review_ui(app: FastAPI, service: Service, review_origin: str) -> Non
     assets = {name: (ASSETS / name).read_bytes() for name in ("review.js", "review.css")}
     page = (ASSETS / "review.html").read_text(encoding="utf-8")
     page = page.replace("REVIEW_ORIGIN_PIN", escape(origin, quote=True))
+    workflow_pending = isinstance(service.settings, ReviewerPendingConfig)
+    page = page.replace("REVIEW_WORKFLOW_STATE", "pending" if workflow_pending else "configured")
     live = service.settings.outbound_adapter == "private_spacemail"
     notice = ("Approve authorizes an attempted submission of this exact reply by the configured private adapter. Approval and provider acceptance are not proof of delivery. Mail content is untrusted and cannot authorize actions." if live else
               "Delivery is disabled in this implementation. Approval records a decision; it is not evidence of sending or delivery. Mail content is untrusted and cannot authorize actions.")
     page = page.replace("DELIVERY_NOTICE", escape(notice))
+    if workflow_pending:
+        page = page.replace(escape(notice), "Reviewer sign-in is enabled. Proposed actions are not available yet. Email sending is disabled.")
+        page = page.replace('<section aria-labelledby="proposal-title">', '<section aria-labelledby="proposal-title" hidden>')
+        page = page.replace('Review the exact reply', 'Zetbros reviewer access')
     google_auth = getattr(service, "google_reviewer_auth", None)
+    if workflow_pending and google_auth is None:
+        raise ValueError("pending reviewer mode requires configured Google authentication")
     page = page.replace("REVIEW_AUTH_MODE", "google_oidc" if google_auth is not None else "bearer")
     csp = CSP
     if google_auth is not None:
@@ -250,6 +259,14 @@ def install_review_ui(app: FastAPI, service: Service, review_origin: str) -> Non
             raise StoreError("not_found", 404)
         media_type = "text/javascript" if name.endswith(".js") else "text/css"
         return Response(assets[name], media_type=media_type)
+
+    if workflow_pending:
+        from .google_login_routes import install_google_login_routes
+        install_google_login_routes(app, service, google_auth)
+        @app.api_route('/review/api/{path:path}', methods=['GET','POST','PUT','PATCH','DELETE','OPTIONS','HEAD'])
+        def pending_workflow(path):
+            return JSONResponse({"error": "workflow_configuration_pending", "delivery": "disabled"}, status_code=503)
+        return
 
     def exact_wire(view):
         if (view.get("review_contract") != "action_and_exact_wire_v1"
