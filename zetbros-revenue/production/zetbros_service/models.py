@@ -9,7 +9,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Identifier = Annotated[str, Field(min_length=1, max_length=96, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")]
-PrincipalId = Annotated[str, Field(min_length=1, max_length=160, pattern=r"^[^\x00-\x20\x7f]+$")]
+PrincipalId = Annotated[str, Field(min_length=1, max_length=255, pattern=r"^[^\x00-\x20\x7f]+$")]
 Digest = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
 Address = Annotated[str, Field(min_length=3, max_length=254)]
 

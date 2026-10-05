@@ -71,6 +71,14 @@ here only with fake I/O. Real authentication/TLS/provider behavior remains unrun
 
 ## Human review
 
+The optional Google mode is now implemented with a dedicated GIS ID-token
+exchange and isolated short reviewer cookies. See
+[GOOGLE_REVIEWER_LOGIN.md](GOOGLE_REVIEWER_LOGIN.md) for configuration, separate
+agent authority, exact reviewer-session gates and unrun browser/live acceptance.
+The bearer-mode description below remains valid only for explicitly selected
+`existing_access_token` mode. Shipped pending-identity defaults enable neither.
+
+
 `/review` serves self-hosted HTML/CSS/JavaScript. The reviewer supplies an existing
 properly scoped reviewer token in a password field; it lives in page memory only,
 never storage, cookies, URLs or logs. The API verifies the pinned issuer/audience/

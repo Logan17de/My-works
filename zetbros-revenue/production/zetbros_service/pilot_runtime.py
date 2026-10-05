@@ -97,13 +97,17 @@ def build_service(settings, *, factory_builder=LiveSessionFactory, clock=None):
     settings = Settings.model_validate_json(canonical(settings))
     options = {} if clock is None else {"clock": clock}
     if settings.source_adapter == "customer_staged_snapshot" and settings.outbound_adapter == "disabled":
+        if settings.reviewer_auth != "existing_access_token":
+            raise RuntimeError("Google reviewer mode requires the exact-wire private mail contract")
         return Service(settings, **options)
     if settings.source_adapter != "private_spacemail":
         raise RuntimeError("private pilot source contract required")
     validate_identity(settings)
     profile, factory, source = assemble_source(settings, factory_builder=factory_builder)
     transport = None if factory is None else PrivatePreparedWireTransport(profile, factory, sent_copy=True, **options)
-    return MailService(settings, source=source, prepared_transport=transport, **options)
+    service = MailService(settings, source=source, prepared_transport=transport, **options)
+    from .google_auth_runtime import configure_google_review
+    return configure_google_review(service)
 
 
 def initialize_new_pilot(settings, *, factory_builder=LiveSessionFactory, clock=None):
@@ -115,6 +119,9 @@ def initialize_new_pilot(settings, *, factory_builder=LiveSessionFactory, clock=
     if settings.source_adapter != "private_spacemail":
         raise RuntimeError("identity-configured private pilot source contract required")
     validate_identity(settings)
+    if settings.reviewer_auth == "google_oidc":
+        from .google_auth_runtime import load_google_review_profile
+        load_google_review_profile(settings)
     profile = load_profile(settings)
     options = {} if clock is None else {"clock": clock}
     # Initialization never constructs a live factory, even with live config.

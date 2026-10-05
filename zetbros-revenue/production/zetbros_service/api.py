@@ -22,6 +22,8 @@ MAX_BODY = 32768
 
 
 def create_app(service: Service, *, run_worker: bool = True) -> FastAPI:
+    if service.settings.reviewer_auth == "google_oidc" and getattr(service, "google_reviewer_auth", None) is None:
+        raise RuntimeError("Google reviewer mode requires its configured login boundary")
     @asynccontextmanager
     async def lifespan(app):
         import anyio
@@ -42,6 +44,11 @@ def create_app(service: Service, *, run_worker: bool = True) -> FastAPI:
         if any("token" in key.lower() or "authorization" in key.lower() for key in request.query_params):
             return JSONResponse({"error":"tokens_in_urls_forbidden"},status_code=400)
         if request.url.path.startswith("/v1/"):
+            if getattr(service, "google_reviewer_auth", None) is not None:
+                if request.headers.get("cookie") is not None:
+                    return JSONResponse({"error":"agent_credentials_required"},status_code=403)
+                if request.url.path.startswith("/v1/reviews/") or request.url.path == "/v1/audit":
+                    return JSONResponse({"error":"agent_review_surface_forbidden"},status_code=403)
             # No cookies, browser form endpoints, CSRF flow or CORS authorization.
             if request.headers.get("origin") is not None:
                 return JSONResponse({"error":"browser_origin_not_supported"},status_code=403)

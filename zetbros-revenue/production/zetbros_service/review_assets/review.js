@@ -7,9 +7,24 @@
   const status = byId("status");
   const panel = byId("preview");
   const pin = document.documentElement.dataset.reviewOrigin;
+  const googleMode = document.documentElement.dataset.authMode === "google_oidc";
+  const sessionForm = byId("session-form");
+  const googleSession = byId("google-session");
+  const googleButton = byId("google-button");
+  const googleRetry = byId("google-retry");
+  const googleState = byId("google-state");
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const hash = /^[0-9a-f]{64}$/;
   let bearer = "";
+  let reviewCsrf = "";
+  let googleAuthenticated = false;
+  let authGeneration = 0;
+  let authController = null;
+  let authBusy = false;
+  let logoutBusy = false;
+  let googleReady = false;
+  let loginInFlight = null;
+  let googleLibraryPromise = null;
   let generation = 0;
   let preview = null;
   let loadController = null;
@@ -21,15 +36,39 @@
 
   class SafeResponseError extends Error {}
   function message(text) { status.textContent = text; }
+  function authenticated() { return googleMode ? googleAuthenticated && !!reviewCsrf : !!bearer; }
+  function safeOpaque(value) { return typeof value === "string" && /^[A-Za-z0-9_-]{16,256}$/.test(value); }
+  function googleMessage(text) { if (googleState) googleState.textContent = text; }
+  function expiredGoogleSession(response, version) {
+    if (!googleMode || response.status !== 401 || version !== generation) return;
+    googleAuthenticated = false;
+    reviewCsrf = "";
+    googleReady = false;
+    if (googleRetry) googleRetry.hidden = false;
+    googleMessage("Reviewer session expired. Check sign-in to continue.");
+  }
+  function reviewOptions(post = false) {
+    const headers = {Accept: "application/json"};
+    if (post) headers["Content-Type"] = "application/json";
+    if (googleMode) {
+      if (post) headers["X-Review-CSRF"] = reviewCsrf;
+      return {headers, credentials: "same-origin"};
+    }
+    headers.Authorization = "Bearer " + bearer;
+    return {headers, credentials: "omit"};
+  }
   function pending() {
     return preview && preview.review_contract === "action_and_exact_wire_v1" && preview.wire_preview && preview.state === "pending" && !preview.execution && preview.consumed_at === null
       && Number.isSafeInteger(preview.expires_at) && Date.now() < preview.expires_at * 1000
       && !attempted.has(preview.id);
   }
   function controls() {
-    byId("load").disabled = !bearer || deciding || location.origin !== pin;
-    byId("unlock").disabled = deciding || location.origin !== pin;
-    const permitted = !!bearer && !!pending() && confirmation.checked && !deciding && !loadController;
+    byId("load").disabled = !authenticated() || deciding || logoutBusy || location.origin !== pin;
+    if (byId("unlock")) byId("unlock").disabled = googleMode || deciding || location.origin !== pin;
+    if (googleButton) googleButton.hidden = !googleMode || !googleReady || authBusy || logoutBusy || deciding || googleAuthenticated || location.origin !== pin;
+    if (googleRetry) googleRetry.disabled = authBusy || logoutBusy || deciding || location.origin !== pin;
+    byId("logout").disabled = googleMode && logoutBusy;
+    const permitted = authenticated() && !!pending() && confirmation.checked && !deciding && !loadController && !logoutBusy;
     byId("approve").disabled = !permitted;
     byId("deny").disabled = !permitted;
   }
@@ -49,12 +88,204 @@
     loadController = null;
     clearPreview();
   }
-  function logout() {
+  function clearLocalSession() {
     bearer = "";
-    tokenInput.value = "";
+    reviewCsrf = "";
+    googleAuthenticated = false;
+    if (tokenInput) tokenInput.value = "";
     idInput.value = "";
     invalidate();
+  }
+  function stopGoogleAuth() {
+    authGeneration += 1;
+    if (authController) authController.abort();
+    authController = null;
+    authBusy = false;
+    googleReady = false;
+    if (googleRetry) googleRetry.hidden = true;
+    // This only stops automatic browser sign-in, never revokes Google access.
+    if (typeof google !== "undefined" && google.accounts && google.accounts.id) {
+      try {
+        google.accounts.id.cancel();
+        google.accounts.id.disableAutoSelect();
+      } catch (error) { /* Local session clearing must not depend on GIS. */ }
+    }
+  }
+  function logout() {
+    if (googleMode) return logoutGoogle();
+    clearLocalSession();
     message(deciding ? "Session cleared. A decision request is still in flight and may have reached the ledger. Do not repeat it; load its status after it settles." : "Session and preview cleared. Enter a reviewer token to continue.");
+  }
+
+  function loadGoogleLibrary() {
+    if (googleLibraryPromise) return googleLibraryPromise;
+    googleLibraryPromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.referrerPolicy = "no-referrer";
+      script.onload = () => {
+        if (typeof google !== "undefined" && google.accounts && google.accounts.id) resolve();
+        else reject(new Error("google_library_unavailable"));
+      };
+      script.onerror = () => { script.remove(); reject(new Error("google_library_unavailable")); };
+      document.head.appendChild(script);
+    }).catch((error) => { googleLibraryPromise = null; throw error; });
+    return googleLibraryPromise;
+  }
+  function authFailure(version, text) {
+    if (version !== authGeneration) return;
+    googleAuthenticated = false;
+    reviewCsrf = "";
+    authBusy = false;
+    googleReady = false;
+    googleMessage(text);
+    if (googleRetry) googleRetry.hidden = false;
+    controls();
+  }
+  function acceptGoogleSession(value) {
+    if (!value || value.authenticated !== true || !safeOpaque(value.csrf)) throw new Error("invalid_session");
+    googleAuthenticated = true;
+    reviewCsrf = value.csrf;
+    authBusy = false;
+    googleReady = false;
+    if (googleRetry) googleRetry.hidden = true;
+    googleMessage("Reviewer signed in. Log out or Cancel to clear this session.");
+    if (!deciding) message("Reviewer session verified. Load a proposal to review its exact preview.");
+    controls();
+  }
+  async function prepareGoogleSignIn(version) {
+    const controller = new AbortController();
+    authController = controller;
+    authBusy = true;
+    googleReady = false;
+    googleMessage("Preparing Google sign-in…");
+    controls();
+    const response = await fetch("/review/auth/bootstrap", {method: "GET", headers: {Accept: "application/json"}, credentials: "same-origin", cache: "no-store", redirect: "error", signal: controller.signal});
+    const value = await responseValue(response);
+    if (version !== authGeneration) return;
+    if (!value || value.mode !== "google_oidc" || typeof value.client_id !== "string" || !/^[A-Za-z0-9._-]{1,200}\.apps\.googleusercontent\.com$/.test(value.client_id) || !safeOpaque(value.nonce) || !safeOpaque(value.csrf)) throw new Error("invalid_bootstrap");
+    await loadGoogleLibrary();
+    if (version !== authGeneration) return;
+    authController = null;
+    googleButton.textContent = "";
+    google.accounts.id.initialize({client_id: value.client_id, nonce: value.nonce, auto_select: false,
+      callback: (result) => completeGoogleLogin(result, version, value.csrf)});
+    google.accounts.id.renderButton(googleButton, {type: "standard", theme: "outline", size: "large", text: "signin_with"});
+    authBusy = false;
+    googleReady = true;
+    googleMessage("Sign in with an approved reviewer account.");
+    if (!deciding) message("Sign in with Google, then load a proposal.");
+    controls();
+  }
+  async function checkGoogleSession() {
+    if (!googleMode || location.origin !== pin) return;
+    if (authBusy) return;
+    if (logoutBusy || deciding) {
+      if (googleRetry) googleRetry.hidden = false;
+      googleMessage("Wait for the in-flight request to settle, then check sign-in.");
+      controls();
+      return;
+    }
+    const activeLogin = loginInFlight;
+    stopGoogleAuth();
+    clearLocalSession();
+    const version = authGeneration;
+    const controller = new AbortController();
+    authController = controller;
+    authBusy = true;
+    googleMessage("Checking reviewer session…");
+    controls();
+    try {
+      if (activeLogin) await activeLogin;
+      if (version !== authGeneration) return;
+      const response = await fetch("/review/auth/session", {method: "GET", headers: {Accept: "application/json"}, credentials: "same-origin", cache: "no-store", redirect: "error", signal: controller.signal});
+      if (version !== authGeneration) return;
+      if (response.status === 401) { await prepareGoogleSignIn(version); return; }
+      const value = await responseValue(response);
+      if (version !== authGeneration) return;
+      if (value && value.authenticated === false) { await prepareGoogleSignIn(version); return; }
+      acceptGoogleSession(value);
+    } catch (error) {
+      authFailure(version, "Reviewer session could not be verified. Check sign-in to try again.");
+    } finally {
+      if (version === authGeneration) authController = null;
+    }
+  }
+  function completeGoogleLogin(result, version, loginCsrf) {
+    if (version !== authGeneration || authBusy || logoutBusy || deciding || googleAuthenticated || !googleReady || location.origin !== pin) return;
+    if (!result || typeof result.credential !== "string" || !result.credential || result.credential.length > 8192 || /\s/.test(result.credential)) {
+      authFailure(version, "Google sign-in did not provide a valid response. Check sign-in to start again.");
+      return;
+    }
+    authBusy = true;
+    googleReady = false;
+    googleMessage("Verifying reviewer access…");
+    controls();
+    // The GIS ID token is submitted once to this origin. It is never used as an
+    // API bearer, saved, decoded for authority, or sent to any other endpoint.
+    const operation = (async () => {
+      try {
+        const response = await fetch("/review/auth/google", {method: "POST", headers: {Accept: "application/json", "Content-Type": "application/json", "X-Login-CSRF": loginCsrf}, body: JSON.stringify({credential: result.credential}), credentials: "same-origin", cache: "no-store", redirect: "error"});
+        const value = await responseValue(response);
+        if (version !== authGeneration) return;
+        acceptGoogleSession(value);
+      } catch (error) {
+        authFailure(version, "Google sign-in was refused or could not be confirmed. Check sign-in before continuing; the sign-in response will not be resubmitted.");
+      }
+    })();
+    loginInFlight = operation;
+    operation.finally(() => { if (loginInFlight === operation) loginInFlight = null; });
+    return operation;
+  }
+  async function logoutGoogle() {
+    if (logoutBusy) return;
+    if (location.origin !== pin) { stopGoogleAuth(); clearLocalSession(); return; }
+    const csrf = reviewCsrf;
+    const activeLogin = loginInFlight;
+    stopGoogleAuth();
+    clearLocalSession();
+    const version = authGeneration;
+    logoutBusy = true;
+    controls();
+    googleMessage(activeLogin ? "Waiting for the sign-in request to settle before clearing the server session…" : "Clearing reviewer session…");
+    message(deciding ? "Session cleared. A decision request is still in flight and may have reached the ledger. Do not repeat it; load its status after it settles." : "Preview cleared. Clearing the server reviewer session…");
+    try {
+      let logoutCsrf = csrf;
+      // A login response can set a cookie after Cancel. Wait without aborting
+      // its POST, then resolve and clear that session before permitting login.
+      if (activeLogin || !logoutCsrf) {
+        if (activeLogin) await activeLogin;
+        const response = await fetch("/review/auth/session", {method: "GET", headers: {Accept: "application/json"}, credentials: "same-origin", cache: "no-store", redirect: "error"});
+        if (response.status !== 401) {
+          const value = await responseValue(response);
+          if (value && value.authenticated === true && safeOpaque(value.csrf)) logoutCsrf = value.csrf;
+          else if (!value || value.authenticated !== false) throw new Error("invalid_session");
+        }
+      }
+      if (logoutCsrf) {
+        const response = await fetch("/review/auth/logout", {method: "POST", headers: {Accept: "application/json", "X-Review-CSRF": logoutCsrf}, credentials: "same-origin", cache: "no-store", redirect: "error"});
+        if (!response.ok) {
+          if (response.status !== 401) throw new Error("logout_unconfirmed");
+          // A refused logout can also mean a stale CSRF value. Only a fresh
+          // unauthenticated session check establishes that authority is gone.
+          const current = await fetch("/review/auth/session", {method: "GET", headers: {Accept: "application/json"}, credentials: "same-origin", cache: "no-store", redirect: "error"});
+          if (current.status !== 401) throw new Error("logout_unconfirmed");
+        }
+      }
+      if (version !== authGeneration) return;
+      logoutBusy = false;
+      if (!deciding) message("Reviewer session and preview cleared.");
+      await prepareGoogleSignIn(version);
+    } catch (error) {
+      if (version !== authGeneration) return;
+      logoutBusy = false;
+      authFailure(version, "Log out could not be confirmed. This page is locked. Check sign-in to verify the server session before continuing.");
+      if (!deciding) message("Preview cleared. The server session's log out outcome is unconfirmed.");
+    } finally {
+      logoutBusy = false;
+      controls();
+    }
   }
   function showIdentity(label, value) {
     const term = document.createElement("dt");
@@ -99,9 +330,9 @@
     }
     return response.json();
   }
-  byId("session-form").addEventListener("submit", (event) => {
+  if (sessionForm && tokenInput) sessionForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (deciding || location.origin !== pin) return;
+    if (googleMode || deciding || location.origin !== pin) return;
     invalidate();
     bearer = tokenInput.value;
     tokenInput.value = "";
@@ -109,14 +340,15 @@
     else message("Token held in page memory. Load a proposal to verify reviewer access.");
     controls();
   });
-  tokenInput.addEventListener("input", () => { if (bearer) { bearer = ""; invalidate(); message("Session cleared while replacing the token."); } });
+  if (tokenInput) tokenInput.addEventListener("input", () => { if (bearer) { bearer = ""; invalidate(); message("Session cleared while replacing the token."); } });
   byId("logout").addEventListener("click", logout);
   byId("cancel").addEventListener("click", logout);
+  if (googleRetry) googleRetry.addEventListener("click", checkGoogleSession);
   idInput.addEventListener("input", () => { invalidate(); message(deciding ? "A decision is in flight. Changing this field does not cancel it." : "Proposal changed. Load a fresh preview before deciding."); });
   confirmation.addEventListener("change", controls);
   byId("proposal-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!bearer || deciding || location.origin !== pin) return;
+    if (!authenticated() || deciding || logoutBusy || location.origin !== pin) return;
     const id = idInput.value;
     invalidate();
     if (!uuid.test(id)) { message("Enter a complete proposal UUID."); return; }
@@ -126,7 +358,8 @@
     controls();
     message("Loading the stored exact preview…");
     try {
-      const response = await fetch("/review/api/proposals/" + encodeURIComponent(id), {method: "GET", headers: {Authorization: "Bearer " + bearer, Accept: "application/json"}, credentials: "omit", cache: "no-store", redirect: "error", signal: controller.signal});
+      const response = await fetch("/review/api/proposals/" + encodeURIComponent(id), {method: "GET", ...reviewOptions(), cache: "no-store", redirect: "error", signal: controller.signal});
+      expiredGoogleSession(response, version);
       const value = await responseValue(response);
       if (version !== generation) return;
       if (value.id.toLowerCase() !== id.toLowerCase()) throw new Error("invalid_preview");
@@ -142,7 +375,7 @@
     }
   });
   async function decide(decision) {
-    if (!bearer || !pending() || !confirmation.checked || deciding || loadController || location.origin !== pin) return;
+    if (!authenticated() || !pending() || !confirmation.checked || deciding || loadController || logoutBusy || location.origin !== pin) return;
     const shown = preview;
     const version = generation;
     attempted.add(shown.id);
@@ -151,7 +384,8 @@
     controls();
     message("Recording the " + decision + " decision. Do not repeat this request…");
     try {
-      const response = await fetch("/review/api/proposals/" + encodeURIComponent(shown.id) + "/decision", {method: "POST", headers: {Authorization: "Bearer " + bearer, Accept: "application/json", "Content-Type": "application/json"}, body: JSON.stringify({digest: shown.digest, decision}), credentials: "omit", cache: "no-store", redirect: "error"});
+      const response = await fetch("/review/api/proposals/" + encodeURIComponent(shown.id) + "/decision", {method: "POST", ...reviewOptions(true), body: JSON.stringify({digest: shown.digest, decision}), cache: "no-store", redirect: "error"});
+      expiredGoogleSession(response, version);
       const value = await responseValue(response);
       if (version !== generation) return;
       if (!value || value.id !== shown.id || value.digest !== shown.digest || value.state !== (decision === "approve" ? "approved" : "denied")) throw new Error("invalid_decision_response");
@@ -170,8 +404,22 @@
   }
   byId("approve").addEventListener("click", () => decide("approve"));
   byId("deny").addEventListener("click", () => decide("deny"));
-  addEventListener("pagehide", logout);
-  addEventListener("pageshow", (event) => { if (event.persisted) logout(); });
-  if (location.origin !== pin) { logout(); message("This page is outside the configured trusted review origin. Reviewer access is disabled."); }
+  addEventListener("pagehide", () => {
+    if (googleMode) { stopGoogleAuth(); clearLocalSession(); }
+    else logout();
+  });
+  addEventListener("pageshow", (event) => {
+    if (!event.persisted) return;
+    if (googleMode) { stopGoogleAuth(); clearLocalSession(); checkGoogleSession(); }
+    else logout();
+  });
+  if (sessionForm) sessionForm.hidden = googleMode;
+  if (tokenInput && googleMode) { tokenInput.value = ""; tokenInput.disabled = true; }
+  if (googleSession) googleSession.hidden = !googleMode;
+  if (location.origin !== pin) {
+    if (googleMode) stopGoogleAuth();
+    clearLocalSession();
+    message("This page is outside the configured trusted review origin. Reviewer access is disabled.");
+  } else if (googleMode) checkGoogleSession();
   controls();
 })();

@@ -60,10 +60,12 @@ class Settings(StrictModel):
     source_adapter: Literal["customer_staged_snapshot", "private_spacemail"] = "customer_staged_snapshot"
     private_bridge_profile_file: str | None = None
     review_origin: str | None = None
+    reviewer_auth: Literal["existing_access_token", "google_oidc"] = "existing_access_token"
+    google_reviewer_profile_file: str | None = None
 
     _sender = field_validator("sender_address")(address)
 
-    @field_validator("private_bridge_profile_file")
+    @field_validator("private_bridge_profile_file", "google_reviewer_profile_file")
     @classmethod
     def optional_profile_path(cls, value):
         if value is not None and (not Path(value).is_absolute() or "\x00" in value):
@@ -99,6 +101,8 @@ class Settings(StrictModel):
 
     @model_validator(mode="after")
     def separate_principals(self) -> "Settings":
+        if self.reviewer_auth == "google_oidc" and (self.google_reviewer_profile_file is None or self.review_origin is None):
+            raise ValueError("Google reviewer mode requires its explicit profile and origin")
         live_source = self.source_adapter == "private_spacemail"
         live_transport = self.outbound_adapter == "private_spacemail"
         if live_transport and not live_source:

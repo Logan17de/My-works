@@ -1,0 +1,27 @@
+{
+  "additional_independent_audit_probes": 20,
+  "additional_independent_operator_session_throttle_probes": 38,
+  "covered": [
+    "fail_closed_profile_startup_before_new_ledger",
+    "agent_reviewer_authority_separation",
+    "cookie_origin_CSRF_nonce_audience_issuer_sub_expiry",
+    "exact_preview_digest_and_single_use_decision",
+    "logout_cancel_stale_callback_and_uncertain_response_UI",
+    "cookie_scoped_revoke_reconciliation_audit_pagination",
+    "reconciliation_preserves_uncertainty_no_retry",
+    "fake_fixed_public_JWKS_transport",
+    "unchanged_pending_identity_disabled_walkthrough"
+  ],
+  "final_focused_socket_free_tests": 46,
+  "outcome": "no remaining authorization or startup bypass found",
+  "remaining_acceptance": [
+    "actual approved public origin client ID and immutable reviewer subjects",
+    "separate actual agent identity resource/public keys",
+    "verified proxy forwarding and global traffic limits",
+    "actual Google browser HTTPS cookies CSP COOP referrer behavior",
+    "target resource envelope",
+    "separately approved provider credential and controlled send workflow"
+  ],
+  "review": "independent dormant Google reviewer/agent and final-additions review",
+  "review_scope": "offline fake keys and ASGI/Node interfaces; no real Google/provider/network/browser pixels/deployment"
+}

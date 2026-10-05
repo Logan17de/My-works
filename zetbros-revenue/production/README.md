@@ -10,7 +10,12 @@ stages without a ledger until actual owner identity configuration is available;
 see [DISABLED_STAGING.md](DISABLED_STAGING.md) for the supported init/check/start
 walkthrough. No placeholder identity is permanently pinned.
 
- The reviewed pilot runtime now
+The dormant [Google reviewer login](GOOGLE_REVIEWER_LOGIN.md) now supports a
+dedicated identity-only sign-in and short reviewer sessions, with a separate
+agent access-token boundary. Actual public origin/client/subject configuration
+and deployed browser acceptance are still pending.
+
+The reviewed pilot runtime now
 includes our own live-capable session factory and human exact-preview interface,
 but requires explicit operator configuration and protected existing credentials.
 No real provider, identity deployment, customer-host setup or delivery was tested.

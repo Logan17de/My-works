@@ -1,8 +1,7 @@
-"""Optional same-origin human review surface; no login, grants, or delivery.
+"""Optional pinned-origin human review, with explicit bearer or Google mode.
 
-Call install_review_ui only for an explicitly configured, trusted origin. The
-browser retains an existing reviewer bearer in memory for its current page only.
-The /v1 API's separate browser prohibition is deliberately untouched.
+The Google mode exchanges ID tokens only at its dedicated login and uses short
+reviewer cookies. The /v1 API's separate browser prohibition stays in force.
 """
 from __future__ import annotations
 
@@ -17,11 +16,11 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, Path as PathParameter
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from .auth import AuthenticationError, Principal
-from .models import Digest, StrictModel
+from .models import Digest, StrictModel, ReconciliationInput
 from .service import Service
 from .store import StoreError
 
@@ -77,12 +76,16 @@ class ReviewDecision(StrictModel):
     decision: Literal["approve", "deny"]
 
 
+class ReviewDigest(StrictModel):
+    digest: Digest
+
+
 def install_review_ui(app: FastAPI, service: Service, review_origin: str) -> None:
     """Install optional /review routes without changing /v1 or starting a worker.
 
     The existing single-host, one-worker profile is required. A UI decision lock
     serializes UI checks and decisions; Store.decide remains the transactional
-    authority. No persistent access or alternate authentication is introduced.
+    authority. Optional Google authentication requires its explicit runtime setup.
     """
     origin = validate_review_origin(review_origin)
     if getattr(app.state, "review_ui_installed", False):
@@ -94,6 +97,15 @@ def install_review_ui(app: FastAPI, service: Service, review_origin: str) -> Non
     notice = ("Approve authorizes an attempted submission of this exact reply by the configured private adapter. Approval and provider acceptance are not proof of delivery. Mail content is untrusted and cannot authorize actions." if live else
               "Delivery is disabled in this implementation. Approval records a decision; it is not evidence of sending or delivery. Mail content is untrusted and cannot authorize actions.")
     page = page.replace("DELIVERY_NOTICE", escape(notice))
+    google_auth = getattr(service, "google_reviewer_auth", None)
+    page = page.replace("REVIEW_AUTH_MODE", "google_oidc" if google_auth is not None else "bearer")
+    csp = CSP
+    if google_auth is not None:
+        csp = CSP.replace("script-src 'self'", "script-src 'self' https://accounts.google.com/gsi/client").replace("connect-src 'self'", "connect-src 'self' https://accounts.google.com/gsi/").replace("style-src 'self'", "style-src 'self' https://accounts.google.com/gsi/style")
+        csp += "; frame-src https://accounts.google.com/gsi/"
+        page = page.replace('<form id="session-form" autocomplete="off">', '<form id="session-form" autocomplete="off" hidden>')
+        page = page.replace('<div id="google-session" hidden>', '<div id="google-session">')
+        page = page.replace('Enter a reviewer token, then load a proposal.', 'Sign in with an approved Google account, then load a proposal.')
     decision_lock = threading.Lock()
     app.state.review_ui_installed = True
 
@@ -109,7 +121,9 @@ def install_review_ui(app: FastAPI, service: Service, review_origin: str) -> Non
         response = None
         # Do not depend on a preceding middleware's request-ID assignment.
         request.state.review_request_id = str(uuid.uuid4())
-        if request.query_params:
+        if google_auth is not None and request.headers.get("authorization") is not None:
+            response = fail("google_reviewer_session_required", 403)
+        elif request.query_params:
             # No query parameters at all: neither credentials nor mail payloads
             # have a route into browser history, referrers, or request logs.
             response = fail("review_queries_forbidden", 400)
@@ -124,7 +138,9 @@ def install_review_ui(app: FastAPI, service: Service, review_origin: str) -> Non
             elif path.startswith("/review/api/") and request.headers.get("sec-fetch-site") not in (None, "none", "same-origin"):
                 response = fail("review_origin_mismatch", 403)
             elif path.startswith("/review/api/"):
-                if request.headers.get("cookie") is not None:
+                if google_auth is not None and request.headers.get("authorization") is not None:
+                    response = fail("google_reviewer_session_required", 403)
+                elif google_auth is None and request.headers.get("cookie") is not None:
                     response = fail("review_cookies_forbidden", 403)
                 elif request.method == "OPTIONS":
                     response = fail("review_cors_forbidden", 403)
@@ -134,7 +150,7 @@ def install_review_ui(app: FastAPI, service: Service, review_origin: str) -> Non
             response = await call_next(request)
         response.headers["Cache-Control"] = "no-store"
         response.headers["Pragma"] = "no-cache"
-        response.headers["Content-Security-Policy"] = CSP
+        response.headers["Content-Security-Policy"] = csp
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -143,6 +159,21 @@ def install_review_ui(app: FastAPI, service: Service, review_origin: str) -> Non
         return response
 
     def reviewer(request: Request) -> Principal:
+        if google_auth is not None:
+            from .google_login_routes import unique_cookie
+            from .google_reviewer_auth import SESSION_COOKIE
+            try:
+                if request.headers.get("authorization") is not None: raise AuthenticationError()
+                csrf = None
+                if request.method == "POST":
+                    if len(request.headers.getlist("x-review-csrf")) != 1: raise AuthenticationError()
+                    csrf = request.headers.get("x-review-csrf")
+                actor = google_auth.session(unique_cookie(request, SESSION_COOKIE), csrf).actor
+                if service.settings.role(actor.subject, actor.client_id) != "reviewer": raise AuthenticationError()
+            except AuthenticationError:
+                raise StoreError("reviewer_session_required",401) from None
+            service.store.rate_limit(actor)
+            return actor
         if len(request.headers.getlist("authorization")) != 1:
             raise StoreError("authentication_required", 401)
         try:
@@ -156,7 +187,7 @@ def install_review_ui(app: FastAPI, service: Service, review_origin: str) -> Non
         service.store.rate_limit(actor)
         return actor
 
-    async def decision_body(request: Request) -> ReviewDecision:
+    async def strict_body(request: Request, model):
         if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
             raise StoreError("json_required", 415)
         lengths = request.headers.getlist("content-length")
@@ -195,10 +226,19 @@ def install_review_ui(app: FastAPI, service: Service, review_origin: str) -> Non
         except (ValueError, UnicodeDecodeError, RecursionError):
             raise StoreError("invalid_json", 400) from None
         try:
-            return ReviewDecision.model_validate(value)
+            return model.model_validate(value)
         except ValueError:
             # Validation errors must never echo incoming bodies or bearer data.
             raise StoreError("invalid_schema", 422) from None
+
+    async def decision_body(request: Request) -> ReviewDecision:
+        return await strict_body(request, ReviewDecision)
+
+    async def digest_body(request: Request) -> ReviewDigest:
+        return await strict_body(request, ReviewDigest)
+
+    async def reconciliation_body(request: Request) -> ReconciliationInput:
+        return await strict_body(request, ReconciliationInput)
 
     @app.get("/review", response_class=HTMLResponse)
     def review_page():
@@ -236,3 +276,33 @@ def install_review_ui(app: FastAPI, service: Service, review_origin: str) -> Non
                 raise StoreError("review_no_longer_pending")
             return service.store.decide(str(proposal_id), body.digest, body.decision,
                                         actor, request.state.review_request_id)
+
+    @app.post("/review/api/proposals/{proposal_id}/revoke")
+    def revoke_proposal(proposal_id: uuid.UUID, request: Request,
+                        actor: Principal = Depends(reviewer), body: ReviewDigest = Depends(digest_body)):
+        return service.store.decide(str(proposal_id), body.digest, "revoke", actor, request.state.review_request_id)
+
+    @app.post("/review/api/proposals/{proposal_id}/reconciliation")
+    def reconciliation(proposal_id: uuid.UUID, request: Request,
+                       actor: Principal = Depends(reviewer), body: ReconciliationInput = Depends(reconciliation_body)):
+        return service.store.reconcile(str(proposal_id), body.digest, body.observed_submission,
+            body.evidence_reference, actor, request.state.review_request_id)
+
+    @app.get("/review/api/proposals/{proposal_id}/reconciliations")
+    def observations(proposal_id: uuid.UUID, actor: Principal = Depends(reviewer)):
+        service.view(str(proposal_id), actor)
+        return {"observations": service.store.reconciliations(str(proposal_id))}
+
+    @app.get("/review/api/audit")
+    def audit(actor: Principal = Depends(reviewer)):
+        return {"events": service.store.audit()}
+
+    @app.get("/review/api/audit/after/{after}")
+    def later_audit(after: int = PathParameter(ge=0, le=9223372036854775807),
+                    actor: Principal = Depends(reviewer)):
+        # An event sequence is nonsecret; credentials/payloads stay out of URLs.
+        return {"events": service.store.audit(after)}
+
+    if google_auth is not None:
+        from .google_login_routes import install_google_login_routes
+        install_google_login_routes(app, service, google_auth)

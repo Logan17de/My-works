@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-review-origin="REVIEW_ORIGIN_PIN">
+<html lang="en" data-review-origin="REVIEW_ORIGIN_PIN" data-auth-mode="REVIEW_AUTH_MODE">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -19,8 +19,14 @@
       <input id="reviewer-token" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="16377" required>
       <p class="help">Use an existing reviewer access token. It stays in this page's memory and is cleared on Cancel or Log out. No token is issued here.</p>
       <button id="unlock" type="submit">Use reviewer token</button>
-      <button id="logout" type="button">Log out</button>
     </form>
+    <div id="google-session" hidden>
+      <p class="help">Sign in with an approved Google account. Only a server-configured reviewer can open previews or record decisions. Google sign-in does not grant mailbox access.</p>
+      <p id="google-state" role="status" aria-live="polite">Checking reviewer session…</p>
+      <div id="google-button" class="google-sign-in" hidden></div>
+      <button id="google-retry" type="button" hidden>Check sign-in</button>
+    </div>
+    <button id="logout" type="button">Log out</button>
   </section>
   <section aria-labelledby="proposal-title">
     <h2 id="proposal-title">Proposal</h2>

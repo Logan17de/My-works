@@ -1,0 +1,14 @@
+{
+  "cloud_sample_not_target_host_acceptance": true,
+  "listener_sockets": "not_opened",
+  "peak_rss_kib": 56128,
+  "provider_connections": "not_performed",
+  "public_keys": "fictional in-memory RSA fixture only",
+  "real_credentials": "not_read",
+  "sample": "mock Google ID-token login then eight concurrent ASGI cookie-review and health callers",
+  "sampled_peak_threads": 16,
+  "startup_rss_kib": 54112,
+  "under_memory_high_96m": true,
+  "under_memory_max_128m": true,
+  "under_tasks_max_32": true
+}
