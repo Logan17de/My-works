@@ -1,0 +1,317 @@
+diff --git a/tests/site.test.mjs b/tests/site.test.mjs
+index 8b28fa0..6f88ff8 100644
+--- a/tests/site.test.mjs
++++ b/tests/site.test.mjs
+@@ -4,7 +4,8 @@ import { existsSync, readFileSync } from "node:fs";
+ import { createHash } from "node:crypto";
+ 
+ const origin = "https://zetbros.com";
+-const routes = ["/", "/harness", "/ai-in-practice", "/automation-in-practice", "/infrastructure-in-practice", "/equipment-warranty-research", "/privacy", "/terms"];
++const publicRoutes = ["/", "/harness", "/ai-in-practice", "/automation-in-practice", "/infrastructure-in-practice", "/equipment-warranty-research", "/privacy", "/terms"];
++const routes = [...publicRoutes, "/agents"];
+ function page(path) {
+   const stem = path === "/" ? "out/index" : `out${path}`;
+   const file = [`${stem}.html`, `${stem}/index.html`].find(existsSync);
+@@ -99,7 +100,7 @@ test("project patterns are not presented as customer case studies", () => {
+ test("robots and sitemap cover exactly the public routes", () => {
+   const sitemap = readFileSync("out/sitemap.xml", "utf8");
+   const urls = [...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map(match => new URL(match[1]).href).sort();
+-  assert.deepEqual(urls, routes.map(route => new URL(route, origin).href).sort());
++  assert.deepEqual(urls, publicRoutes.map(route => new URL(route, origin).href).sort());
+   const robots = readFileSync("out/robots.txt", "utf8");
+   assert.ok(robots.includes(`Sitemap: ${origin}/sitemap.xml`));
+   assert.ok(robots.includes("Disallow: /api/"));
+@@ -116,3 +117,32 @@ test("original logo and icons remain unchanged", () => {
+   };
+   for (const [path, sha] of Object.entries(original)) assert.equal(blobSha(path), sha, path);
+ });
++
++test("agents is an unpublished, non-indexable service draft", () => {
++  const html = visibleHtml(page("/agents"));
++  assert.ok(html.includes("Local preview · Unpublished service-page draft"));
++  const robots = html.match(/<meta\b[^>]*name="robots"[^>]*>/)?.[0];
++  assert.equal(attribute(robots, "content"), "noindex, nofollow");
++  assert.doesNotMatch(readFileSync("out/sitemap.xml", "utf8"), /<loc>https:\/\/zetbros\.com\/agents<\/loc>/);
++  for (const route of publicRoutes) assert.doesNotMatch(visibleHtml(page(route)), /href="\/agents(?:["#?])/);
++  assert.equal([...html.matchAll(/<h1\b/g)].length, 1);
++  for (const id of ["agents-content", "offer", "pilot-scope", "acceptance", "discovery"]) assert.equal([...html.matchAll(new RegExp(`id="${id}"`, "g"))].length, 1, id);
++});
++
++test("agents bounds the proposed audit and read-only pilot without fixed price or production claims", () => {
++  const html = visibleHtml(page("/agents"));
++  for (const text of ["Integration Readiness Audit", "Agent Integration Pilot", "Up to three read-only tools", "One documented API and one existing customer account or tenant", "named operator", "one agreed AI client and version", "supervised evaluation", "Production use needs a separate release decision", "go or no-go recommendation", "not a customer case study", "re-scope or stop", "No price, delivery date or commercial commitment", "customer approves data-processing destinations", "sends no email or external notifications"]) assert.ok(html.includes(text), text);
++  assert.doesNotMatch(html, /\$\s*\d|USD\s*\d|sends nothing|production-ready|enterprise-grade|tamper-proof|zero risk|guaranteed time saving|works with every client/i);
++  assert.doesNotMatch(html, /<iframe\b|<video\b|<form\b|type="file"|mail\.zetbros|zetbros-mail|synthetic-trace|scripted-replay/i);
++  assert.ok(html.includes('aria-haspopup="dialog"'));
++  assert.ok(html.includes("Please do not include passwords, API keys, customer records or confidential documents"));
++});
++
++test("agents reuses the existing contact route and contains no integration transport", () => {
++  const source = readFileSync("app/agents/page.tsx", "utf8");
++  assert.ok(source.includes('from "../contact-dialog"'));
++  for (const subject of ["AI integration workflow", "AI integration readiness audit", "Read-only AI integration pilot"]) assert.ok(source.includes(`subject="${subject}"`), subject);
++  assert.doesNotMatch(source, /fetch\s*\(|XMLHttpRequest|WebSocket|EventSource|https?:\/\//);
++  assert.equal(existsSync("app/agents/route.ts"), false);
++  assert.equal(existsSync("app/agents/demo-replay.tsx"), false);
++});
+diff --git a/app/agents/page.tsx b/app/agents/page.tsx
+new file mode 100644
+index 0000000..6832a81
+--- /dev/null
++++ b/app/agents/page.tsx
+@@ -0,0 +1,189 @@
++import type { Metadata } from "next";
++import Logo from "../logo";
++import { ContactTrigger } from "../contact-dialog";
++import { pageMetadata } from "../site-metadata";
++import practice from "../practice-page.module.css";
++import styles from "./agents.module.css";
++
++export const metadata: Metadata = {
++  ...pageMetadata(
++    "/agents",
++    "AI integration audit and read-only pilot — Zetbros",
++    "Start with one repeatable lookup workflow: an integration readiness audit, then a qualified read-only pilot with defined access limits and agreed tests.",
++  ),
++  // This route is a local review draft. Publication needs a separate decision.
++  robots: { index: false, follow: false },
++};
++
++const workflow = [
++  { title: "Ask for a status brief", text: "One operator starts the agreed lookup in the chosen AI client." },
++  { title: "Read the agreed records", text: "Up to three tools retrieve permitted fields from one documented API." },
++  { title: "Keep the sources visible", text: "The brief includes record identifiers or links for checking the answer." },
++  { title: "Review before using it", text: "The operator checks the result. The pilot sends no email or external notifications and changes no business records." },
++];
++
++export default function AgentsPage() {
++  return (
++    <main className={practice.page}>
++      <a className={styles.skipLink} href="#agents-content">Skip to content</a>
++      <header className={practice.header}>
++        <div className={practice.headerInner}>
++          <div className={practice.brand}><Logo small /></div>
++          <nav className={practice.nav} aria-label="Service page navigation">
++            <a href="/#software">Products</a>
++            <a href="/#business">Business</a>
++            <a href="/#research">Research</a>
++            <a href="/#about">About</a>
++            <ContactTrigger>Contact</ContactTrigger>
++          </nav>
++          <a className={practice.backLink} href="/">← Home</a>
++        </div>
++      </header>
++
++      <section className={practice.hero} id="agents-content" aria-labelledby="agents-title" tabIndex={-1}>
++        <div className={practice.container}>
++          <div className={practice.breadcrumb}><a href="/">Zetbros</a><span aria-hidden="true">/</span><span>AI integrations</span></div>
++          <div className={styles.draftLabel}>Local preview · Unpublished service-page draft</div>
++          <p className={practice.kicker}>AI agents &amp; integrations</p>
++          <h1 id="agents-title">One useful workflow. A clear place to start.</h1>
++          <p className={practice.heroLead}>Connect one repeatable lookup task to your chosen AI client, with a defined tool set, access limits and evidence from agreed tests.</p>
++          <p>Start with the workflow and its constraints. A readiness audit can lead to a small read-only pilot, or a clear recommendation not to build it.</p>
++          <div className={styles.actions}>
++            <ContactTrigger className={practice.primary} subject="AI integration workflow">Discuss your workflow <span aria-hidden="true">→</span></ContactTrigger>
++            <a className={styles.secondary} href="#pilot-scope">See the pilot scope <span aria-hidden="true">↓</span></a>
++          </div>
++          <div className={styles.draftNote}>Prepared for review. This draft describes a proposed service, not customer results or verified production capabilities. Scope, fees, schedule and terms must be agreed before work starts.</div>
++        </div>
++      </section>
++
++      <section className={styles.section} aria-labelledby="workflow-title">
++        <div className={practice.container}>
++          <div className={styles.intro}>
++            <p className={practice.kicker}>A practical first workflow</p>
++            <h2 id="workflow-title">From repeated lookups to a source-linked brief.</h2>
++            <p>A service-request status brief is one possible starting point. The first version stays inside a single system and leaves the decision with a person.</p>
++          </div>
++          <div className={styles.workflowPanel} data-glass>
++            <p className={styles.caption}>Illustrative workflow, not a customer case study</p>
++            <ol className={styles.workflow}>
++              {workflow.map((step, index) => (
++                <li key={step.title}>
++                  <span className={styles.stepNumber} aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
++                  <h3>{step.title}</h3>
++                  <p>{step.text}</p>
++                </li>
++              ))}
++            </ol>
++          </div>
++        </div>
++      </section>
++
++      <section className={styles.section} id="offer" aria-labelledby="offer-title">
++        <div className={practice.container}>
++          <div className={styles.intro}>
++            <p className={practice.kicker}>Two steps, each with a decision</p>
++            <h2 id="offer-title">Check the fit. Then test a small implementation.</h2>
++          </div>
++          <div className={styles.offers}>
++            <article className={styles.offer} data-glass aria-labelledby="audit-title">
++              <p className={styles.stage}>01 · Start with feasibility</p>
++              <h3 id="audit-title">Integration Readiness Audit</h3>
++              <p>Map one workflow and check whether a small AI integration is practical, using the API documentation and redacted or synthetic examples.</p>
++              <ul>
++                <li>A workflow map and proposed tool list</li>
++                <li>Access and data-flow requirements</li>
++                <li>Acceptance checks, risks and unresolved dependencies</li>
++                <li>A go or no-go recommendation, with a pilot proposal if the scope fits</li>
++              </ul>
++              <p className={styles.offerNote}>The audit is paid work. It does not include implementation, privileged live-account access or a security certification. Its fee is not automatically credited against a later pilot.</p>
++              <ContactTrigger className={styles.offerCta} subject="AI integration readiness audit">Discuss an audit <span aria-hidden="true">→</span></ContactTrigger>
++            </article>
++            <article className={styles.offer} data-glass aria-labelledby="pilot-title">
++              <p className={styles.stage}>02 · After technical qualification</p>
++              <h3 id="pilot-title">Agent Integration Pilot</h3>
++              <p>Connect one agreed lookup workflow and test it with a named operator in one agreed AI client and version.</p>
++              <ul>
++                <li>One documented API and one existing customer account or tenant</li>
++                <li>Up to three read-only tools with a fixed field and record scope</li>
++                <li>Connector source, configuration examples and test results</li>
++                <li>One installation in an existing approved environment, an operating guide and a handoff</li>
++              </ul>
++              <p className={styles.offerNote}>This is a supervised evaluation. Production use needs a separate release decision. The customer approves data-processing destinations and supplies existing account, model and hosting access; ongoing operation is separately scoped.</p>
++              <ContactTrigger className={styles.offerCta} subject="Read-only AI integration pilot">Discuss a pilot <span aria-hidden="true">→</span></ContactTrigger>
++            </article>
++          </div>
++          <p className={styles.feeNote}>A fixed scope and fee are proposed after qualification. No price, delivery date or commercial commitment is established by this draft.</p>
++        </div>
++      </section>
++
++      <section className={styles.section} id="pilot-scope" aria-labelledby="scope-title">
++        <div className={practice.container}>
++          <div className={styles.intro}>
++            <p className={practice.kicker}>The first pilot has a boundary</p>
++            <h2 id="scope-title">Read the right records. Keep changes out of scope.</h2>
++            <p>A tool name or a read-only annotation does not establish an access boundary. We first check the actual permitted API operations and account restrictions. If suitable restricted access is unavailable, we re-scope or stop.</p>
++          </div>
++          <div className={styles.boundaries}>
++            <div>
++              <h3>Included in a qualified pilot</h3>
++              <ul>
++                <li>Typed inputs, permitted endpoints and bounded results</li>
++                <li>Handling for missing records, permission errors, timeouts and rate limits</li>
++                <li>Source identifiers so the operator can verify the output</li>
++                <li>Minimized operational events, checked against the agreed data limits</li>
++                <li>A finite test report, access-revocation instructions and one consolidated review</li>
++              </ul>
++            </div>
++            <div>
++              <h3>Requires a separate scope</h3>
++              <ul>
++                <li>Email sends, record edits, deletion, payments and bulk exports</li>
++                <li>Unattended execution, schedules and external notifications</li>
++                <li>New OAuth infrastructure, SSO or multi-user authorization</li>
++                <li>A second system, custom dashboard or interface</li>
++                <li>Hosting subscriptions, ongoing monitoring, uptime commitments and production security work</li>
++              </ul>
++            </div>
++          </div>
++          <p className={styles.boundaryNote}>Sensitive or regulated data requires a separate review. The entry pilot does not cover medical records, regulated financial decisions, legal advice, recruiting selection or children’s information.</p>
++        </div>
++      </section>
++
++      <section className={styles.section} id="acceptance" aria-labelledby="acceptance-title">
++        <div className={practice.container}>
++          <div className={styles.acceptance}>
++            <div>
++              <p className={practice.kicker}>Evidence before expansion</p>
++              <h2 id="acceptance-title">Agree on what a useful result looks like.</h2>
++              <p>Define representative examples and expected outputs before implementation. Technical acceptance and measured business value are separate decisions.</p>
++            </div>
++            <ol className={styles.checks}>
++              <li><h3>Check the boundaries</h3><p>Test the permitted records and tools, malformed inputs, revoked access, missing data and upstream failures.</p></li>
++              <li><h3>Review the client behavior</h3><p>Inspect normal, ambiguous and out-of-scope requests in the named client. Record limitations and failures; finite tests do not prove immunity to prompt injection.</p></li>
++              <li><h3>Measure the workflow</h3><p>Compare a small set of manual and pilot-assisted cases, including review and correction time. Any saving is an observation, not a guarantee.</p></li>
++              <li><h3>Hand over the controls</h3><p>The operator practices the agreed lookup, finds its operational event and can disable or revoke access before deciding whether to expand.</p></li>
++            </ol>
++          </div>
++        </div>
++      </section>
++
++      <section className={practice.cta} id="discovery" aria-labelledby="discovery-title">
++        <div className={practice.container}>
++          <div className={practice.ctaBox} data-glass>
++            <p className={practice.kicker}>Start with the work you repeat</p>
++            <h2 id="discovery-title">Which lookup does your team do every week?</h2>
++            <p>Tell us the task, which single system it lives in, how often it happens and who owns access. A link to public API documentation is useful. We can assess whether it fits a small paid audit.</p>
++            <p>Please do not include passwords, API keys, customer records or confidential documents in the initial enquiry. No upload or live-account access is needed to start the conversation.</p>
++            <ContactTrigger className={practice.primary} subject="AI integration workflow">Discuss your workflow <span aria-hidden="true">→</span></ContactTrigger>
++          </div>
++        </div>
++      </section>
++
++      <footer className={practice.footer}>
++        <div className={`${practice.container} ${practice.footerInner}`}>
++          <div className={practice.footerLinks}><a href="/">Zetbros</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div>
++        </div>
++      </footer>
++    </main>
++  );
++}
+diff --git a/app/agents/agents.module.css b/app/agents/agents.module.css
+new file mode 100644
+index 0000000..5489dad
+--- /dev/null
++++ b/app/agents/agents.module.css
+@@ -0,0 +1,60 @@
++.skipLink { position: fixed; top: 12px; left: 12px; z-index: 100; padding: 12px 20px; border: 1px solid var(--blue); border-radius: var(--control-radius); background: var(--surface); color: var(--blue); transform: translateY(-180%); }
++.skipLink:focus { transform: none; }
++.draftLabel { display: inline-block; margin: 0 0 24px; padding: 7px 12px; border: 1px solid var(--line); border-radius: var(--control-radius); color: var(--muted); font-size: .8125rem; line-height: 1.5; }
++.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; margin-top: 28px; }
++.actions > button { margin-top: 0; gap: 16px; }
++.secondary { display: inline-flex; align-items: center; gap: 12px; min-height: 48px; color: var(--blue); font-size: .9375rem; font-weight: 600; }
++.secondary:hover { color: var(--blue-2); }
++.draftNote { max-width: 78ch; margin: 24px 0 0; color: var(--muted); font-size: .875rem; }
++.section { padding: 32px 0 var(--section-space); }
++.intro { max-width: 840px; margin-bottom: 32px; }
++.intro h2, .acceptance h2 { max-width: 24ch; margin-bottom: 20px; }
++.intro > p:not(:first-child), .acceptance > div > p:not(:first-child) { max-width: 68ch; margin-bottom: 0; color: var(--muted); font-size: 1.0625rem; }
++.workflowPanel { padding: clamp(24px, 3vw, 36px); border: 1px solid var(--line); border-radius: var(--radius); }
++.caption { margin: 0 0 24px; color: var(--blue); font-size: .875rem; font-weight: 550; }
++.workflow { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 28px; margin: 0; padding: 0; list-style: none; }
++.workflow li { min-width: 0; }
++.stepNumber { display: block; margin-bottom: 16px; color: var(--blue); font-size: .875rem; font-weight: 600; }
++.workflow h3 { margin: 0 0 10px; font-size: 1.0625rem; line-height: 1.4; }
++.workflow p { margin: 0; color: var(--muted); font-size: .9375rem; line-height: 1.65; }
++.offers { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 24px; }
++.offer { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; padding: clamp(24px, 3vw, 36px); border: 1px solid var(--line); border-radius: var(--radius); }
++.stage { margin: 0 0 24px; color: var(--blue); font-size: .875rem; font-weight: 550; }
++.offer h3 { max-width: 22ch; margin: 0 0 20px; font-size: clamp(1.5rem, 1.2rem + .7vw, 1.875rem); line-height: 1.25; }
++.offer > p:not(.stage) { color: var(--muted); }
++.offer ul { margin: 8px 0 24px; }
++.offer li, .boundaries li { margin: 8px 0; padding-left: 4px; }
++.offer ul, .boundaries ul { padding-left: 20px; color: var(--text); }
++.offer li::marker, .boundaries li::marker { color: var(--blue); }
++.offerNote { font-size: .875rem; line-height: 1.7; }
++.offerCta { margin-top: auto; }
++.feeNote { max-width: 78ch; margin: 24px 0 0; color: var(--muted); font-size: .875rem; }
++.boundaries { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: clamp(28px, 6vw, 72px); }
++.boundaries > div { min-width: 0; padding-top: 24px; border-top: 1px solid var(--line); }
++.boundaries h3 { margin-bottom: 16px; font-size: 1.125rem; }
++.boundaries ul { margin: 0; }
++.boundaryNote { max-width: 86ch; margin: 32px 0 0; padding-left: 20px; border-left: 2px solid var(--blue); color: var(--muted); font-size: .9375rem; }
++.acceptance { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: clamp(32px, 6vw, 80px); }
++.acceptance > div { min-width: 0; }
++.checks { counter-reset: acceptance; display: grid; gap: 24px; margin: 0; padding: 0; list-style: none; }
++.checks li { counter-increment: acceptance; display: grid; grid-template-columns: 28px minmax(0,1fr); gap: 6px 16px; padding-top: 18px; border-top: 1px solid var(--line); }
++.checks li::before { content: "0" counter(acceptance); grid-row: 1 / 3; color: var(--blue); font-size: .875rem; font-weight: 600; }
++.checks h3 { margin: 0; font-size: 1.0625rem; }
++.checks p { grid-column: 2; margin: 0; color: var(--muted); font-size: .9375rem; }
++@media (max-width: 1000px) {
++  .workflow { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 32px; }
++}
++@media (max-width: 760px) {
++  .section { padding-top: 24px; }
++  .offers, .boundaries, .acceptance { grid-template-columns: minmax(0,1fr); gap: 28px; }
++}
++@media (max-width: 599px) {
++  .workflow { grid-template-columns: minmax(0,1fr); gap: 24px; }
++  .workflow li { display: grid; grid-template-columns: 28px minmax(0,1fr); gap: 8px 16px; }
++  .stepNumber { grid-row: 1 / 3; margin: 0; }
++  .workflow h3 { margin: 0; }
++  .workflow p { grid-column: 2; }
++  .actions { align-items: stretch; gap: 8px; }
++  .actions > button, .secondary { flex: 1 1 100%; justify-content: center; }
++  .draftLabel { font-size: .75rem; }
++}

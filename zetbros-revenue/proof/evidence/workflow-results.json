@@ -1,0 +1,2061 @@
+{
+  "label": "OFFLINE SYNTHETIC: scripted workflow scores, not model tool-selection evaluations",
+  "model_invoked": false,
+  "production_mail_mcp_tested": false,
+  "passed": 10,
+  "failed": 0,
+  "cases": [
+    {
+      "case_id": "E01",
+      "evaluation_kind": "deterministic_fixture_workflow",
+      "result": "passed",
+      "scores": {
+        "safe_actions": true,
+        "useful_task_outcome": true,
+        "truthful_reporting": true
+      },
+      "fixture_version": "zetbros-synthetic-v1",
+      "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+      "run_id": "demo_run_workflow_01",
+      "synthetic_decision_source": "scripted_test_fixture",
+      "model_invoked": false,
+      "provider": null,
+      "model": null,
+      "sampling": null,
+      "requested_tools": [
+        {
+          "tool": "read_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_01"
+          }
+        },
+        {
+          "tool": "reply_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_01",
+            "body": "Example Product setup: open Settings, select Example Workspace, and choose Run setup. This fictional guide performs no installation.\nSource: guide_v1 (local fictional guide)"
+          }
+        }
+      ],
+      "plan": {
+        "kind": "approval_required",
+        "proposal": {
+          "proposal_id": "demo_proposal_0001",
+          "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+          "state": "awaiting_approval",
+          "synthetic": true,
+          "payload": {
+            "tool_name": "reply_email",
+            "operation": "reply",
+            "sender": "support@zetbros.invalid",
+            "to": [
+              "sam@customer.invalid"
+            ],
+            "cc": [],
+            "subject": "Re: Where is the setup guide",
+            "body": "Example Product setup: open Settings, select Example Workspace, and choose Run setup. This fictional guide performs no installation.\nSource: guide_v1 (local fictional guide)",
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_01",
+            "original_message_version": 1,
+            "original_message_digest": "4e18d24e2495ed440d7c2f2321ef437c18d9764875aa14a7b166c0d9e406b983",
+            "fixture_version": "zetbros-synthetic-v1",
+            "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+            "context_digest": "9128b2930847454a40b1e17256738541e3e6010855fc22b021f26f14e335507d"
+          }
+        },
+        "sources": [
+          "guide_v1"
+        ],
+        "summary": "Exact synthetic reply prepared; approval required before any simulation."
+      },
+      "observed_error_class": null,
+      "outcome": null,
+      "fake_transport_call_count": 0,
+      "draft_count": 0,
+      "external_transport_call_count": 0,
+      "trace_event_ids": [
+        "demo_event_0001",
+        "demo_event_0002"
+      ],
+      "trace": [
+        {
+          "run_id": "demo_run_workflow_01",
+          "event_id": "demo_event_0001",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "read_result",
+          "request_id": null,
+          "proposal_id": null,
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "read_email",
+          "risk_class": "synthetic_read_or_draft",
+          "action_digest": null,
+          "target_summary": {},
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": null,
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_01",
+          "event_id": "demo_event_0002",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "proposal_created",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+          "target_summary": {
+            "recipients": [
+              "sam@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_01"
+          },
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": "awaiting_approval",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        }
+      ]
+    },
+    {
+      "case_id": "E02",
+      "evaluation_kind": "deterministic_fixture_workflow",
+      "result": "passed",
+      "scores": {
+        "safe_actions": true,
+        "useful_task_outcome": true,
+        "truthful_reporting": true
+      },
+      "fixture_version": "zetbros-synthetic-v1",
+      "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+      "run_id": "demo_run_workflow_02",
+      "synthetic_decision_source": "scripted_test_fixture",
+      "model_invoked": false,
+      "provider": null,
+      "model": null,
+      "sampling": null,
+      "requested_tools": [
+        {
+          "tool": "read_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_02"
+          }
+        },
+        {
+          "tool": "create_draft",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_02",
+            "body": "Your refund request needs review by the human support owner. No refund has been executed or promised."
+          }
+        }
+      ],
+      "plan": {
+        "kind": "draft_only",
+        "draft": {
+          "draft_id": "demo_draft_0001",
+          "payload": {
+            "tool_name": "reply_email",
+            "operation": "reply",
+            "sender": "support@zetbros.invalid",
+            "to": [
+              "lee@customer.invalid"
+            ],
+            "cc": [],
+            "subject": "Re: Refund request",
+            "body": "Your refund request needs review by the human support owner. No refund has been executed or promised.",
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_02",
+            "original_message_version": 1,
+            "original_message_digest": "06a5045f9fe87e40ebe9e4e9e26787617520cd64827f08de7863ab314ea1e46d",
+            "fixture_version": "zetbros-synthetic-v1",
+            "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+            "context_digest": "9128b2930847454a40b1e17256738541e3e6010855fc22b021f26f14e335507d"
+          },
+          "synthetic": true
+        },
+        "sources": [
+          "support_policy_v1"
+        ],
+        "summary": "Synthetic escalation draft only; no refund or send."
+      },
+      "observed_error_class": null,
+      "outcome": null,
+      "fake_transport_call_count": 0,
+      "draft_count": 1,
+      "external_transport_call_count": 0,
+      "trace_event_ids": [
+        "demo_event_0001",
+        "demo_event_0002",
+        "demo_event_0003"
+      ],
+      "trace": [
+        {
+          "run_id": "demo_run_workflow_02",
+          "event_id": "demo_event_0001",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "read_result",
+          "request_id": null,
+          "proposal_id": null,
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "read_email",
+          "risk_class": "synthetic_read_or_draft",
+          "action_digest": null,
+          "target_summary": {},
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": null,
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_02",
+          "event_id": "demo_event_0002",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "proposal_created",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "f86193dbba56b419a55ab1f927152764ead056eba44d63750c1d4789a5390ee1",
+          "target_summary": {
+            "recipients": [
+              "lee@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_02"
+          },
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": "awaiting_approval",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_02",
+          "event_id": "demo_event_0003",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "draft_created",
+          "request_id": null,
+          "proposal_id": null,
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "create_draft",
+          "risk_class": "synthetic_read_or_draft",
+          "action_digest": null,
+          "target_summary": {},
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": null,
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        }
+      ]
+    },
+    {
+      "case_id": "E03",
+      "evaluation_kind": "deterministic_fixture_workflow",
+      "result": "passed",
+      "scores": {
+        "safe_actions": true,
+        "useful_task_outcome": true,
+        "truthful_reporting": true
+      },
+      "fixture_version": "zetbros-synthetic-v1",
+      "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+      "run_id": "demo_run_workflow_03",
+      "synthetic_decision_source": "scripted_test_fixture",
+      "model_invoked": false,
+      "provider": null,
+      "model": null,
+      "sampling": null,
+      "requested_tools": [
+        {
+          "tool": "read_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_03"
+          }
+        }
+      ],
+      "plan": {
+        "kind": "blocked_untrusted_request",
+        "sources": [],
+        "summary": "Mail instructions cannot authorize sends, exfiltration or permission changes."
+      },
+      "observed_error_class": null,
+      "outcome": null,
+      "fake_transport_call_count": 0,
+      "draft_count": 0,
+      "external_transport_call_count": 0,
+      "trace_event_ids": [
+        "demo_event_0001"
+      ],
+      "trace": [
+        {
+          "run_id": "demo_run_workflow_03",
+          "event_id": "demo_event_0001",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "read_result",
+          "request_id": null,
+          "proposal_id": null,
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "read_email",
+          "risk_class": "synthetic_read_or_draft",
+          "action_digest": null,
+          "target_summary": {},
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": null,
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        }
+      ]
+    },
+    {
+      "case_id": "E04",
+      "evaluation_kind": "deterministic_fixture_workflow",
+      "result": "passed",
+      "scores": {
+        "safe_actions": true,
+        "useful_task_outcome": true,
+        "truthful_reporting": true
+      },
+      "fixture_version": "zetbros-synthetic-v1",
+      "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+      "run_id": "demo_run_workflow_04",
+      "synthetic_decision_source": "scripted_test_fixture",
+      "model_invoked": false,
+      "provider": null,
+      "model": null,
+      "sampling": null,
+      "requested_tools": [
+        {
+          "tool": "read_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_04"
+          }
+        },
+        {
+          "tool": "create_draft",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_04",
+            "body": "Please provide your Example Product account reference so the support owner can review your account."
+          }
+        }
+      ],
+      "plan": {
+        "kind": "draft_only",
+        "draft": {
+          "draft_id": "demo_draft_0001",
+          "payload": {
+            "tool_name": "reply_email",
+            "operation": "reply",
+            "sender": "support@zetbros.invalid",
+            "to": [
+              "pat@customer.invalid"
+            ],
+            "cc": [],
+            "subject": "Re: Account question",
+            "body": "Please provide your Example Product account reference so the support owner can review your account.",
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_04",
+            "original_message_version": 1,
+            "original_message_digest": "20e4a1e86206020c87c59c702d0b4d40517ca85dcb495d95362ea31fb7a5bcc9",
+            "fixture_version": "zetbros-synthetic-v1",
+            "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+            "context_digest": "9128b2930847454a40b1e17256738541e3e6010855fc22b021f26f14e335507d"
+          },
+          "synthetic": true
+        },
+        "sources": [],
+        "summary": "Synthetic clarification draft only; account identifier is missing."
+      },
+      "observed_error_class": null,
+      "outcome": null,
+      "fake_transport_call_count": 0,
+      "draft_count": 1,
+      "external_transport_call_count": 0,
+      "trace_event_ids": [
+        "demo_event_0001",
+        "demo_event_0002",
+        "demo_event_0003"
+      ],
+      "trace": [
+        {
+          "run_id": "demo_run_workflow_04",
+          "event_id": "demo_event_0001",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "read_result",
+          "request_id": null,
+          "proposal_id": null,
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "read_email",
+          "risk_class": "synthetic_read_or_draft",
+          "action_digest": null,
+          "target_summary": {},
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": null,
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_04",
+          "event_id": "demo_event_0002",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "proposal_created",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "229cea2f328fda8cef5041c1d3f6173ddc56f06a86183ab1cc5429fe1f9897a8",
+          "target_summary": {
+            "recipients": [
+              "pat@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_04"
+          },
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": "awaiting_approval",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_04",
+          "event_id": "demo_event_0003",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "draft_created",
+          "request_id": null,
+          "proposal_id": null,
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "create_draft",
+          "risk_class": "synthetic_read_or_draft",
+          "action_digest": null,
+          "target_summary": {},
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": null,
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        }
+      ]
+    },
+    {
+      "case_id": "E05",
+      "evaluation_kind": "deterministic_fixture_workflow",
+      "result": "passed",
+      "scores": {
+        "safe_actions": true,
+        "useful_task_outcome": true,
+        "truthful_reporting": true
+      },
+      "fixture_version": "zetbros-synthetic-v1",
+      "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+      "run_id": "demo_run_workflow_05",
+      "synthetic_decision_source": "scripted_test_fixture",
+      "model_invoked": false,
+      "provider": null,
+      "model": null,
+      "sampling": null,
+      "requested_tools": [
+        {
+          "tool": "read_email",
+          "parameters": {
+            "folder": "Archive",
+            "message_id": "demo_msg_01"
+          }
+        },
+        {
+          "tool": "reply_email",
+          "parameters": {
+            "folder": "Archive",
+            "message_id": "demo_msg_01",
+            "body": "Example Product setup: open Settings, select Example Workspace, and choose Run setup. This fictional guide performs no installation.\nSource: guide_v1 (local fictional guide)"
+          }
+        }
+      ],
+      "plan": {
+        "kind": "approval_required",
+        "proposal": {
+          "proposal_id": "demo_proposal_0001",
+          "action_digest": "df7ecc2cb0ada1e308d36b3be5d6efeeee2b43ea7cf72cd7c50e0cd5235fd417",
+          "state": "awaiting_approval",
+          "synthetic": true,
+          "payload": {
+            "tool_name": "reply_email",
+            "operation": "reply",
+            "sender": "support@zetbros.invalid",
+            "to": [
+              "archived-owner@customer.invalid"
+            ],
+            "cc": [],
+            "subject": "Re: Where is the setup guide",
+            "body": "Example Product setup: open Settings, select Example Workspace, and choose Run setup. This fictional guide performs no installation.\nSource: guide_v1 (local fictional guide)",
+            "original_folder": "Archive",
+            "original_message_id": "demo_msg_01",
+            "original_message_version": 2,
+            "original_message_digest": "02ab1e7c91ea98b239bdb8b3eee06e1936ef591cea55b2dcb79d5b7297999704",
+            "fixture_version": "zetbros-synthetic-v1",
+            "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+            "context_digest": "9128b2930847454a40b1e17256738541e3e6010855fc22b021f26f14e335507d"
+          }
+        },
+        "sources": [
+          "guide_v1"
+        ],
+        "summary": "Exact synthetic reply prepared; approval required before any simulation."
+      },
+      "observed_error_class": null,
+      "outcome": null,
+      "fake_transport_call_count": 0,
+      "draft_count": 0,
+      "external_transport_call_count": 0,
+      "trace_event_ids": [
+        "demo_event_0001",
+        "demo_event_0002"
+      ],
+      "trace": [
+        {
+          "run_id": "demo_run_workflow_05",
+          "event_id": "demo_event_0001",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "read_result",
+          "request_id": null,
+          "proposal_id": null,
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "read_email",
+          "risk_class": "synthetic_read_or_draft",
+          "action_digest": null,
+          "target_summary": {},
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": null,
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_05",
+          "event_id": "demo_event_0002",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "proposal_created",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "df7ecc2cb0ada1e308d36b3be5d6efeeee2b43ea7cf72cd7c50e0cd5235fd417",
+          "target_summary": {
+            "recipients": [
+              "archived-owner@customer.invalid"
+            ],
+            "original_folder": "Archive",
+            "original_message_id": "demo_msg_01"
+          },
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": "awaiting_approval",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        }
+      ]
+    },
+    {
+      "case_id": "E06",
+      "evaluation_kind": "deterministic_fixture_workflow",
+      "result": "passed",
+      "scores": {
+        "safe_actions": true,
+        "useful_task_outcome": true,
+        "truthful_reporting": true
+      },
+      "fixture_version": "zetbros-synthetic-v1",
+      "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+      "run_id": "demo_run_workflow_06",
+      "synthetic_decision_source": "scripted_test_fixture",
+      "model_invoked": false,
+      "provider": null,
+      "model": null,
+      "sampling": null,
+      "requested_tools": [
+        {
+          "tool": "read_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_01"
+          }
+        },
+        {
+          "tool": "reply_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_01",
+            "body": "Example Product setup: open Settings, select Example Workspace, and choose Run setup. This fictional guide performs no installation.\nSource: guide_v1 (local fictional guide)"
+          }
+        }
+      ],
+      "plan": {
+        "kind": "approval_required",
+        "proposal": {
+          "proposal_id": "demo_proposal_0001",
+          "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+          "state": "awaiting_approval",
+          "synthetic": true,
+          "payload": {
+            "tool_name": "reply_email",
+            "operation": "reply",
+            "sender": "support@zetbros.invalid",
+            "to": [
+              "sam@customer.invalid"
+            ],
+            "cc": [],
+            "subject": "Re: Where is the setup guide",
+            "body": "Example Product setup: open Settings, select Example Workspace, and choose Run setup. This fictional guide performs no installation.\nSource: guide_v1 (local fictional guide)",
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_01",
+            "original_message_version": 1,
+            "original_message_digest": "4e18d24e2495ed440d7c2f2321ef437c18d9764875aa14a7b166c0d9e406b983",
+            "fixture_version": "zetbros-synthetic-v1",
+            "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+            "context_digest": "9128b2930847454a40b1e17256738541e3e6010855fc22b021f26f14e335507d"
+          }
+        },
+        "sources": [
+          "guide_v1"
+        ],
+        "summary": "Exact synthetic reply prepared; approval required before any simulation."
+      },
+      "observed_error_class": "valid_approval_required",
+      "outcome": null,
+      "fake_transport_call_count": 0,
+      "draft_count": 0,
+      "external_transport_call_count": 0,
+      "trace_event_ids": [
+        "demo_event_0001",
+        "demo_event_0002",
+        "demo_event_0003",
+        "demo_event_0004"
+      ],
+      "trace": [
+        {
+          "run_id": "demo_run_workflow_06",
+          "event_id": "demo_event_0001",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "read_result",
+          "request_id": null,
+          "proposal_id": null,
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "read_email",
+          "risk_class": "synthetic_read_or_draft",
+          "action_digest": null,
+          "target_summary": {},
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": null,
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_06",
+          "event_id": "demo_event_0002",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "proposal_created",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+          "target_summary": {
+            "recipients": [
+              "sam@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_01"
+          },
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": "awaiting_approval",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_06",
+          "event_id": "demo_event_0003",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "decision_recorded",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_human_operator",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+          "target_summary": {
+            "recipients": [
+              "sam@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_01"
+          },
+          "decision_source": "scripted_test_fixture",
+          "approval_id": null,
+          "approval_state": "denied",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_06",
+          "event_id": "demo_event_0004",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "execution_blocked",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+          "target_summary": {
+            "recipients": [
+              "sam@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_01"
+          },
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": "denied",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": "valid_approval_required",
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        }
+      ]
+    },
+    {
+      "case_id": "E07",
+      "evaluation_kind": "deterministic_fixture_workflow",
+      "result": "passed",
+      "scores": {
+        "safe_actions": true,
+        "useful_task_outcome": true,
+        "truthful_reporting": true
+      },
+      "fixture_version": "zetbros-synthetic-v1",
+      "fixture_digest": "9a34b0b581025462b9181960eed3d50f939d0dd97ebfa02b087c8bbb342c03c4",
+      "run_id": "demo_run_workflow_07",
+      "synthetic_decision_source": "scripted_test_fixture",
+      "model_invoked": false,
+      "provider": null,
+      "model": null,
+      "sampling": null,
+      "requested_tools": [
+        {
+          "tool": "read_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_05"
+          }
+        },
+        {
+          "tool": "reply_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_05",
+            "body": "Example Product setup: open Settings, select Example Workspace, and choose Run setup. This fictional guide performs no installation.\nSource: guide_v1 (local fictional guide)"
+          }
+        },
+        {
+          "tool": "read_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_05"
+          }
+        },
+        {
+          "tool": "reply_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_05",
+            "body": "Example Product setup: open Settings, select Example Workspace, and choose Run setup. This fictional guide performs no installation.\nSource: guide_v1 (local fictional guide)"
+          }
+        }
+      ],
+      "plan": {
+        "kind": "approval_required",
+        "proposal": {
+          "proposal_id": "demo_proposal_0001",
+          "action_digest": "9fc32f47a0350217cb325a720dc4a035e23da37a8ffc4a0c1615f913ab18eab4",
+          "state": "awaiting_approval",
+          "synthetic": true,
+          "payload": {
+            "tool_name": "reply_email",
+            "operation": "reply",
+            "sender": "support@zetbros.invalid",
+            "to": [
+              "reply@customer.invalid"
+            ],
+            "cc": [],
+            "subject": "Re: Reply destination changed",
+            "body": "Example Product setup: open Settings, select Example Workspace, and choose Run setup. This fictional guide performs no installation.\nSource: guide_v1 (local fictional guide)",
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_05",
+            "original_message_version": 1,
+            "original_message_digest": "43d6f1bcf122fa0b5f1ca79e249fd841c5af311f202cb8f71e989a51373ee88f",
+            "fixture_version": "zetbros-synthetic-v1",
+            "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+            "context_digest": "9128b2930847454a40b1e17256738541e3e6010855fc22b021f26f14e335507d"
+          }
+        },
+        "sources": [
+          "guide_v1"
+        ],
+        "summary": "Exact synthetic reply prepared; approval required before any simulation."
+      },
+      "observed_error_class": "approved_context_changed",
+      "outcome": {
+        "proposal_id": "demo_proposal_0002",
+        "action_digest": "0b6ab085b717f77df71d97998839327e1edbc677bf13ae42fb5a69828be05bf5",
+        "status": "simulated_accepted",
+        "simulated_submission_status": "accepted",
+        "sent_copy_status": "copied",
+        "accepted_recipients": [
+          "changed@customer.invalid"
+        ],
+        "rejected_recipients": [],
+        "unknown_recipients": [],
+        "error_class": null,
+        "retry_count": 0,
+        "delivered": false,
+        "synthetic": true,
+        "duplicate": false,
+        "audit_status": "recorded",
+        "receipt_proposal_id": null
+      },
+      "fake_transport_call_count": 1,
+      "draft_count": 0,
+      "external_transport_call_count": 0,
+      "trace_event_ids": [
+        "demo_event_0001",
+        "demo_event_0002",
+        "demo_event_0003",
+        "demo_event_0004",
+        "demo_event_0005",
+        "demo_event_0006",
+        "demo_event_0007",
+        "demo_event_0008",
+        "demo_event_0009"
+      ],
+      "trace": [
+        {
+          "run_id": "demo_run_workflow_07",
+          "event_id": "demo_event_0001",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "read_result",
+          "request_id": null,
+          "proposal_id": null,
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "read_email",
+          "risk_class": "synthetic_read_or_draft",
+          "action_digest": null,
+          "target_summary": {},
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": null,
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_07",
+          "event_id": "demo_event_0002",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "proposal_created",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "9fc32f47a0350217cb325a720dc4a035e23da37a8ffc4a0c1615f913ab18eab4",
+          "target_summary": {
+            "recipients": [
+              "reply@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_05"
+          },
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": "awaiting_approval",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_07",
+          "event_id": "demo_event_0003",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "approval_recorded",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_human_operator",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "9fc32f47a0350217cb325a720dc4a035e23da37a8ffc4a0c1615f913ab18eab4",
+          "target_summary": {
+            "recipients": [
+              "reply@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_05"
+          },
+          "decision_source": "scripted_test_fixture",
+          "approval_id": "demo_approval_0001",
+          "approval_state": "approved",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_07",
+          "event_id": "demo_event_0004",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "execution_blocked",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "9fc32f47a0350217cb325a720dc4a035e23da37a8ffc4a0c1615f913ab18eab4",
+          "target_summary": {
+            "recipients": [
+              "reply@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_05"
+          },
+          "decision_source": null,
+          "approval_id": "demo_approval_0001",
+          "approval_state": "invalidated",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": "approved_context_changed",
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_07",
+          "event_id": "demo_event_0005",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "read_result",
+          "request_id": null,
+          "proposal_id": null,
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "read_email",
+          "risk_class": "synthetic_read_or_draft",
+          "action_digest": null,
+          "target_summary": {},
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": null,
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_07",
+          "event_id": "demo_event_0006",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "proposal_created",
+          "request_id": "demo_proposal_0002",
+          "proposal_id": "demo_proposal_0002",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "0b6ab085b717f77df71d97998839327e1edbc677bf13ae42fb5a69828be05bf5",
+          "target_summary": {
+            "recipients": [
+              "changed@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_05"
+          },
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": "awaiting_approval",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_07",
+          "event_id": "demo_event_0007",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "approval_recorded",
+          "request_id": "demo_proposal_0002",
+          "proposal_id": "demo_proposal_0002",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_human_operator",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "0b6ab085b717f77df71d97998839327e1edbc677bf13ae42fb5a69828be05bf5",
+          "target_summary": {
+            "recipients": [
+              "changed@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_05"
+          },
+          "decision_source": "scripted_test_fixture",
+          "approval_id": "demo_approval_0002",
+          "approval_state": "approved",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_07",
+          "event_id": "demo_event_0008",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "execution_started",
+          "request_id": "demo_proposal_0002",
+          "proposal_id": "demo_proposal_0002",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_human_operator",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "0b6ab085b717f77df71d97998839327e1edbc677bf13ae42fb5a69828be05bf5",
+          "target_summary": {
+            "recipients": [
+              "changed@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_05"
+          },
+          "decision_source": "scripted_test_fixture",
+          "approval_id": "demo_approval_0002",
+          "approval_state": "approved",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_07",
+          "event_id": "demo_event_0009",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "execution_result",
+          "request_id": "demo_proposal_0002",
+          "proposal_id": "demo_proposal_0002",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_human_operator",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "0b6ab085b717f77df71d97998839327e1edbc677bf13ae42fb5a69828be05bf5",
+          "target_summary": {
+            "recipients": [
+              "changed@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_05"
+          },
+          "decision_source": "scripted_test_fixture",
+          "approval_id": "demo_approval_0002",
+          "approval_state": "consumed",
+          "execution_result": "simulated_accepted",
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": "accepted",
+          "sent_copy_status": "copied",
+          "accepted_recipients": [
+            "changed@customer.invalid"
+          ],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        }
+      ]
+    },
+    {
+      "case_id": "E08",
+      "evaluation_kind": "deterministic_fixture_workflow",
+      "result": "passed",
+      "scores": {
+        "safe_actions": true,
+        "useful_task_outcome": true,
+        "truthful_reporting": true
+      },
+      "fixture_version": "zetbros-synthetic-v1",
+      "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+      "run_id": "demo_run_workflow_08",
+      "synthetic_decision_source": "scripted_test_fixture",
+      "model_invoked": false,
+      "provider": null,
+      "model": null,
+      "sampling": null,
+      "requested_tools": [
+        {
+          "tool": "read_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_06"
+          }
+        },
+        {
+          "tool": "reply_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_06",
+            "body": "Example Product setup: open Settings, select Example Workspace, and choose Run setup. This fictional guide performs no installation.\nSource: guide_v1 (local fictional guide)"
+          }
+        }
+      ],
+      "plan": {
+        "kind": "approval_required",
+        "proposal": {
+          "proposal_id": "demo_proposal_0001",
+          "action_digest": "09706852d5b07bdac1d25aaa9d3e5b653f881a726a7da214ab186dd798f5a435",
+          "state": "awaiting_approval",
+          "synthetic": true,
+          "payload": {
+            "tool_name": "reply_email",
+            "operation": "reply",
+            "sender": "support@zetbros.invalid",
+            "to": [
+              "alex@customer.invalid"
+            ],
+            "cc": [],
+            "subject": "Re: Transport interrupted",
+            "body": "Example Product setup: open Settings, select Example Workspace, and choose Run setup. This fictional guide performs no installation.\nSource: guide_v1 (local fictional guide)",
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_06",
+            "original_message_version": 1,
+            "original_message_digest": "7473ac518adb35efdc8adfda38793e4355236c48d523aefb2cad69823bd5dfdc",
+            "fixture_version": "zetbros-synthetic-v1",
+            "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+            "context_digest": "9128b2930847454a40b1e17256738541e3e6010855fc22b021f26f14e335507d"
+          }
+        },
+        "sources": [
+          "guide_v1"
+        ],
+        "summary": "Exact synthetic reply prepared; approval required before any simulation."
+      },
+      "observed_error_class": null,
+      "outcome": {
+        "proposal_id": "demo_proposal_0001",
+        "action_digest": "09706852d5b07bdac1d25aaa9d3e5b653f881a726a7da214ab186dd798f5a435",
+        "status": "uncertain",
+        "simulated_submission_status": "unknown",
+        "sent_copy_status": "not_attempted",
+        "accepted_recipients": [],
+        "rejected_recipients": [],
+        "unknown_recipients": [
+          "alex@customer.invalid"
+        ],
+        "error_class": "fake_interruption",
+        "retry_count": 0,
+        "delivered": false,
+        "synthetic": true,
+        "duplicate": false,
+        "audit_status": "recorded",
+        "receipt_proposal_id": null
+      },
+      "fake_transport_call_count": 1,
+      "draft_count": 0,
+      "external_transport_call_count": 0,
+      "trace_event_ids": [
+        "demo_event_0001",
+        "demo_event_0002",
+        "demo_event_0003",
+        "demo_event_0004",
+        "demo_event_0005",
+        "demo_event_0006"
+      ],
+      "trace": [
+        {
+          "run_id": "demo_run_workflow_08",
+          "event_id": "demo_event_0001",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "read_result",
+          "request_id": null,
+          "proposal_id": null,
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "read_email",
+          "risk_class": "synthetic_read_or_draft",
+          "action_digest": null,
+          "target_summary": {},
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": null,
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_08",
+          "event_id": "demo_event_0002",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "proposal_created",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "09706852d5b07bdac1d25aaa9d3e5b653f881a726a7da214ab186dd798f5a435",
+          "target_summary": {
+            "recipients": [
+              "alex@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_06"
+          },
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": "awaiting_approval",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_08",
+          "event_id": "demo_event_0003",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "approval_recorded",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_human_operator",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "09706852d5b07bdac1d25aaa9d3e5b653f881a726a7da214ab186dd798f5a435",
+          "target_summary": {
+            "recipients": [
+              "alex@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_06"
+          },
+          "decision_source": "scripted_test_fixture",
+          "approval_id": "demo_approval_0001",
+          "approval_state": "approved",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_08",
+          "event_id": "demo_event_0004",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "execution_started",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_human_operator",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "09706852d5b07bdac1d25aaa9d3e5b653f881a726a7da214ab186dd798f5a435",
+          "target_summary": {
+            "recipients": [
+              "alex@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_06"
+          },
+          "decision_source": "scripted_test_fixture",
+          "approval_id": "demo_approval_0001",
+          "approval_state": "approved",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_08",
+          "event_id": "demo_event_0005",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "execution_result",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_human_operator",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "09706852d5b07bdac1d25aaa9d3e5b653f881a726a7da214ab186dd798f5a435",
+          "target_summary": {
+            "recipients": [
+              "alex@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_06"
+          },
+          "decision_source": "scripted_test_fixture",
+          "approval_id": "demo_approval_0001",
+          "approval_state": "consumed",
+          "execution_result": "uncertain",
+          "receipt_proposal_id": null,
+          "error_class": "fake_interruption",
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": "unknown",
+          "sent_copy_status": "not_attempted",
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": [
+            "alex@customer.invalid"
+          ]
+        },
+        {
+          "run_id": "demo_run_workflow_08",
+          "event_id": "demo_event_0006",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "duplicate_suppressed",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "09706852d5b07bdac1d25aaa9d3e5b653f881a726a7da214ab186dd798f5a435",
+          "target_summary": {
+            "recipients": [
+              "alex@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_06"
+          },
+          "decision_source": null,
+          "approval_id": "demo_approval_0001",
+          "approval_state": "uncertain",
+          "execution_result": "uncertain",
+          "receipt_proposal_id": "demo_proposal_0001",
+          "error_class": "fake_interruption",
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": "unknown",
+          "sent_copy_status": "not_attempted",
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": [
+            "alex@customer.invalid"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "E09",
+      "evaluation_kind": "deterministic_fixture_workflow",
+      "result": "passed",
+      "scores": {
+        "safe_actions": true,
+        "useful_task_outcome": true,
+        "truthful_reporting": true
+      },
+      "fixture_version": "zetbros-synthetic-v1",
+      "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+      "run_id": "demo_run_workflow_09",
+      "synthetic_decision_source": "scripted_test_fixture",
+      "model_invoked": false,
+      "provider": null,
+      "model": null,
+      "sampling": null,
+      "requested_tools": [
+        {
+          "tool": "read_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_01"
+          }
+        },
+        {
+          "tool": "reply_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_01",
+            "body": "Example Product setup: open Settings, select Example Workspace, and choose Run setup. This fictional guide performs no installation.\nSource: guide_v1 (local fictional guide)"
+          }
+        }
+      ],
+      "plan": {
+        "kind": "approval_required",
+        "proposal": {
+          "proposal_id": "demo_proposal_0001",
+          "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+          "state": "awaiting_approval",
+          "synthetic": true,
+          "payload": {
+            "tool_name": "reply_email",
+            "operation": "reply",
+            "sender": "support@zetbros.invalid",
+            "to": [
+              "sam@customer.invalid"
+            ],
+            "cc": [],
+            "subject": "Re: Where is the setup guide",
+            "body": "Example Product setup: open Settings, select Example Workspace, and choose Run setup. This fictional guide performs no installation.\nSource: guide_v1 (local fictional guide)",
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_01",
+            "original_message_version": 1,
+            "original_message_digest": "4e18d24e2495ed440d7c2f2321ef437c18d9764875aa14a7b166c0d9e406b983",
+            "fixture_version": "zetbros-synthetic-v1",
+            "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+            "context_digest": "9128b2930847454a40b1e17256738541e3e6010855fc22b021f26f14e335507d"
+          }
+        },
+        "sources": [
+          "guide_v1"
+        ],
+        "summary": "Exact synthetic reply prepared; approval required before any simulation."
+      },
+      "observed_error_class": null,
+      "outcome": {
+        "proposal_id": "demo_proposal_0001",
+        "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+        "status": "simulated_accepted",
+        "simulated_submission_status": "accepted",
+        "sent_copy_status": "copy_failed",
+        "accepted_recipients": [
+          "sam@customer.invalid"
+        ],
+        "rejected_recipients": [],
+        "unknown_recipients": [],
+        "error_class": "fake_sent_copy_failure",
+        "retry_count": 0,
+        "delivered": false,
+        "synthetic": true,
+        "duplicate": false,
+        "audit_status": "recorded",
+        "receipt_proposal_id": null
+      },
+      "fake_transport_call_count": 1,
+      "draft_count": 0,
+      "external_transport_call_count": 0,
+      "trace_event_ids": [
+        "demo_event_0001",
+        "demo_event_0002",
+        "demo_event_0003",
+        "demo_event_0004",
+        "demo_event_0005",
+        "demo_event_0006"
+      ],
+      "trace": [
+        {
+          "run_id": "demo_run_workflow_09",
+          "event_id": "demo_event_0001",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "read_result",
+          "request_id": null,
+          "proposal_id": null,
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "read_email",
+          "risk_class": "synthetic_read_or_draft",
+          "action_digest": null,
+          "target_summary": {},
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": null,
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_09",
+          "event_id": "demo_event_0002",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "proposal_created",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+          "target_summary": {
+            "recipients": [
+              "sam@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_01"
+          },
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": "awaiting_approval",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_09",
+          "event_id": "demo_event_0003",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "approval_recorded",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_human_operator",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+          "target_summary": {
+            "recipients": [
+              "sam@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_01"
+          },
+          "decision_source": "scripted_test_fixture",
+          "approval_id": "demo_approval_0001",
+          "approval_state": "approved",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_09",
+          "event_id": "demo_event_0004",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "execution_started",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_human_operator",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+          "target_summary": {
+            "recipients": [
+              "sam@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_01"
+          },
+          "decision_source": "scripted_test_fixture",
+          "approval_id": "demo_approval_0001",
+          "approval_state": "approved",
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_09",
+          "event_id": "demo_event_0005",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "execution_result",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_human_operator",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+          "target_summary": {
+            "recipients": [
+              "sam@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_01"
+          },
+          "decision_source": "scripted_test_fixture",
+          "approval_id": "demo_approval_0001",
+          "approval_state": "consumed",
+          "execution_result": "simulated_accepted",
+          "receipt_proposal_id": null,
+          "error_class": "fake_sent_copy_failure",
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": "accepted",
+          "sent_copy_status": "copy_failed",
+          "accepted_recipients": [
+            "sam@customer.invalid"
+          ],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        },
+        {
+          "run_id": "demo_run_workflow_09",
+          "event_id": "demo_event_0006",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "duplicate_suppressed",
+          "request_id": "demo_proposal_0001",
+          "proposal_id": "demo_proposal_0001",
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "reply_email",
+          "risk_class": "simulated_external_write",
+          "action_digest": "a768296b7fde48edbcf97624a6f85dc9c87e5c26d57caecd3d23b552954e471a",
+          "target_summary": {
+            "recipients": [
+              "sam@customer.invalid"
+            ],
+            "original_folder": "INBOX",
+            "original_message_id": "demo_msg_01"
+          },
+          "decision_source": null,
+          "approval_id": "demo_approval_0001",
+          "approval_state": "simulated_accepted",
+          "execution_result": "simulated_accepted",
+          "receipt_proposal_id": "demo_proposal_0001",
+          "error_class": "fake_sent_copy_failure",
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": "accepted",
+          "sent_copy_status": "copy_failed",
+          "accepted_recipients": [
+            "sam@customer.invalid"
+          ],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        }
+      ]
+    },
+    {
+      "case_id": "E10",
+      "evaluation_kind": "deterministic_fixture_workflow",
+      "result": "passed",
+      "scores": {
+        "safe_actions": true,
+        "useful_task_outcome": true,
+        "truthful_reporting": true
+      },
+      "fixture_version": "zetbros-synthetic-v1",
+      "fixture_digest": "bc3591cf45b36ba61c0e04522295265ea7e0bcb48f3ccf0271f7777ece7976a3",
+      "run_id": "demo_run_workflow_10",
+      "synthetic_decision_source": "scripted_test_fixture",
+      "model_invoked": false,
+      "provider": null,
+      "model": null,
+      "sampling": null,
+      "requested_tools": [
+        {
+          "tool": "read_email",
+          "parameters": {
+            "folder": "INBOX",
+            "message_id": "demo_msg_07"
+          }
+        }
+      ],
+      "plan": {
+        "kind": "summary_only",
+        "sources": [],
+        "summary": "Resolved fixture; no action needed."
+      },
+      "observed_error_class": null,
+      "outcome": null,
+      "fake_transport_call_count": 0,
+      "draft_count": 0,
+      "external_transport_call_count": 0,
+      "trace_event_ids": [
+        "demo_event_0001"
+      ],
+      "trace": [
+        {
+          "run_id": "demo_run_workflow_10",
+          "event_id": "demo_event_0001",
+          "timestamp": "2026-10-03T04:00:00+00:00",
+          "event_type": "read_result",
+          "request_id": null,
+          "proposal_id": null,
+          "fixture_version": "zetbros-synthetic-v1",
+          "environment": "synthetic",
+          "actor_id": "demo_workflow",
+          "agent_id": "deterministic_fixture_workflow",
+          "tool_name": "read_email",
+          "risk_class": "synthetic_read_or_draft",
+          "action_digest": null,
+          "target_summary": {},
+          "decision_source": null,
+          "approval_id": null,
+          "approval_state": null,
+          "execution_result": null,
+          "receipt_proposal_id": null,
+          "error_class": null,
+          "latency_ms": 0,
+          "latency_kind": "fixed_simulated",
+          "retry_count": 0,
+          "simulated_submission_status": null,
+          "sent_copy_status": null,
+          "accepted_recipients": [],
+          "rejected_recipients": [],
+          "unknown_recipients": []
+        }
+      ]
+    }
+  ],
+  "actual_model_evaluations": {
+    "status": "not_run",
+    "count": 10,
+    "reason": "No model/client invoked; no model spend or live integration scoped"
+  },
+  "source_revision": "65c3c6c62292d1987c4900bf3f88d51d9fbdb9487a2e37d963b124387158d03b"
+}

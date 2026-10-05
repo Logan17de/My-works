@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+node_modules/
+.env
+.env.*
+!.env.example
+
+# Deliberately version the reviewed synthetic traces, despite the root ignore.
+!proof/evidence/*.jsonl
