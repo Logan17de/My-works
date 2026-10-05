@@ -1,0 +1,11 @@
+{
+  "runtime_state": "identity_proof_only",
+  "enabled": false,
+  "client_id": null,
+  "origin": null,
+  "capture_window_seconds": null,
+  "challenge_seconds": 120,
+  "max_challenges": 16,
+  "bootstrap_per_peer_per_minute": 4,
+  "jwks_url": "https://www.googleapis.com/oauth2/v3/certs"
+}

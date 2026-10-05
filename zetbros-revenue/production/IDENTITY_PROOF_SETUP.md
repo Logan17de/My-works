@@ -14,10 +14,12 @@ and offline acceptance only; the installed pilot is not activated or changed.
 
 ## Smallest practical sequence
 
-1. Approve a bounded identity-proof deployment window at the already selected
+1. Approve identity-proof deployment and its availability at the already selected
    HTTPS review origin. Install the new pinned code separately and start only
    `google_identity_proof:configured_identity_proof_app` with the public client ID
-   and exact HTTPS origin. No unknown subject, agent issuer, mailbox identity,
+   and exact HTTPS origin. The default capture window is 600 seconds; continuous
+   project-duration availability requires explicit approval and
+   `capture_window_seconds: null`. No unknown subject, agent issuer, mailbox identity,
    ledger, signing secret or Google client secret is needed for this step.
 2. The owner opens `/identity` in their browser and deliberately uses the Google
    sign-in button with the intended account. The browser submits the ID token to
@@ -30,7 +32,8 @@ and offline acceptance only; the installed pilot is not activated or changed.
    dedicated reviewer client ID** in the private reviewer allowlist. A first
    proof never self-enrolls. Proofs from other Google accounts can show those
    accounts their own identity but provide no access to any application data.
-4. Stop the temporary proof service/window. Configure the separate actual agent
+4. Stop the proof service when its approved availability ends. For continuous
+   availability, stop and disable it when the project ends. Configure the separate actual agent
    identity resource before a ledger-backed reviewer pilot is enabled. That is a
    later setup step, not a prerequisite for the identity proof. Keep outbound
    Mail disabled through authentication acceptance.
@@ -61,9 +64,13 @@ reviewer permission. Email, domains and claimed roles are not authorization.
   server point to 8082. The holding default, `/review`, `/v1`, installed pilot at
   8081 and existing Mail service/tunnel remain untouched
 - Budget: MemoryHigh 64 MiB, MemoryMax 80 MiB, no swap, CPUQuota 25%, TasksMax 16,
-  four HTTP requests and two blocking route threads. A 600-second app window and
-  systemd RuntimeMaxSec enforce closure; Restart=no prevents reopening. No writable ledger path or
-  LoadCredential. This is a proposed additional temporary process, so verify
+  four HTTP requests and two blocking route threads. The default 600-second app
+  window and systemd RuntimeMaxSec enforce closure; Restart=no prevents reopening.
+  Explicit continuous mode uses `capture_window_seconds: null` and
+  `deploy/zetbros-identity-proof.continuous.service.example` with RuntimeMaxSec=infinity.
+  It retains the same budget, uses limited failure restarts and a boot install
+  target for availability, and must be stopped/disabled at project end. No writable ledger path or
+  LoadCredential. This is a proposed additional isolated process, so verify
   current host free memory and the combined existing-service budget before start
 - Public profile: `runtime_state: identity_proof_only`, `enabled: true`, actual
   public web client ID, exact canonical HTTPS origin. No subject/role/agent/mail/
@@ -79,13 +86,14 @@ proxy fragment is not a complete host configuration: use verified existing
 rate/connection limits, overwrite forwarding headers, trust only the loopback
 proxy and test canonical scheme/host/client-IP behavior. Request bodies and
 proof subjects must not enter logs. Bound header/read/body/time/resource limits
-and a short owner-attended window are required before public exposure. Neither
+and explicit approval of bounded or continuous availability are required before public exposure. Neither
 application challenge bounds nor a proxy fragment promises DDoS resistance.
 
 The app accepts no bearer authority or query parameters. Its challenge cookie
 is distinct, Secure/HttpOnly/SameSite=Lax and scoped to `/identity`, disappears
 on proof/cancel, and is not an authenticated session. Challenges expire within
-two minutes by default; replacement, successful/failed verification and cancel
+two minutes by default on both wall and monotonic clocks, including continuous
+mode; replacement, successful/failed verification and cancel
 consume them. Verification rechecks expiry after a slow key check. Restart
 forgets outstanding challenges. Pools and peer bootstrap requests are bounded;
 raw forwarding headers cannot bypass the app's transport-peer throttle.
@@ -102,8 +110,9 @@ is offered.
 Offline implementation/review/checkpoint does not perform these actions:
 
 1. Approve installing the identified proof-only release, public profile and
-   separate temporary unit/layout and dynamic-user isolation, the
-   narrowly scoped proxy change and start/stop window under the stated budget
+   separate unit/layout and dynamic-user isolation, the narrowly scoped proxy
+   change and bounded or continuous availability under the stated budget.
+   Continuous availability does not approve any reviewer, Mail or agent grant
 2. Owner performs Google sign-in/consent in their browser for identity data to
    Google and the exact approved review origin; no model handles raw credentials
 3. Approve the resulting exact subject/client reviewer allowlist grant after

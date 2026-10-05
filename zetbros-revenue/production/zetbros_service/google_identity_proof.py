@@ -45,7 +45,8 @@ class IdentityProofProfile(StrictModel):
     challenge_seconds: Annotated[int, Field(ge=60, le=180)] = 120
     max_challenges: Annotated[int, Field(ge=1, le=32)] = 16
     bootstrap_per_peer_per_minute: Annotated[int, Field(ge=1, le=8)] = 4
-    capture_window_seconds: Annotated[int, Field(ge=60, le=600)] = 600
+    # None explicitly opts into continuous page availability, not authority.
+    capture_window_seconds: Annotated[int, Field(ge=60, le=600)] | None = 600
     jwks_url: Literal['https://www.googleapis.com/oauth2/v3/certs'] = GOOGLE_JWKS_URL
 
     @model_validator(mode='after')
@@ -66,6 +67,8 @@ class ProofChallenge:
     csrf: str
     issued: int
     expires: int
+    issued_monotonic: float
+    expires_monotonic: float
 
 
 class IdentityProof:
@@ -90,15 +93,22 @@ class IdentityProof:
             raise AuthenticationError()
         return hashlib.sha256(value.encode('ascii')).hexdigest()
 
+    def challenge_current(self, challenge):
+        return (challenge.issued <= int(self.clock()) < challenge.expires
+                and challenge.issued_monotonic <= self.monotonic() < challenge.expires_monotonic)
+
     def prune(self):
-        now = int(self.clock())
         self.challenges = {key: value for key, value in self.challenges.items()
-                           if value.issued <= now < value.expires}
+                           if self.challenge_current(value)}
 
     def require_window(self):
-        if (self.window_closed
-                or not self.started <= int(self.clock()) < self.started + self.profile.capture_window_seconds
-                or not 0 <= self.monotonic() - self.started_monotonic < self.profile.capture_window_seconds):
+        if self.window_closed:
+            raise AuthenticationError()
+        seconds = self.profile.capture_window_seconds
+        if seconds is None:
+            return
+        if (not self.started <= int(self.clock()) < self.started + seconds
+                or not 0 <= self.monotonic() - self.started_monotonic < seconds):
             self.window_closed = True  # Clock correction cannot reopen a closed capture.
             raise AuthenticationError()
 
@@ -121,7 +131,9 @@ class IdentityProof:
                 raise AuthenticationError()
             cookie, nonce, csrf = (secrets.token_urlsafe(32) for _ in range(3))
             now = int(self.clock())
-            self.challenges[self.key(cookie)] = ProofChallenge(nonce, csrf, now, now + self.profile.challenge_seconds)
+            elapsed = self.monotonic()
+            self.challenges[self.key(cookie)] = ProofChallenge(nonce, csrf, now,
+                now + self.profile.challenge_seconds, elapsed, elapsed + self.profile.challenge_seconds)
             return cookie, nonce, csrf
 
     def consume(self, cookie, csrf):
@@ -141,7 +153,7 @@ class IdentityProof:
         # No claims or token retained, and no role/allowlist/session side effect.
         subject = self.verifier.verify_identity(credential, challenge.nonce)
         self.require_window()
-        if not challenge.issued <= int(self.clock()) < challenge.expires:
+        if not self.challenge_current(challenge):
             raise AuthenticationError()
         return subject
 
