@@ -1,5 +1,9 @@
 # Mail owner integration: offline exact-preview candidate
 
+This is the historical owner-interface checkpoint. The current runnable pilot
+code and exact remaining setup requirements are in
+[PILOT_RUNTIME.md](PILOT_RUNTIME.md); shipped configuration remains disabled.
+
 This increment inspects the supplied Mail 0.1.2 interface and integrates our own
 control code with its read-only selected-mailbox shape. **Configured production
 still uses `SnapshotSource` and `DisabledTransport`. No setting activates this

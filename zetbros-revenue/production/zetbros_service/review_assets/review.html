@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en" data-review-origin="REVIEW_ORIGIN_PIN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Zetbros human review</title>
+  <link rel="stylesheet" href="/review/assets/review.css">
+  <script src="/review/assets/review.js" defer></script>
+</head>
+<body>
+<main>
+  <header><p class="eyebrow">Zetbros · Human review</p><h1>Review the exact reply</h1></header>
+  <p class="notice">DELIVERY_NOTICE</p>
+  <section aria-labelledby="session-title">
+    <h2 id="session-title">Reviewer session</h2>
+    <form id="session-form" autocomplete="off">
+      <label for="reviewer-token">Existing reviewer bearer token</label>
+      <input id="reviewer-token" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="16377" required>
+      <p class="help">Use an existing reviewer access token. It stays in this page's memory and is cleared on Cancel or Log out. No token is issued here.</p>
+      <button id="unlock" type="submit">Use reviewer token</button>
+      <button id="logout" type="button">Log out</button>
+    </form>
+  </section>
+  <section aria-labelledby="proposal-title">
+    <h2 id="proposal-title">Proposal</h2>
+    <form id="proposal-form" autocomplete="off">
+      <label for="proposal-id">Proposal ID</label>
+      <input id="proposal-id" type="text" maxlength="36" autocomplete="off" spellcheck="false" autocapitalize="none" required>
+      <div class="buttons"><button id="load" type="submit" disabled>Load exact preview</button><button id="cancel" type="button">Cancel and clear session</button></div>
+    </form>
+  </section>
+  <p id="status" role="status" aria-live="polite">Enter a reviewer token, then load a proposal.</p>
+  <section id="preview" aria-labelledby="preview-title" hidden>
+    <h2 id="preview-title">Stored preview</h2>
+    <dl id="identity"></dl>
+    <h3>Exact reply body</h3><pre id="reply-body" class="mail-text"></pre>
+    <h3>Full bound action (JSON)</h3><pre id="action"></pre>
+    <div id="wire-section" hidden><h3>Full exact-wire preview (JSON)</h3><pre id="wire"></pre><h3>Exact wire-preview body</h3><pre id="wire-body" class="mail-text"></pre></div>
+    <h3>Current ledger state (JSON)</h3><pre id="ledger"></pre>
+    <p class="help">JSON also shows escaped tabs, line endings, and trailing whitespace. Approval uses the complete review digest displayed above, binding the required full exact-wire preview. Action-only ledgers cannot be reviewed here.</p>
+    <label class="confirmation"><input id="confirm-preview" type="checkbox"> I checked the source identity, sender, recipient, full body, action, and complete review digest.</label>
+    <div class="buttons"><button id="approve" type="button" disabled>Approve this exact preview</button><button id="deny" type="button" disabled>Deny this exact preview</button></div>
+  </section>
+  <noscript>JavaScript is required. No decision can be made from this page without it.</noscript>
+</main>
+</body>
+</html>

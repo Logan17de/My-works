@@ -5,17 +5,16 @@ single-host deployment and one support-mail reply workflow. This is separate
 from the existing offline proof. It is not a universal gateway or a hosted
 multi-tenant product.
 
-**Live outbound delivery is disabled in code. Buyer production release is
-blocked until the reviewed live Mail bridge, existing customer identity
-configuration, approved deployment, and release acceptance are available.**
-No environment switch enables sending. The supplied Mail source has now been inspected and an offline exact-preview
-integration candidate is documented in [MAIL_OWNER_INTEGRATION.md](MAIL_OWNER_INTEGRATION.md).
-No real mailbox, provider credential, customer deployment, live model/client
-integration or real delivery was accessed or tested.
+**Shipped configuration remains non-sending.** The reviewed pilot runtime now
+includes our own live-capable session factory and human exact-preview interface,
+but requires explicit operator configuration and protected existing credentials.
+No real provider, identity deployment, customer-host setup or delivery was tested.
+See [PILOT_RUNTIME.md](PILOT_RUNTIME.md) for the runnable code, resource sample,
+review flows and specific setup approvals still required.
 
-The next dormant phase-transport increment is documented in
-[PRIVATE_WIRE_BRIDGE.md](PRIVATE_WIRE_BRIDGE.md), including validated disabled
-profiles and the concrete owner-host setup needed for live integration.
+The earlier offline checkpoints remain documented in
+[MAIL_OWNER_INTEGRATION.md](MAIL_OWNER_INTEGRATION.md) and
+[PRIVATE_WIRE_BRIDGE.md](PRIVATE_WIRE_BRIDGE.md).
 
 ## Run and verify
 
@@ -38,9 +37,11 @@ system configuration changed in a customer environment.
 For a customer-controlled, private evaluation, review `deploy/config.example.json`
 and supply the existing issuer's trusted **public** JWKS and explicit existing
 agent/reviewer subject/client mappings. The placeholders are not usable login
-credentials. This service has no token issuer, password login, default key,
-fixture secret, OAuth-grant creation, or provider-credential lookup. Missing or
-invalid config/JWKS/source directory prevents startup.
+credentials. The base staged service has no token issuer, password login,
+default key, fixture secret, OAuth-grant creation or provider-credential lookup.
+The optional pilot uses an operator-approved systemd credential source, described
+in [PILOT_RUNTIME.md](PILOT_RUNTIME.md). Missing or invalid required config/JWKS/
+source or ledger paths prevent startup.
 
 Create an existing approved local durable-volume directory for the database and
 mount the customer-staged source directory read-only. With approved data and
@@ -79,7 +80,7 @@ is a separate operator action, not performed here. There is no public deployment
    event commit in one transaction. The worker rechecks configured identities,
    policy, current source fingerprint, issuance, expiry and revocation. A required
    preflight failure makes zero adapter calls and does not consume approval.
-5. This release records `blocked / delivery_disabled` durably. In controlled
+5. With shipped disabled settings, this workflow records `blocked / delivery_disabled` durably. In controlled
    adapter tests only, a successful claim atomically consumes approval, fences
    the execution and records its audit before invoking the test adapter. No DB
    transaction stays open during invocation. Results survive restart.
@@ -114,8 +115,11 @@ Existing tokens for removed mappings lose access after that reviewed restart.
 Agent and reviewer client ID sets must be disjoint; the same human subject may
 use distinct separately configured clients without upgrading the agent client.
 
-This is a Bearer-only JSON API, with no browser review UI, cookies or CORS flow.
-Browser Origin requests and tokens in URLs are refused. No MCP interface or
+The base `/v1` surface is a Bearer-only JSON API with no cookies or CORS flow.
+Browser Origin requests and tokens in URLs are refused there. The optional pinned-
+origin `/review` interface uses the same existing reviewer identities and full
+composite preview, as described in [PILOT_RUNTIME.md](PILOT_RUNTIME.md).
+No MCP interface or
 multi-client compatibility is claimed. A future remote MCP adapter needs its
 own OAuth resource/audience and client acceptance tests.
 

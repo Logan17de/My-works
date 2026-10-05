@@ -40,10 +40,31 @@ class Settings(StrictModel):
     token_client_claim: Literal["azp", "client_id"] = "azp"
     token_header_type: Literal["at+jwt", "JWT"] = "at+jwt"
     deployment_profile: Literal["single_host_local_volume"] = "single_host_local_volume"
-    outbound_adapter: Literal["disabled"] = "disabled"
-    source_adapter: Literal["customer_staged_snapshot"] = "customer_staged_snapshot"
+    outbound_adapter: Literal["disabled", "private_spacemail"] = "disabled"
+    source_adapter: Literal["customer_staged_snapshot", "private_spacemail"] = "customer_staged_snapshot"
+    private_bridge_profile_file: str | None = None
+    review_origin: str | None = None
 
     _sender = field_validator("sender_address")(address)
+
+    @field_validator("private_bridge_profile_file")
+    @classmethod
+    def optional_profile_path(cls, value):
+        if value is not None and (not Path(value).is_absolute() or "\x00" in value):
+            raise ValueError("private profile path must be absolute")
+        return value
+
+    @field_validator("review_origin")
+    @classmethod
+    def fixed_review_origin(cls, value):
+        if value is None: return value
+        parsed = urlsplit(value)
+        if (parsed.scheme not in ("https", "http") or not parsed.hostname or parsed.username or parsed.password
+                or parsed.path or parsed.query or parsed.fragment or value.endswith("/")):
+            raise ValueError("exact reviewer origin required")
+        if parsed.scheme == "http" and parsed.hostname not in ("127.0.0.1", "localhost", "::1"):
+            raise ValueError("reviewer HTTP is permitted only on loopback")
+        return value
 
     @field_validator("issuer")
     @classmethod
@@ -62,6 +83,10 @@ class Settings(StrictModel):
 
     @model_validator(mode="after")
     def separate_principals(self) -> "Settings":
+        live_source = self.source_adapter == "private_spacemail"
+        live_transport = self.outbound_adapter == "private_spacemail"
+        if live_source != live_transport or (live_source and (self.private_bridge_profile_file is None or self.review_origin is None)):
+            raise ValueError("explicit paired private adapters, profile and reviewer origin required")
         keys = [(g.subject, g.client_id) for g in self.principals]
         if not keys or len(keys) != len(set(keys)) or {g.role for g in self.principals} != {"agent", "reviewer"}:
             raise ValueError("distinct configured agent and reviewer principal/client pairs required")

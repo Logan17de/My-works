@@ -1,0 +1,42 @@
+# PROPOSED STAGING UNIT ONLY. Not installed, enabled or approved for live use.
+[Unit]
+Description=Zetbros single-customer reviewed-reply pilot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zetbros-pilot
+Group=zetbros-pilot
+WorkingDirectory=/srv/zetbros/pilot/production
+Environment=ZETBROS_CONFIG_FILE=/srv/zetbros/pilot/config/service.json
+Environment=MALLOC_ARENA_MAX=2
+LoadCredential=spacemail-password:/etc/zetbros/pilot/spacemail-password
+ExecStart=/srv/zetbros/pilot/venv/bin/python -m uvicorn zetbros_service.pilot_runtime:configured_pilot_app --factory --host 127.0.0.1 --port 8081 --workers 1 --no-access-log --limit-concurrency 8 --timeout-keep-alive 5 --timeout-graceful-shutdown 30
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+UMask=0077
+MemoryHigh=96M
+MemoryMax=128M
+MemorySwapMax=0
+CPUQuota=25%
+TasksMax=32
+LimitNOFILE=128
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/srv/zetbros/pilot/state
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

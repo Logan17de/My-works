@@ -1,5 +1,9 @@
 # Private exact-wire bridge: dormant protocol implementation
 
+This is the historical protocol checkpoint. The later
+[PILOT_RUNTIME.md](PILOT_RUNTIME.md) adds our own live-capable factory and human
+review interface, with dormant shipped defaults and live setup still unperformed.
+
 This increment adds our own stdlib-shaped SMTP/IMAP phase bridge on top of the
 approved-byte ledger candidate. It neither imports nor redistributes the
 supplied Mail implementation. It is disabled by default, has no real session

@@ -165,13 +165,18 @@ class MailService(Service):
 
     def read_source(self, source_id):
         result = super().read_source(source_id)
-        result["source_kind"] = "owner_mail_interface_offline_candidate"
+        result["source_kind"] = ("operator_configured_private_mail" if self.settings.source_adapter == "private_spacemail"
+                                 else "owner_mail_interface_offline_candidate")
         return result
 
     def readiness(self):
         result = super().readiness()
         result["source"] = "owner_mail_interface_offline_candidate"
         result["owner_account_attestation"] = "unverified"
+        if self.settings.outbound_adapter == "private_spacemail":
+            result["source"] = "operator_configured_private_mail"
+            result["delivery"] = "operator_configured_pilot_unverified"
+            result["live_delivery_ready"] = False
         return result
 
     async def worker_once(self, stop=None):
@@ -184,7 +189,7 @@ class MailService(Service):
             current = self.store.get(proposal_id)
             source_fingerprint = None
             try:
-                source_fingerprint = digest(self.source.get(current["payload"]["source_id"]))
+                source_fingerprint = digest(await asyncio.to_thread(self.source.get, current["payload"]["source_id"]))
             except SourceUnavailable:
                 pass
             claimed = self.store.claim(proposal_id, source_fingerprint, bool(port is not None and port.enabled), request_id)
@@ -193,10 +198,14 @@ class MailService(Service):
             action, token = claimed
             preflight_error = "source_revalidation_failed"
             try:
-                fresh = self.source.get(action.source_id)
+                fresh = await asyncio.to_thread(self.source.get, action.source_id)
                 prepared = prepare_reply(self.source.binding, action, fresh, now=int(self.clock()))
                 preflight_error = "submission_gate_refused"
                 self.store.submission_gate(proposal_id, token, prepared, request_id, "pre_submit")
+            except asyncio.CancelledError:
+                result = TransportResult(submission="rejected", sent_copy="not_attempted", error_class="source_revalidation_failed")
+                self.store.finish(proposal_id, token, result.model_dump(mode="json"), request_id)
+                raise
             except Exception:
                 # No port invocation occurred. Approval remains consumed and
                 # execution terminal: a later source repair cannot permit retry.

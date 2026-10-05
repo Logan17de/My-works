@@ -1,0 +1,38 @@
+{
+  "tenant_id": "REPLACE_CUSTOMER_ID",
+  "connector_id": "REPLACE_CONNECTOR_ID",
+  "account_id": "REPLACE_CUSTOMER_ACCOUNT_ID",
+  "sender_address": "support@example.invalid",
+  "policy_version": "support-reply-v1",
+  "issuer": "https://identity.example.invalid",
+  "audience": "REPLACE_EXISTING_ACCESS_TOKEN_AUDIENCE",
+  "jwks_file": "/srv/zetbros/pilot/config/public-jwks.json",
+  "database_path": "/srv/zetbros/pilot/state/state.sqlite3",
+  "source_directory": "/srv/zetbros/pilot/sources",
+  "principals": [
+    {
+      "subject": "REPLACE_EXISTING_AGENT_SUBJECT",
+      "client_id": "REPLACE_EXISTING_AGENT_CLIENT",
+      "role": "agent"
+    },
+    {
+      "subject": "REPLACE_EXISTING_HUMAN_SUBJECT",
+      "client_id": "REPLACE_EXISTING_REVIEW_CLIENT",
+      "role": "reviewer"
+    }
+  ],
+  "token_client_claim": "azp",
+  "token_header_type": "at+jwt",
+  "deployment_profile": "single_host_local_volume",
+  "source_adapter": "customer_staged_snapshot",
+  "outbound_adapter": "disabled",
+  "proposal_ttl_seconds": 600,
+  "approval_ttl_seconds": 300,
+  "claim_timeout_seconds": 60,
+  "adapter_timeout_seconds": 20,
+  "token_max_lifetime_seconds": 900,
+  "requests_per_minute": 60,
+  "max_database_bytes": 1073741824,
+  "private_bridge_profile_file": "/srv/zetbros/pilot/config/private-bridge-profile.json",
+  "review_origin": "http://127.0.0.1:8081"
+}

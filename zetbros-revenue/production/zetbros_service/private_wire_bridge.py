@@ -38,7 +38,7 @@ class PrivateBridgeProfile(StrictModel):
     total_timeout_seconds: Annotated[int, Field(ge=1, le=15)] = 10
     phase_timeout_seconds: Annotated[int, Field(ge=1, le=5)] = 3
     deployment_profile: Literal["single_customer_single_host"] = "single_customer_single_host"
-    outbound: Literal["disabled"] = "disabled"
+    outbound: Literal["disabled", "owner_approved_live"] = "disabled"
 
     _mailbox = field_validator("mailbox_address")(address)
 
@@ -297,9 +297,12 @@ class PrivatePreparedWireTransport:
         self.clock, self.monotonic, self.copy_enabled = clock, monotonic, sent_copy
         if type(offline_test_mode) is not bool or type(sent_copy) is not bool:
             raise ValueError("strict offline options required")
-        if offline_test_mode and getattr(factory, "offline_only", None) is not True:
+        if offline_test_mode and (self.profile.outbound != "disabled" or getattr(factory, "offline_only", None) is not True):
             raise ValueError("only an explicitly offline fake factory may exercise this release")
-        self.enabled = offline_test_mode
+        live = self.profile.outbound == "owner_approved_live"
+        if live and getattr(factory, "offline_only", None) is not False:
+            raise ValueError("operator live profile requires its private live factory")
+        self.enabled = offline_test_mode or live
 
     async def submit_prepared(self, prepared, before_body):
         if not self.enabled:

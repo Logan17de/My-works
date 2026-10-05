@@ -1,0 +1,38 @@
+[
+  {
+    "after_rss_kib": 57896,
+    "cloud_sample_not_target_host_or_cgroup_acceptance": true,
+    "event_loop_ipc": "standard local asyncio wakeup socketpair only",
+    "listener_sockets": "not_opened",
+    "peak_rss_kib": 57896,
+    "proposed_memory_high_kib": 98304,
+    "proposed_memory_max_kib": 131072,
+    "provider_connections": "not_performed",
+    "real_credentials": "not_read",
+    "sample": "one separate cloud Python process,8 concurrent ASGI proposal requests then8 fake SMTP/IMAP operations",
+    "sampled_peak_threads_including_benchmark_callers": 23,
+    "seconds": 0.349,
+    "startup_rss_kib": 52032,
+    "under_memory_high": true,
+    "under_memory_max": true,
+    "under_tasks_max_32": true
+  },
+  {
+    "after_rss_kib": 57124,
+    "cloud_sample_not_target_host_or_cgroup_acceptance": true,
+    "event_loop_ipc": "standard local asyncio wakeup socketpair only",
+    "listener_sockets": "not_opened",
+    "peak_rss_kib": 57124,
+    "proposed_memory_high_kib": 98304,
+    "proposed_memory_max_kib": 131072,
+    "provider_connections": "not_performed",
+    "real_credentials": "not_read",
+    "sample": "one separate cloud Python process,8 concurrent ASGI proposal requests then8 fake SMTP/IMAP operations",
+    "sampled_peak_threads_including_benchmark_callers": 21,
+    "seconds": 0.347,
+    "startup_rss_kib": 52080,
+    "under_memory_high": true,
+    "under_memory_max": true,
+    "under_tasks_max_32": true
+  }
+]

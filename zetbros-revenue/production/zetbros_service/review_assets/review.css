@@ -1,0 +1,25 @@
+:root { color-scheme: light; font-family: system-ui, sans-serif; color: #17283b; background: #edf2f7; }
+body { margin: 0; }
+main { max-width: 880px; margin: 0 auto; padding: 32px 20px 64px; }
+h1 { font-size: 2rem; margin: 8px 0 18px; }
+h2 { font-size: 1.25rem; margin: 0 0 16px; }
+h3 { font-size: 1rem; margin-top: 24px; }
+.eyebrow { font-size: .85rem; font-weight: 650; letter-spacing: .06em; color: #365573; }
+section { padding: 24px; margin: 20px 0; background: white; border: 1px solid #c9d4e0; border-radius: 8px; }
+.notice { padding: 16px; border-left: 4px solid #975b00; background: #fff4dc; line-height: 1.6; }
+label { display: block; font-weight: 600; margin: 12px 0 8px; }
+input[type="text"], input[type="password"] { box-sizing: border-box; width: 100%; padding: 11px; border: 1px solid #708499; border-radius: 4px; font: inherit; }
+.help { font-size: .9rem; color: #435870; line-height: 1.5; }
+button { padding: 11px 16px; margin: 4px 8px 4px 0; border-radius: 4px; border: 1px solid #254666; background: #254666; color: white; font: inherit; font-weight: 600; cursor: pointer; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+#deny, #logout, #cancel { background: white; color: #254666; }
+button:focus-visible, input:focus-visible { outline: 3px solid #007fc4; outline-offset: 3px; }
+#status { padding: 14px 16px; background: #e0ebf5; line-height: 1.6; overflow-wrap: anywhere; }
+pre { padding: 16px; border: 1px solid #d6dee6; background: #f5f7f9; white-space: pre-wrap; overflow-wrap: anywhere; font: .88rem/1.6 ui-monospace, monospace; tab-size: 4; }
+.mail-text { min-height: 40px; color: #17283b; }
+dl { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(0, 3fr); gap: 9px 16px; }
+dt { font-weight: 650; }
+dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.confirmation { font-weight: 500; line-height: 1.6; }
+[hidden] { display: none !important; }
+@media (max-width: 540px) { main { padding: 20px 12px 40px; } section { padding: 18px; } dl { grid-template-columns: 1fr; gap: 5px; } dd { margin-bottom: 10px; } }

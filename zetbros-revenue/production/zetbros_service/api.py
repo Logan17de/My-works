@@ -24,6 +24,8 @@ MAX_BODY = 32768
 def create_app(service: Service, *, run_worker: bool = True) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app):
+        import anyio
+        anyio.to_thread.current_default_thread_limiter().total_tokens = 4
         stop = asyncio.Event()
         task = asyncio.create_task(service.worker_loop(stop)) if run_worker else None
         yield
@@ -148,9 +150,13 @@ def create_app(service: Service, *, run_worker: bool = True) -> FastAPI:
             raise StoreError("reviewer_required",403)
         return {"events":service.store.audit(after)}
 
+    if service.settings.review_origin is not None:
+        from .review_ui import install_review_ui
+        install_review_ui(app, service, service.settings.review_origin)
     return app
 
 
 def configured_app() -> FastAPI:
     # No developer auth, token creation, credentials or live transport startup.
-    return create_app(Service(load_settings()))
+    from .pilot_runtime import build_service
+    return create_app(build_service(load_settings()))
