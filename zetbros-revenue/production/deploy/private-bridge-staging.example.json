@@ -1,0 +1,18 @@
+{
+  "status": "review_only_not_an_executable_deployment",
+  "customer_profile": "one_customer_one_account_one_process_one_local_ledger",
+  "api_bind": "127.0.0.1",
+  "api_port": 8081,
+  "workers": 1,
+  "service_configuration": "/srv/zetbros/REPLACE_CUSTOMER/config/service.json",
+  "private_bridge_profile": "/srv/zetbros/REPLACE_CUSTOMER/config/private-bridge-profile.json",
+  "public_jwks": "/srv/zetbros/REPLACE_CUSTOMER/config/public-jwks.json",
+  "ledger": "/srv/zetbros/REPLACE_CUSTOMER/data/state.sqlite3",
+  "factory_requirement": "owner_supplied_reviewed_private_session_factory_using_existing_protected_credentials",
+  "authentication": "existing_distinct_agent_and_human_reviewer_subject_client_pairs",
+  "remote_exposure": "existing_approved_https_boundary_only",
+  "source_factory": "not_configured",
+  "outbound_factory": "disabled",
+  "ledger_migration": "not_available_do_not_initialize_over_an_existing_deployment",
+  "customer_environment_changes": "not_performed"
+}

@@ -13,6 +13,10 @@ integration candidate is documented in [MAIL_OWNER_INTEGRATION.md](MAIL_OWNER_IN
 No real mailbox, provider credential, customer deployment, live model/client
 integration or real delivery was accessed or tested.
 
+The next dormant phase-transport increment is documented in
+[PRIVATE_WIRE_BRIDGE.md](PRIVATE_WIRE_BRIDGE.md), including validated disabled
+profiles and the concrete owner-host setup needed for live integration.
+
 ## Run and verify
 
 Python 3.12 is the tested runtime. From this directory:

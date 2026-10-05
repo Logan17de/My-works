@@ -1,0 +1,25 @@
+{
+  "binding": {
+    "tenant_id": "REPLACE_CUSTOMER_ID",
+    "connector_id": "REPLACE_CONNECTOR_ID",
+    "account_id": "REPLACE_ACCOUNT_ID",
+    "sender_address": "support@example.invalid",
+    "policy_version": "support-reply-v1"
+  },
+  "mailbox_address": "support@example.invalid",
+  "approved_aliases": [],
+  "endpoints": {
+    "host": "mail.spacemail.com",
+    "imap_port": 993,
+    "smtp_port": 465,
+    "security": "implicit_tls_verified",
+    "inbox": "INBOX",
+    "operation_timeout_seconds": 10,
+    "source_byte_limit": 65536
+  },
+  "sent_folder": "Sent",
+  "total_timeout_seconds": 10,
+  "phase_timeout_seconds": 3,
+  "deployment_profile": "single_customer_single_host",
+  "outbound": "disabled"
+}

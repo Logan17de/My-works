@@ -70,7 +70,7 @@ class MailStore(Store):
                     or any(getattr(preview, key) != getattr(action, key) for key in
                            ("source_id", "source_version", "source_fingerprint", "sender", "to", "subject", "body"))):
                 raise ValueError
-            return PreparedReply(preview, wire)
+            return PreparedReply(preview, wire, action)
         except Exception:
             raise StoreError("wire_preview_invalid") from None
 
@@ -148,6 +148,14 @@ class MailService(Service):
         for key in ("tenant_id", "connector_id", "account_id", "sender_address", "policy_version"):
             if getattr(source.binding, key) != getattr(settings, key):
                 raise RuntimeError("owner interface deployment binding mismatch")
+        if getattr(prepared_transport, "profile", None) is not None:
+            from .private_wire_bridge import PrivateBridgeProfile, strict_revalidate
+            profile = strict_revalidate(prepared_transport.profile, PrivateBridgeProfile)
+            if profile.binding != source.binding:
+                raise RuntimeError("private transport deployment binding mismatch")
+            source_profile = getattr(source.owner, "profile", None)
+            if source_profile is not None and strict_revalidate(source_profile, PrivateBridgeProfile) != profile:
+                raise RuntimeError("private read/transport account profile mismatch")
         self.settings, self.clock = settings, clock
         self.verifier = Verifier(settings)
         self.source, self.transport = source, DisabledTransport()
@@ -226,5 +234,5 @@ class MailService(Service):
             except Exception:
                 result = TransportResult(submission="uncertain", sent_copy="unknown", error_class="adapter_exception")
             self.store.finish(proposal_id, token, result.model_dump(mode="json"), request_id)
-            if cancellation:
+            if cancellation or (asyncio.current_task() is not None and asyncio.current_task().cancelling()):
                 raise asyncio.CancelledError()

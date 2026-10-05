@@ -335,6 +335,7 @@ class WirePreview(StrictModel):
 class PreparedReply:
     preview: WirePreview
     wire: bytes
+    action: ReplyAction | None = None
 
     @property
     def preview_digest(self) -> str:
@@ -406,7 +407,7 @@ def prepare_reply(binding: ProviderBinding, action: ReplyAction, fresh: SpaceMai
             source_version=fresh.version, sender=action.sender, to=action.to, subject=action.subject, body=action.body,
             message_id=message_id, in_reply_to=fresh.rfc_message_id, references=refs, date=date,
             wire_sha256=hashlib.sha256(wire).hexdigest())
-        return PreparedReply(preview, wire)
+        return PreparedReply(preview, wire, action)
     except Exception:
         raise ContractError("reply_preparation_refused") from None
 

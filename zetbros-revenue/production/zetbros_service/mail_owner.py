@@ -54,6 +54,11 @@ class OwnerMailSource:
     The injected port's secure account binding is not proven by this class.
     """
     def __init__(self, binding: ProviderBinding, owner: OwnerReadPort):
+        if getattr(owner, "profile", None) is not None:
+            from .private_wire_bridge import PrivateBridgeProfile, strict_revalidate
+            profile = strict_revalidate(owner.profile, PrivateBridgeProfile)
+            if profile.binding != binding:
+                raise ValueError("private read port deployment binding mismatch")
         self.binding, self.owner = binding, owner
 
     def ready(self) -> bool:

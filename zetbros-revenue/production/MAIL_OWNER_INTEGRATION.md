@@ -105,6 +105,14 @@ The final socket-free runner passes 109 tests: 29 new integration tests and
 was not rerun after the last small review fixes. Both evidence snapshots remain
 separate, with source hashes. Compile checks and whitespace checks also pass.
 
+## Later private-bridge checkpoint
+
+Our own stdlib-shaped phase bridge now implements exact-wire SMTP sequencing,
+prebody approval fencing, watchdog/cancellation and Sent-copy handling with fake
+sessions. See [PRIVATE_WIRE_BRIDGE.md](PRIVATE_WIRE_BRIDGE.md). It remains dormant;
+no real authenticated session factory or deployment is present. The 109-test
+owner-integration evidence above is preserved as its historical checkpoint.
+
 ## Remaining live release gates
 
 1. Owner-controlled credential/account/endpoint attestation and a secure private
