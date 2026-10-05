@@ -97,7 +97,8 @@ class GoogleIdTokenVerifier:
             except Exception:
                 raise AuthenticationError() from None
 
-    def verify_login(self, credential, nonce):
+    def verify_identity(self, credential, nonce):
+        """Cryptographic identity proof only; this method grants no role/session."""
         try:
             if type(credential) is not str or not 1 <= len(credential) <= 8192: raise ValueError
             header = jwt.get_unverified_header(credential)
@@ -110,7 +111,8 @@ class GoogleIdTokenVerifier:
                 options={'require':['iss','aud','sub','exp','iat','nonce']})
             now = int(self.clock())
             if (claims['aud'] != self.profile.client_id or type(claims['aud']) is not str
-                    or type(claims['sub']) is not str or claims['sub'] not in self.profile.reviewer_subjects
+                    or type(claims['sub']) is not str or not claims['sub'].isascii()
+                    or not re.fullmatch(r'[^\x00-\x20\x7f@]{1,255}',claims['sub'])
                     or type(claims['exp']) is not int or type(claims['iat']) is not int
                     or not claims['iat'] <= now < claims['exp'] or not 0 < claims['exp']-claims['iat'] <= 3600
                     or claims.get('azp',self.profile.client_id) != self.profile.client_id
@@ -119,6 +121,13 @@ class GoogleIdTokenVerifier:
             return claims['sub']
         except Exception:
             raise AuthenticationError() from None
+
+    def verify_login(self, credential, nonce):
+        # Review authority stays fail-closed and separate from identity capture.
+        subject = self.verify_identity(credential, nonce)
+        if subject not in self.profile.reviewer_subjects:
+            raise AuthenticationError()
+        return subject
 
 
 @dataclass(frozen=True)
@@ -188,7 +197,9 @@ class GoogleReviewerAuth:
         key=self.key(challenge_cookie)
         with self.lock:
             self.prune();challenge=self.challenges.pop(key,None)
-        if challenge is None or type(csrf) is not str or not hmac.compare_digest(challenge.csrf,csrf):
+        if (challenge is None or type(csrf) is not str
+                or not re.fullmatch(r'[A-Za-z0-9_-]{43}',csrf)
+                or not hmac.compare_digest(challenge.csrf,csrf)):
             raise AuthenticationError()
         sub=self.id_tokens.verify_login(credential,challenge.nonce)
         actor=Principal(sub,self.profile.client_id,'reviewer')
@@ -208,7 +219,8 @@ class GoogleReviewerAuth:
             self.prune();session=self.sessions.get(key)
         if session is None or self.settings.role(session.actor.subject,session.actor.client_id)!='reviewer':
             raise AuthenticationError()
-        if csrf is not None and (type(csrf) is not str or not hmac.compare_digest(session.csrf,csrf)):
+        if csrf is not None and (type(csrf) is not str or not re.fullmatch(r'[A-Za-z0-9_-]{43}',csrf)
+                                or not hmac.compare_digest(session.csrf,csrf)):
             raise AuthenticationError()
         return session
 

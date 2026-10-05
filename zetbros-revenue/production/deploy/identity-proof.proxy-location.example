@@ -1,0 +1,27 @@
+# PROPOSAL ONLY: insert into the already approved HTTPS server after approval.
+# Only the identity page/assets/POST proof traffic moves to separate loopback 8082.
+# Keep the current /review, /v1 and default holding-503 configuration unchanged.
+location = /identity {
+    proxy_pass http://127.0.0.1:8082;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_connect_timeout 2s;
+    proxy_send_timeout 5s;
+    proxy_read_timeout 8s;
+    client_max_body_size 16k;
+}
+location ^~ /identity/ {
+    proxy_pass http://127.0.0.1:8082;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_connect_timeout 2s;
+    proxy_send_timeout 5s;
+    proxy_read_timeout 8s;
+    client_max_body_size 16k;
+}
+# Before exposure: integrate verified shared limit_req/limit_conn zones and a
+# canonical review-origin server; do not log request bodies/ID tokens/subjects.
+# Uvicorn must trust only this loopback proxy's forwarding headers. Do not broaden
+# forwarded-allow-ips to '*', enable public 8082, or copy incoming spoofed headers.

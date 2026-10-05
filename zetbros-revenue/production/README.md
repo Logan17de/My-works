@@ -12,7 +12,9 @@ walkthrough. No placeholder identity is permanently pinned.
 
 The dormant [Google reviewer login](GOOGLE_REVIEWER_LOGIN.md) now supports a
 dedicated identity-only sign-in and short reviewer sessions, with a separate
-agent access-token boundary. Actual public origin/client/subject configuration
+agent access-token boundary. A separate [identity-proof-only page](IDENTITY_PROOF_SETUP.md)
+now obtains a verified Google subject without enrollment or ledger/Mail authority.
+Actual public origin/client/subject configuration
 and deployed browser acceptance are still pending.
 
 The reviewed pilot runtime now

@@ -1,0 +1,26 @@
+{
+  "additional_independent_boundary_deadline_probes": 18,
+  "covered": [
+    "cryptographic_identity_separate_from_reviewer_allowlist",
+    "no_service_ledger_session_agent_Mail_or_enrollment_authority",
+    "exact_origin_CSFR_nonce_signature_audience_issuer_subject_and_times",
+    "replay_failed_cancel_and_stale_UI_requests",
+    "monotonic_capture_deadline_and_permanently_closed_window",
+    "malformed_CSFR_sanitized",
+    "isolated_DynamicUser_and_explicit_inaccessible_pilot_paths",
+    "separate_loopback_port_pinned_proxy_forwarding_and_no_auto_restart",
+    "proof_vs_owner_confirmed_enrollment_vs_agent_setup"
+  ],
+  "focused_socket_free_tests": 67,
+  "outcome": "no remaining blocking security findings",
+  "remaining_acceptance": [
+    "specific proof-only deployment and proxy approval",
+    "static-name-collision permissions resource and isolation host preflight",
+    "owner-performed actual Google sign-in/consent",
+    "actual browser HTTPS cookie CSP popup and proxy acceptance",
+    "specific captured-sub reviewer allowlist approval",
+    "separate actual agent identity resource/public keys before pilot"
+  ],
+  "review": "independent identity-proof-only implementation and deployment design",
+  "review_scope": "offline fake keys ASGI Node and static proposals; no real Google/provider/network/browser pixels/deployment"
+}

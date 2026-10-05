@@ -1,0 +1,14 @@
+{
+  "cloud_sample_not_target_host_acceptance": true,
+  "ledger_service_sessions_or_grants": "none",
+  "listener_sockets": "not_opened",
+  "peak_rss_kib": 51684,
+  "provider_connections": "not_performed",
+  "real_credentials": "not_read",
+  "sample": "mock signed Google identity proof then four concurrent ASGI shell/health callers",
+  "sampled_peak_threads": 10,
+  "startup_rss_kib": 51436,
+  "under_memory_high_64m": true,
+  "under_memory_max_80m": true,
+  "under_tasks_max_16": true
+}

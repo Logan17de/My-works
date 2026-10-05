@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en" data-origin="IDENTITY_ORIGIN_PIN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Zetbros · Google identity proof</title>
+  <link rel="stylesheet" href="/identity/assets/identity.css">
+  <script src="/identity/assets/identity.js" defer></script>
+</head>
+<body>
+<main>
+  <header><p class="eyebrow">Zetbros · Identity proof only</p><h1>Get your verified Google subject</h1></header>
+  <p class="notice">This page proves your Google account's immutable subject. It does not enroll your account or grant reviewer, mailbox, or agent access.</p>
+  <section aria-labelledby="proof-title">
+    <h2 id="proof-title">One-time identity proof</h2>
+    <p class="help">Start a new proof, then choose your Google account. The server verifies Google's signed response and a one-time challenge. Only the verified subject is shown here. No Google token is displayed or saved.</p>
+    <div class="buttons"><button id="start-proof" type="button">Start new proof</button><button id="cancel-proof" type="button" disabled>Cancel and clear</button></div>
+    <div id="google-button" class="google-sign-in" hidden></div>
+    <p id="proof-status" role="status" aria-live="polite">Start a proof when you're ready. This page grants no application authority.</p>
+  </section>
+  <section id="proof-result" aria-labelledby="result-title" hidden>
+    <h2 id="result-title">Verified immutable Google subject (sub)</h2>
+    <pre id="proof-subject" aria-label="Verified Google subject"></pre>
+    <p id="proof-authority">Authority: none</p>
+    <p class="help">This result is not a reviewer session or enrollment. Cancel, start a new proof, or leave this page to clear the displayed result.</p>
+  </section>
+  <noscript>JavaScript is required for identity verification. No application authority is granted by this page.</noscript>
+</main>
+</body>
+</html>

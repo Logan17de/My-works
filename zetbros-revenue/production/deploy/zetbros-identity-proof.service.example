@@ -1,0 +1,40 @@
+# PROPOSED TEMPORARY PROOF-ONLY SERVICE. Requires specific deployment approval.
+# Separate from the installed pilot; no ledger or provider credential access.
+[Unit]
+Description=Zetbros Google identity proof only
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+User=zetbros-proof
+WorkingDirectory=/srv/zetbros/identity-proof/current/production
+Environment=ZETBROS_IDENTITY_PROOF_CONFIG_FILE=/srv/zetbros/identity-proof/config/proof.json
+Environment=MALLOC_ARENA_MAX=2
+ExecStart=/srv/zetbros/identity-proof/venv/bin/python -m uvicorn zetbros_service.google_identity_proof:configured_identity_proof_app --factory --host 127.0.0.1 --port 8082 --workers 1 --proxy-headers --forwarded-allow-ips 127.0.0.1 --no-access-log --limit-concurrency 4 --timeout-keep-alive 5 --timeout-graceful-shutdown 15
+Restart=no
+RuntimeMaxSec=600
+TimeoutStopSec=20
+UMask=0077
+MemoryHigh=64M
+MemoryMax=80M
+MemorySwapMax=0
+CPUQuota=25%
+TasksMax=16
+LimitNOFILE=64
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+InaccessiblePaths=-/srv/zetbros/pilot -/etc/zetbros/pilot -/run/credentials
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+# No install target: approve/start a bounded capture window, then stop it.

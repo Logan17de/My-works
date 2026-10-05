@@ -8,6 +8,10 @@ authentication service, provider factory or worker. The new example
 `deploy/google-reviewer.disabled.example.json` has `enabled: false`, null client
 and origin, and an empty subject list; it cannot enable sign-in.
 
+The separate [identity-proof workflow](IDENTITY_PROOF_SETUP.md) now obtains an
+initial verified subject without reviewer access. The owner is not expected to
+supply an unknown subject manually; reviewer enrollment still needs approval.
+
 ## Exact owner configuration needed
 
 1. Choose the exact canonical HTTPS reviewer origin and its approved deployment

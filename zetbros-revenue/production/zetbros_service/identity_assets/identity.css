@@ -1,0 +1,19 @@
+:root { color-scheme: light; font-family: system-ui, sans-serif; color: #17283b; background: #edf2f7; }
+body { margin: 0; }
+main { max-width: 720px; margin: 0 auto; padding: 32px 20px 64px; }
+h1 { font-size: 2rem; margin: 8px 0 18px; }
+h2 { font-size: 1.25rem; margin: 0 0 16px; }
+.eyebrow { font-size: .85rem; font-weight: 650; letter-spacing: .06em; color: #365573; }
+section { padding: 24px; margin: 20px 0; background: white; border: 1px solid #c9d4e0; border-radius: 8px; }
+.notice { padding: 16px; border-left: 4px solid #975b00; background: #fff4dc; line-height: 1.6; }
+.help { font-size: .95rem; color: #435870; line-height: 1.6; }
+button { padding: 11px 16px; margin: 4px 8px 4px 0; border-radius: 4px; border: 1px solid #254666; background: #254666; color: white; font: inherit; font-weight: 600; cursor: pointer; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+#cancel-proof { background: white; color: #254666; }
+button:focus-visible { outline: 3px solid #007fc4; outline-offset: 3px; }
+.google-sign-in { min-height: 44px; margin: 16px 0; }
+#proof-status { padding: 14px 16px; background: #e0ebf5; line-height: 1.6; overflow-wrap: anywhere; }
+pre { padding: 16px; border: 1px solid #d6dee6; background: #f5f7f9; white-space: pre-wrap; overflow-wrap: anywhere; font: .95rem/1.6 ui-monospace, monospace; user-select: text; }
+#proof-authority { font-weight: 650; }
+[hidden] { display: none !important; }
+@media (max-width: 540px) { main { padding: 20px 12px 40px; } section { padding: 18px; } h1 { font-size: 1.7rem; } }
